@@ -1,0 +1,11 @@
+{
+  "name": "AREARNZONE",
+  "description": "A professional earning platform with membership systems, daily tasks, and referral bonuses.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

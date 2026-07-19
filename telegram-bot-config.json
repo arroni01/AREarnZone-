@@ -1,0 +1,17 @@
+{
+  "token": "8008225715:AAEcA2qivE4QE_55Za_GyUd7f31B0s-4FgE",
+  "username": "@AREarnZone_bot",
+  "channel": "https://t.me/arearnzone",
+  "smtpList": [
+    {
+      "user": "arearnzone1@gmail.com",
+      "pass": "vkligbjsedqebzqi",
+      "limit": 500
+    },
+    {
+      "user": "arearnzone2@gmail.com",
+      "pass": "Iwnbipzmpgtvpekg",
+      "limit": 500
+    }
+  ]
+}

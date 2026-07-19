@@ -1,0 +1,11 @@
+{
+  "registeredCodes": {
+    "AREZ-621113": {
+      "expectedPhone": "01326624555",
+      "timestamp": 1782462933890
+    }
+  },
+  "pendingCodes": {
+    "12345": "AREZ-621113"
+  }
+}

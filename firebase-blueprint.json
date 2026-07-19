@@ -1,0 +1,288 @@
+{
+  "entities": {
+    "GlobalConfig": {
+      "title": "Global Config",
+      "description": "Application settings and flags",
+      "type": "object",
+      "properties": {
+        "appName": { "type": "string" },
+        "maintenanceMode": { "type": "boolean" },
+        "defaultLanguage": { "type": "string" },
+        "cdnOptimization": { "type": "boolean" },
+        "systemNotice": { "type": "string" }
+      }
+    },
+    "User": {
+      "title": "User",
+      "description": "A user of the application",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "balance": { "type": "number" },
+        "role": { "type": "string" }
+      }
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Earn task description",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "reward": { "type": "number" }
+      }
+    },
+    "TaskSubmission": {
+      "title": "Task Submission",
+      "description": "User task completion proof submission",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "taskId": { "type": "string" },
+        "userId": { "type": "string" }
+      }
+    },
+    "WithdrawRequest": {
+      "title": "Withdraw Request",
+      "description": "A request by a user to withdraw money",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" }
+      }
+    },
+    "MembershipRequest": {
+      "title": "Membership Request",
+      "description": "Request to upgrade membership plan",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" }
+      }
+    },
+    "DepositRequest": {
+      "title": "Deposit Request",
+      "description": "A balance deposit request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" }
+      }
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "A financial transaction record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" }
+      }
+    },
+    "AdViewLog": {
+      "title": "Ad View Log",
+      "description": "A log of an ad view",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "adLink": { "type": "string" }
+      }
+    },
+    "WithdrawOption": {
+      "title": "Withdraw Option",
+      "description": "A withdrawal option",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      }
+    },
+    "PaymentMethod": {
+      "title": "Payment Method",
+      "description": "A deposit payment method",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      }
+    },
+    "MembershipPlan": {
+      "title": "Membership Plan",
+      "description": "An upgradeable membership plan",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      }
+    },
+    "SocialLink": {
+      "title": "Social Link",
+      "description": "A social link configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      }
+    },
+    "AppNotification": {
+      "title": "App Notification",
+      "description": "In-app system notification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      }
+    },
+    "SellCategory": {
+      "title": "Sell Category",
+      "description": "Digital assets store category",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      }
+    },
+    "SellItem": {
+      "title": "Sell Item",
+      "description": "Digital item for sale",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      }
+    },
+    "StoreOrder": {
+      "title": "Store Order",
+      "description": "An order of a store item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      }
+    },
+    "TelegramVerificationRequest": {
+      "title": "Telegram Verification Request",
+      "description": "Telegram account verification request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      }
+    },
+    "ReferralTarget": {
+      "title": "Referral Target",
+      "description": "Admin created referral targets for users or monitors",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "targetRole": { "type": "string" },
+        "periodType": { "type": "string" },
+        "referralGoal": { "type": "number" },
+        "bonusReward": { "type": "number" }
+      }
+    },
+    "TargetHistory": {
+      "title": "Target History",
+      "description": "User completed targets logs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "targetId": { "type": "string" },
+        "userId": { "type": "string" },
+        "referralsAchieved": { "type": "number" },
+        "bonusReward": { "type": "number" }
+      }
+    },
+    "GatewayLog": {
+      "title": "Gateway Log",
+      "description": "Gateway daily transaction stats and log records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "gatewayId": { "type": "string" },
+        "gatewayName": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "config": {
+      "schema": "GlobalConfig",
+      "description": "System config settings"
+    },
+    "users": {
+      "schema": "User",
+      "description": "User records"
+    },
+    "tasks": {
+      "schema": "Task",
+      "description": "Earning tasks list"
+    },
+    "submissions": {
+      "schema": "TaskSubmission",
+      "description": "User task completions"
+    },
+    "withdraws": {
+      "schema": "WithdrawRequest",
+      "description": "User withdraw requests"
+    },
+    "membershipRequests": {
+      "schema": "MembershipRequest",
+      "description": "User membership upgrade requests"
+    },
+    "depositRequests": {
+      "schema": "DepositRequest",
+      "description": "Deposit balance requests"
+    },
+    "transactions": {
+      "schema": "Transaction",
+      "description": "Accounting transaction logs"
+    },
+    "adViewLogs": {
+      "schema": "AdViewLog",
+      "description": "Sponsored ads view limits logging"
+    },
+    "withdrawOptions": {
+      "schema": "WithdrawOption",
+      "description": "Payout gateways list"
+    },
+    "paymentMethods": {
+      "schema": "PaymentMethod",
+      "description": "Receiving payment methods"
+    },
+    "membershipPlans": {
+      "schema": "MembershipPlan",
+      "description": "Upgraded tier levels"
+    },
+    "socialLinks": {
+      "schema": "SocialLink",
+      "description": "Official channels or URLs"
+    },
+    "appNotifications": {
+      "schema": "AppNotification",
+      "description": "System-wide broadcasts and notices"
+    },
+    "sellCategories": {
+      "schema": "SellCategory",
+      "description": "Store departments"
+    },
+    "sellItems": {
+      "schema": "SellItem",
+      "description": "Items listed for purchase"
+    },
+    "storeOrders": {
+      "schema": "StoreOrder",
+      "description": "Logged digital product orders"
+    },
+    "telegramRequests": {
+      "schema": "TelegramVerificationRequest",
+      "description": "Telegram verification logs"
+    },
+    "targets": {
+      "schema": "ReferralTarget",
+      "description": "Assigned referral targets"
+    },
+    "targetHistories": {
+      "schema": "TargetHistory",
+      "description": "Logs of completed targets"
+    },
+    "gatewayLogs": {
+      "schema": "GatewayLog",
+      "description": "Gateway daily transaction logs"
+    }
+  }
+}

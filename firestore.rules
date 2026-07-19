@@ -1,0 +1,142 @@
+// Security Rules for AREARNZONE
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128;
+    }
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global Config
+    match /config/{configId} {
+      allow read: if true;
+      allow write: if isValidId(configId);
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if isValidId(userId);
+    }
+
+    // Tasks
+    match /tasks/{taskId} {
+      allow read: if true;
+      allow write: if isValidId(taskId);
+    }
+
+    // Task submissions
+    match /submissions/{submissionId} {
+      allow read: if true;
+      allow write: if isValidId(submissionId);
+    }
+
+    // Withdraw requests
+    match /withdraws/{withdrawId} {
+      allow read: if true;
+      allow write: if isValidId(withdrawId);
+    }
+
+    // Membership upgrade requests
+    match /membershipRequests/{requestId} {
+      allow read: if true;
+      allow write: if isValidId(requestId);
+    }
+
+    // Deposit requests
+    match /depositRequests/{requestId} {
+      allow read: if true;
+      allow write: if isValidId(requestId);
+    }
+
+    // Financial transactions
+    match /transactions/{transactionId} {
+      allow read: if true;
+      allow write: if isValidId(transactionId);
+    }
+
+    // Ad View Logs
+    match /adViewLogs/{logId} {
+      allow read: if true;
+      allow write: if isValidId(logId);
+    }
+
+    // Withdraw Options
+    match /withdrawOptions/{optionId} {
+      allow read: if true;
+      allow write: if isValidId(optionId);
+    }
+
+    // Payment Methods
+    match /paymentMethods/{methodId} {
+      allow read: if true;
+      allow write: if isValidId(methodId);
+    }
+
+    // Membership Plans
+    match /membershipPlans/{planId} {
+      allow read: if true;
+      allow write: if isValidId(planId);
+    }
+
+    // Social Links
+    match /socialLinks/{linkId} {
+      allow read: if true;
+      allow write: if isValidId(linkId);
+    }
+
+    // App Notifications
+    match /appNotifications/{notificationId} {
+      allow read: if true;
+      allow write: if isValidId(notificationId);
+    }
+
+    // Sell Categories
+    match /sellCategories/{categoryId} {
+      allow read: if true;
+      allow write: if isValidId(categoryId);
+    }
+
+    // Sell Items
+    match /sellItems/{itemId} {
+      allow read: if true;
+      allow write: if isValidId(itemId);
+    }
+
+    // Store Orders
+    match /storeOrders/{orderId} {
+      allow read: if true;
+      allow write: if isValidId(orderId);
+    }
+
+    // Telegram verification requests
+    match /telegramRequests/{requestId} {
+      allow read: if true;
+      allow write: if isValidId(requestId);
+    }
+
+    // Referral Targets
+    match /targets/{targetId} {
+      allow read: if true;
+      allow write: if isValidId(targetId);
+    }
+
+    // Referral Target Completion History
+    match /targetHistories/{historyId} {
+      allow read: if true;
+      allow write: if isValidId(historyId);
+    }
+
+    // Gateway Daily Transaction Logs
+    match /gatewayLogs/{logId} {
+      allow read: if true;
+      allow write: if isValidId(logId);
+    }
+  }
+}
