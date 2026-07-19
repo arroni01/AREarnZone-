@@ -16,7 +16,7 @@ import {
 
 // Config parsed from firebase-applet-config.json
 const firebaseConfig = {
-  apiKey: "AIzaSyD55HAUBpJ-glDdg5MbJEE93nRGHxbS-xg",
+  apiKey: import.meta.env.VITE_GOOGLE_API_KEY || "",
   authDomain: "braided-ward-dn50x.firebaseapp.com",
   projectId: "braided-ward-dn50x",
   storageBucket: "braided-ward-dn50x.firebasestorage.app",

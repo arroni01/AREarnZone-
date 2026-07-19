@@ -37,16 +37,24 @@ function saveBotStorage(storage: BotStorage) {
 }
 
 function getTelegramConfig() {
+  let config: any = {
+    token: "",
+    username: "@AREarnZone_bot",
+    channel: "https://t.me/arearnzone",
+    smtpList: []
+  };
   try {
     if (fs.existsSync(CONFIG_FILE)) {
-      return JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
+      config = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
     }
   } catch (e) {}
-  return {
-    token: process.env.TELEGRAM_BOT_TOKEN || "",
-    username: process.env.TELEGRAM_BOT_USERNAME || "@AREarnZone_bot",
-    channel: process.env.TELEGRAM_CHANNEL_LINK || "https://t.me/arearnzone"
-  };
+
+  // Prioritize environment variables to prevent secure credential leaks
+  const envToken = process.env.TELEGRAM_BOT_TOKEN || process.env.VITE_TELEGRAM_BOT_TOKEN;
+  if (envToken) {
+    config.token = envToken;
+  }
+  return config;
 }
 
 async function startServer() {
