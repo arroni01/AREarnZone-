@@ -11,7 +11,7 @@ if (typeof window !== 'undefined') {
       window.location.pathname === '/api/auth/callback/google' ||
       window.location.pathname.startsWith('/api/auth/callback/')) {
     console.log('[API Proxy] Redirecting Google OAuth Callback to live server:', window.location.pathname);
-    window.location.replace(`https://arearnzone.ai.studio${window.location.pathname}${window.location.search}${window.location.hash}`);
+    window.location.replace(`https://ais-pre-h4thh2b6cws4brqp63elrb-90229307226.asia-southeast1.run.app${window.location.pathname}${window.location.search}${window.location.hash}`);
   }
 
   const isFramed = () => {
@@ -42,18 +42,19 @@ if (typeof window !== 'undefined') {
     Object.defineProperty(window, 'fetch', {
       value: function (input: RequestInfo | URL, init?: RequestInit) {
         if (isTargetDomain) {
+          const backendBase = 'https://ais-pre-h4thh2b6cws4brqp63elrb-90229307226.asia-southeast1.run.app';
           if (typeof input === 'string' && input.startsWith('/api/')) {
-            const redirectedUrl = `https://arearnzone.ai.studio${input}`;
+            const redirectedUrl = `${backendBase}${input}`;
             console.log(`[API Proxy] Intercepting fetch: ${input} -> ${redirectedUrl}`);
             return originalFetch(redirectedUrl, init);
           }
           if (input instanceof URL && input.pathname.startsWith('/api/')) {
-            const redirectedUrl = `https://arearnzone.ai.studio${input.pathname}${input.search}`;
+            const redirectedUrl = `${backendBase}${input.pathname}${input.search}`;
             console.log(`[API Proxy] Intercepting URL fetch: ${input.href} -> ${redirectedUrl}`);
             return originalFetch(redirectedUrl, init);
           }
           if (input instanceof Request && input.url.startsWith('/api/')) {
-            const redirectedUrl = `https://arearnzone.ai.studio${input.url}`;
+            const redirectedUrl = `${backendBase}${input.url}`;
             console.log(`[API Proxy] Intercepting Request fetch: ${input.url} -> ${redirectedUrl}`);
             const newRequest = new Request(redirectedUrl, input);
             return originalFetch(newRequest, init);

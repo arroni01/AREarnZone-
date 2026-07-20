@@ -83,7 +83,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     const ua = window.navigator.userAgent || window.navigator.vendor || '';
     return (
       /FBAN|FBAV|Instagram|LinkedInApp|Twitter|Messenger|Line|WeChat|Pinterest/i.test(ua) ||
-      /wv|WebView/i.test(ua)
+      /wv|WebView/i.test(ua) ||
+      /Telegram/i.test(ua) ||
+      /iPhone|iPad|iPod|Android/i.test(ua)
     );
   };
 
@@ -436,7 +438,39 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     return () => window.removeEventListener('message', handleMessage);
   }, [users]);
 
-  const handleGoogleAuthSuccess = (googleUser: any) => {
+  // Check URL hash for direct redirect authentication parameters on mount/update
+  useEffect(() => {
+    const hash = window.location.hash || '';
+    if (hash.includes('/auth/google/success')) {
+      try {
+        const queryIndex = hash.indexOf('?');
+        if (queryIndex !== -1) {
+          const queryString = hash.substring(queryIndex + 1);
+          const urlParams = new URLSearchParams(queryString);
+          const userJson = urlParams.get('user');
+          if (userJson) {
+            const googleUser = JSON.parse(decodeURIComponent(userJson));
+            console.log("[Direct Redirect Auth] Successfully received google user data from URL:", googleUser);
+            
+            // Retrieve pending referral if any
+            const pendingReferral = localStorage.getItem('arez_pending_referral') || '';
+            localStorage.removeItem('arez_pending_referral');
+            
+            // Reset the hash cleanly to prevent loops on manual page refresh
+            window.location.hash = '#/';
+            
+            // Execute login flow
+            handleGoogleAuthSuccess(googleUser, pendingReferral);
+          }
+        }
+      } catch (err) {
+        console.error("Direct Redirect parse failed:", err);
+        setError("Google redirect login failed to parse correctly.");
+      }
+    }
+  }, [users]);
+
+  const handleGoogleAuthSuccess = (googleUser: any, customReferral?: string) => {
     setIsGoogleLoading(true);
     setTimeout(() => {
       const isAdmin = googleUser.email.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase();
@@ -452,9 +486,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       if (existing) {
         onLogin(existing);
       } else {
+        const finalReferral = customReferral !== undefined ? customReferral : referral;
         // Double check referral code validity if provided
-        if (referral.trim() !== '') {
-          const inviter = users.find(u => u.referralCode && u.referralCode.toUpperCase() === referral.trim().toUpperCase());
+        if (finalReferral.trim() !== '') {
+          const inviter = users.find(u => u.referralCode && u.referralCode.toUpperCase() === finalReferral.trim().toUpperCase());
           if (!inviter) {
             setError('ভুল রেফার কোড! দয়া করে সঠিক রেফার কোড দিন অথবা খালি রাখুন (Invalid Referral Code)');
             setIsGoogleLoading(false);
@@ -484,7 +519,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
           securityToken: 'SEC_G_' + Math.random().toString(36).substr(2, 10),
           fraudFlags: []
         };
-        onLogin(newUser, referral);
+        onLogin(newUser, finalReferral);
       }
       setIsGoogleLoading(false);
     }, 1000);
@@ -530,6 +565,20 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       const url = data.url;
       if (!url) {
         throw new Error("No URL received from authentication server.");
+      }
+
+      // Save referral code in local storage before redirecting or opening popup
+      if (referral && referral.trim()) {
+        localStorage.setItem('arez_pending_referral', referral.trim());
+      } else {
+        localStorage.removeItem('arez_pending_referral');
+      }
+
+      // If mobile or in-app webview, perform direct location redirect
+      if (isCurrentlyInApp()) {
+        console.log("Mobile/In-App browser detected. Initiating standard direct redirect flow...");
+        window.location.href = url;
+        return;
       }
 
       const width = 500;

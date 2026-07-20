@@ -60,11 +60,11 @@ function getTelegramConfig() {
 async function startServer() {
   // Load environment variables from .env file if available
   try {
-    if (typeof process.loadEnvFile === 'function') {
-      process.loadEnvFile();
-    } else {
-      const dotenvPath = path.join(process.cwd(), '.env');
-      if (fs.existsSync(dotenvPath)) {
+    const dotenvPath = path.join(process.cwd(), '.env');
+    if (fs.existsSync(dotenvPath)) {
+      if (typeof process.loadEnvFile === 'function') {
+        process.loadEnvFile(dotenvPath);
+      } else {
         const envContent = fs.readFileSync(dotenvPath, 'utf8');
         envContent.split(/\r?\n/).forEach(line => {
           const trimmed = line.trim();
@@ -671,15 +671,15 @@ async function startServer() {
       id: "102930293019302"
     };
 
+    // Retrieve the origin at the top level
+    let origin = state as string;
+    if (!origin || typeof origin !== "string") {
+      origin = getRequestOrigin(req);
+    }
+    origin = origin.replace(/\/$/, "");
+
     if (code && code !== "sandbox_demo" && process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       try {
-        // Retrieve the redirect URI from the state parameter if present, otherwise fallback
-        let origin = state as string;
-        if (!origin || typeof origin !== "string") {
-          origin = getRequestOrigin(req);
-        }
-        origin = origin.replace(/\/$/, "");
-        
         // Dynamically match the callback path that was actually triggered to prevent code exchange mismatches
         const currentPath = req.path;
         const redirectUri = `${origin}${currentPath}`;
@@ -724,8 +724,19 @@ async function startServer() {
       <html>
         <body>
           <script>
-            window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', user: ${JSON.stringify(profile)} }, '*');
-            window.close();
+            const profileData = ${JSON.stringify(profile)};
+            if (window.opener) {
+              try {
+                window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', user: profileData }, '*');
+                window.close();
+              } catch (e) {
+                console.error("postMessage to opener failed, redirecting window:", e);
+                window.location.href = "${origin}/#/auth/google/success?user=" + encodeURIComponent(JSON.stringify(profileData));
+              }
+            } else {
+              console.log("No opener window, redirecting directly...");
+              window.location.href = "${origin}/#/auth/google/success?user=" + encodeURIComponent(JSON.stringify(profileData));
+            }
           </script>
         </body>
       </html>
