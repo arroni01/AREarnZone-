@@ -635,11 +635,13 @@ async function startServer() {
 
     if (!client_id || !client_secret) {
       // Return a demo sandbox mode link if not configured yet
-      const sandboxUrl = `/api/auth/callback/google?code=sandbox_demo`;
+      const backendOrigin = getRequestOrigin(req);
+      const sandboxUrl = `${backendOrigin}/api/auth/callback/google?code=sandbox_demo`;
       const expectedRedirect = `${origin}/api/auth/callback/google`;
       return res.json({ 
         url: sandboxUrl, 
-        redirectUri: expectedRedirect 
+        redirectUri: expectedRedirect,
+        isSandbox: true
       });
     }
 
@@ -657,7 +659,8 @@ async function startServer() {
 
     res.json({ 
       url: authUrl, 
-      redirectUri: expectedRedirect 
+      redirectUri: expectedRedirect,
+      isSandbox: false
     });
   });
 
