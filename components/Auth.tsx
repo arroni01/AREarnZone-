@@ -415,9 +415,14 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // Validate origin
+      // Validate origin to allow Cloud Run dev environments, localhost, and Firebase domains
       const origin = event.origin;
-      if (!origin.endsWith('.run.app') && !origin.includes('localhost')) {
+      if (
+        !origin.endsWith('.run.app') && 
+        !origin.includes('localhost') && 
+        !origin.endsWith('.web.app') && 
+        !origin.endsWith('.firebaseapp.com')
+      ) {
         return;
       }
 
