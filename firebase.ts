@@ -13,19 +13,13 @@ import {
   enableNetwork,
   setLogLevel
 } from "firebase/firestore";
-
-// Config parsed from firebase-applet-config.json
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_GOOGLE_API_KEY || "",
-  authDomain: "braided-ward-dn50x.firebaseapp.com",
-  projectId: "braided-ward-dn50x",
-  storageBucket: "braided-ward-dn50x.firebasestorage.app",
-  messagingSenderId: "818768496606",
-  appId: "1:818768496606:web:61f0d3cf89753d48bf3f4f"
-};
+import { getAuth } from "firebase/auth";
+import firebaseConfig from "./firebase-applet-config.json";
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+
 
 // Silence internal Firestore SDK console errors (including quota limits and backoff warning messages)
 try {
