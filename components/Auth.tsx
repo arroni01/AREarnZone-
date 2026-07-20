@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { User } from '../types';
 import { ICONS } from '../constants';
 import { auth } from '../firebase';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInWithCredential } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
 
 interface AuthProps {
@@ -60,6 +60,8 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     authDomain?: string;
   } | null>(null);
   const [showDebugConsole, setShowDebugConsole] = useState(false);
+  const [isGsiActive, setIsGsiActive] = useState(false);
+  const googleBtnRef = useRef<HTMLDivElement>(null);
 
   const getOriginSafe = (): string => {
     if (typeof window === 'undefined') return '';
@@ -502,6 +504,125 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
         setError("Google redirect login failed to parse correctly.");
       }
     }
+  }, [users]);
+
+  // Dynamically load Google Identity Services for reliable iframe-resilient authentication
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let script = document.getElementById('google-gsi-script') as HTMLScriptElement;
+    if (!script) {
+      script = document.createElement('script');
+      script.id = 'google-gsi-script';
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+    }
+
+    const initGsi = () => {
+      try {
+        const googleObj = (window as any).google;
+        if (googleObj && googleObj.accounts && googleObj.accounts.id) {
+          console.log("[GSI] Initializing Google Identity Services with Client ID:", firebaseConfig.oAuthClientId);
+          
+          googleObj.accounts.id.initialize({
+            client_id: firebaseConfig.oAuthClientId,
+            auto_select: false,
+            callback: async (response: any) => {
+              try {
+                setIsGoogleLoading(true);
+                setError('');
+                console.log("[GSI] ID Token received from Google. Authenticating to Firebase...");
+                
+                const idToken = response.credential;
+                const credential = GoogleAuthProvider.credential(idToken);
+                const result = await signInWithCredential(auth, credential);
+                const firebaseUser = result.user;
+
+                if (!firebaseUser || !firebaseUser.email) {
+                  throw new Error("Could not retrieve user info from Google credential sign-in.");
+                }
+
+                console.log("[GSI] Firebase authentication succeeded:", firebaseUser.email);
+                
+                const googleUserPayload = {
+                  email: firebaseUser.email,
+                  name: firebaseUser.displayName || firebaseUser.email.split('@')[0] || "Google User",
+                  id: firebaseUser.uid
+                };
+
+                // Proceed with login/registration flow
+                handleGoogleAuthSuccess(googleUserPayload);
+              } catch (err: any) {
+                console.error("[GSI] Auth Error:", err);
+                const errMsg = err.message || String(err);
+                setError(`GSI authentication failed: ${errMsg}`);
+                setGoogleAuthError({
+                  code: err.code || "gsi_auth_error",
+                  message: errMsg,
+                  domain: window.location.hostname,
+                  isFramed: isFramed(),
+                  projectId: firebaseConfig.projectId,
+                  authDomain: firebaseConfig.authDomain,
+                  stack: err.stack
+                });
+                setIsGoogleLoading(false);
+              }
+            }
+          });
+
+          setIsGsiActive(true);
+
+          if (googleBtnRef.current) {
+            console.log("[GSI] Rendering official Google Sign-In button...");
+            googleObj.accounts.id.renderButton(
+              googleBtnRef.current,
+              { 
+                theme: "outline", 
+                size: "large",
+                text: "continue_with",
+                shape: "pill",
+                width: googleBtnRef.current.offsetWidth || 280
+              }
+            );
+          }
+        }
+      } catch (e) {
+        console.warn("[GSI] Error initializing Google Identity Services:", e);
+      }
+    };
+
+    script.onload = () => {
+      initGsi();
+    };
+
+    // If script is already loaded
+    if ((window as any).google && (window as any).google.accounts) {
+      initGsi();
+    }
+
+    // Periodically re-render button if container was initially hidden or sized differently
+    const renderInterval = setInterval(() => {
+      const googleObj = (window as any).google;
+      if (googleObj && googleObj.accounts && googleObj.accounts.id && googleBtnRef.current) {
+        // Only render if child element isn't populated yet
+        if (googleBtnRef.current.children.length === 0) {
+          googleObj.accounts.id.renderButton(
+            googleBtnRef.current,
+            { 
+              theme: "outline", 
+              size: "large",
+              text: "continue_with",
+              shape: "pill",
+              width: googleBtnRef.current.offsetWidth || 280
+            }
+          );
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(renderInterval);
   }, [users]);
 
   const handleGoogleAuthSuccess = (googleUser: any, customReferral?: string) => {
@@ -1266,20 +1387,42 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
                     </div>
                   )}
 
-                  <button 
-                     type="button" onClick={startGoogleLogin}
-                     disabled={isGoogleLoading}
-                     className="w-full border-2 border-slate-50 bg-white py-4 sm:py-5 px-6 sm:px-8 rounded-[1.8rem] flex items-center justify-center gap-3 sm:gap-4 hover:border-emerald-500/20 hover:bg-slate-50 transition-all shadow-sm group active:scale-95 disabled:opacity-50"
-                   >
+                   {/* Native Google Identity Services Button Container (Super secure, bypasses iframe cookie limitations) */}
+                   <div className="bg-slate-50 p-4 rounded-[2rem] border border-slate-100/80 space-y-3.5 flex flex-col items-center">
+                     <p className="text-[10px] font-extrabold text-[#10b981] uppercase tracking-wider">
+                       🛡️ SECURE DIRECT GOOGLE LOGIN
+                     </p>
+                     
+                     {/* GSI Container */}
+                     <div className="w-full flex justify-center items-center min-h-[44px]">
+                       <div ref={googleBtnRef} className="w-full flex justify-center"></div>
+                     </div>
+                     
+                     <p className="text-[9px] text-slate-400 font-bold leading-normal text-center uppercase tracking-wider px-2">
+                       আইফ্রেম এবং মোবাইল ব্রাউজারের জন্য এটিই সবচেয়ে নির্ভরযোগ্য মাধ্যম (Recommended & robust sign-in for sandbox/iframes)
+                     </p>
+                   </div>
+
+                   <div className="relative flex py-1 items-center">
+                     <div className="flex-grow border-t border-slate-200/50"></div>
+                     <span className="flex-shrink mx-4 text-[8px] font-black text-slate-300 uppercase tracking-widest">OR / অথবা</span>
+                     <div className="flex-grow border-t border-slate-200/50"></div>
+                   </div>
+
+                   <button 
+                      type="button" onClick={startGoogleLogin}
+                      disabled={isGoogleLoading}
+                      className="w-full border-2 border-slate-100 bg-white py-3.5 sm:py-4 px-6 sm:px-8 rounded-[1.8rem] flex items-center justify-center gap-3 sm:gap-4 hover:border-slate-300 hover:bg-slate-50 transition-all shadow-sm group active:scale-95 disabled:opacity-50"
+                    >
                       {isGoogleLoading ? (
                         <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
                       ) : (
                         <img src="https://www.gstatic.com/images/branding/product/2x/googleg_48dp.png" className="w-5 h-5 sm:w-6 sm:h-6" alt="G" />
                       )}
-                      <span className="font-black text-[10px] sm:text-[11px] text-slate-600 uppercase tracking-widest">
-                        {isGoogleLoading ? 'AUTHENTICATING...' : 'CONTINUE WITH GOOGLE'}
+                      <span className="font-black text-[9.5px] sm:text-[10.5px] text-slate-600 uppercase tracking-widest">
+                        {isGoogleLoading ? 'AUTHENTICATING...' : 'FALLBACK GOOGLE AUTH'}
                       </span>
-                      <div className="bg-emerald-50 px-1.5 sm:px-2 py-0.5 rounded text-[7px] sm:text-[8px] font-black text-[#10b981] uppercase tracking-widest ml-auto">VERIFIED</div>
+                      <div className="bg-slate-100 px-1.5 sm:px-2 py-0.5 rounded text-[6.5px] sm:text-[7.5px] font-black text-slate-500 uppercase tracking-widest ml-auto">POPUPS</div>
                     </button>
 
                     {/* Detailed Google Auth Debugger Console / ডায়াগনস্টিকস */}
