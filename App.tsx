@@ -15,8 +15,10 @@ import {
   listenToDocument,
   getIsQuotaExceeded,
   isQuotaError,
-  fetchCollection
+  fetchCollection,
+  auth
 } from './firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 import Dashboard from './components/Dashboard';
 import Tasks from './components/Tasks';
@@ -613,6 +615,26 @@ const App: React.FC = () => {
     }, 2500);
     return () => clearInterval(timer);
   }, [dbQuotaExceeded]);
+
+  // Listen to Firebase Auth state changes to automatically restore or synchronize Google sessions smoothly
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser && firebaseUser.email) {
+        console.log("[Firebase Auth] Auth state changed: user is logged in:", firebaseUser.email);
+        const existing = users.find(u => u.email.toLowerCase().trim() === firebaseUser.email!.toLowerCase().trim());
+        if (existing) {
+          if (!currentUser || currentUser.email.toLowerCase().trim() !== firebaseUser.email.toLowerCase().trim()) {
+            console.log("[Firebase Auth] Automatically restoring Google session for:", existing.email);
+            setCurrentUser(existing);
+            notify(`Connected: ${existing.name}`);
+          }
+        }
+      } else {
+        console.log("[Firebase Auth] Auth state changed: no active Firebase session");
+      }
+    });
+    return () => unsubscribe();
+  }, [users, currentUser]);
 
   // AI App Health Recovery background scanning effect
   useEffect(() => {
@@ -1760,7 +1782,7 @@ const AppContent: React.FC<{
             <div className="w-16 h-16 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto"><ICONS.Logout size={32} /></div>
             <h3 className="text-xl font-bold dark:text-white uppercase tracking-tighter">Confirm Logout</h3>
             <div className="flex flex-col gap-3 font-sans">
-              <button onClick={() => { setShowLogoutConfirm(false); setCurrentUser(null); localStorage.removeItem('arez_current_user'); sessionStorage.removeItem('arez_social_shown'); notify("Session Ended."); }} className="w-full py-4 bg-red-500 text-white font-bold rounded-xl shadow-lg uppercase tracking-widest text-[10px]">LOGOUT</button>
+              <button onClick={() => { setShowLogoutConfirm(false); setCurrentUser(null); localStorage.removeItem('arez_current_user'); sessionStorage.removeItem('arez_social_shown'); signOut(auth).catch(err => console.warn("Firebase Auth signOut failed:", err)); notify("Session Ended."); }} className="w-full py-4 bg-red-500 text-white font-bold rounded-xl shadow-lg uppercase tracking-widest text-[10px]">LOGOUT</button>
               <button onClick={() => setShowLogoutConfirm(false)} className="w-full py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold rounded-xl uppercase tracking-widest text-[10px]">CANCEL</button>
             </div>
           </div>
@@ -1830,7 +1852,7 @@ const AppContent: React.FC<{
                 </span>
               </div>
               <button 
-                onClick={() => { setCurrentUser(null); localStorage.removeItem('arez_current_user'); notify("Logged out during maintenance."); }} 
+                onClick={() => { setCurrentUser(null); localStorage.removeItem('arez_current_user'); signOut(auth).catch(err => console.warn("Firebase Auth signOut failed:", err)); notify("Logged out during maintenance."); }} 
                 className="px-5 py-3 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition-all border border-red-500/20"
               >
                 Exit Session (লগআউট করুন)

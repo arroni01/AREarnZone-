@@ -116,13 +116,15 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
 
   const isCurrentlyInApp = (): boolean => {
     if (typeof window === 'undefined') return false;
-    const ua = window.navigator.userAgent || window.navigator.vendor || '';
-    return (
-      /FBAN|FBAV|Instagram|LinkedInApp|Twitter|Messenger|Line|WeChat|Pinterest/i.test(ua) ||
-      /wv|WebView/i.test(ua) ||
-      /Telegram/i.test(ua) ||
-      /iPhone|iPad|iPod|Android/i.test(ua)
-    );
+    const ua = window.navigator.userAgent || window.navigator.vendor || (window as any).opera || '';
+    
+    // Detect FBAN, FBAV (Facebook App), Instagram, Messenger, LinkedIn, Twitter, Line, WeChat, Pinterest, Telegram, Snapchat, etc.
+    const inAppRegex = /FBAN|FBAV|Instagram|LinkedInApp|Twitter|Messenger|Line|WeChat|Pinterest|Telegram|Snapchat|SinaWeibo/i;
+    
+    // Detect mobile WebViews
+    const isWebView = /wv|WebView|FB_IAB/i.test(ua) || (ua.includes('Android') && ua.includes('Version/4.0'));
+    
+    return inAppRegex.test(ua) || isWebView;
   };
 
   // Load remaining cooldown on view change or email input change
@@ -556,10 +558,17 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
                 handleGoogleAuthSuccess(googleUserPayload);
               } catch (err: any) {
                 console.error("[GSI] Auth Error:", err);
+                const isUnauthorized = (err.code && err.code.includes('unauthorized-domain')) || (err.message && err.message.includes('unauthorized-domain'));
+                const errCode = isUnauthorized ? 'auth/unauthorized-domain' : (err.code || "gsi_auth_error");
                 const errMsg = err.message || String(err);
-                setError(`GSI authentication failed: ${errMsg}`);
+                
+                const friendlyMsg = isUnauthorized 
+                  ? `অননুমোদিত ডোমেন! এই ডোমেনটি (${window.location.hostname}) ফায়ারবেস কনসোলে Authorized Domains হিসেবে যুক্ত করা নেই। (Unauthorized Domain: Please add ${window.location.hostname} to your Firebase authorized domains.)`
+                  : `GSI authentication failed: ${errMsg}`;
+                
+                setError(friendlyMsg);
                 setGoogleAuthError({
-                  code: err.code || "gsi_auth_error",
+                  code: errCode,
                   message: errMsg,
                   domain: window.location.hostname,
                   isFramed: isFramed(),
@@ -732,9 +741,12 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     } catch (err: any) {
       console.error("Google Login via Firebase Auth Error:", err);
       
+      const isUnauthorized = (err.code && err.code.includes('unauthorized-domain')) || (err.message && err.message.includes('unauthorized-domain'));
+      const errCode = isUnauthorized ? 'auth/unauthorized-domain' : (err.code || "unknown_code");
+      
       // Extract detailed diagnostics for the debugger panel
       const debugInfo = {
-        code: err.code || "unknown_code",
+        code: errCode,
         message: err.message || "Unknown error occurred during authentication.",
         stack: err.stack,
         domain: typeof window !== 'undefined' ? window.location.hostname : "unknown",
@@ -753,10 +765,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
         friendlyError = "সাইন-ইন পপআপ উইন্ডোটি বন্ধ করা হয়েছে। (Sign-in popup closed before completion.)";
       } else if (err.code === 'auth/cancelled-popup-request') {
         friendlyError = "পূর্বের সাইন-ইন অনুরোধটি বাতিল করা হয়েছে। (Sign-in request cancelled.)";
-      } else if (err.code === 'auth/unauthorized-domain') {
+      } else if (isUnauthorized) {
         friendlyError = `অননুমোদিত ডোমেন! এই ডোমেনটি (${debugInfo.domain}) ফায়ারবেস কনসোলে Authorized Domains হিসেবে যুক্ত করা নেই। (Unauthorized Domain: Add ${debugInfo.domain} to your Firebase authorized domains.)`;
       } else {
-        friendlyError = `গুগল সাইন-ইন ব্যর্থ হয়েছে। এরর কোড: ${debugInfo.code}। বার্তা: ${debugInfo.message} (Google Sign-In failed. Error Code: ${debugInfo.code})`;
+        friendlyError = `গুগল সাইন-ইন ব্যর্থ হয়েছে। এরর কোড: ${debugInfo.code || 'unknown_code'}। বার্তা: ${debugInfo.message} (Google Sign-In failed. Error Code: ${debugInfo.code || 'unknown_code'})`;
       }
       
       setError(friendlyError);
@@ -967,9 +979,36 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
             </div>
 
             {error && (
-              <div className="mt-8 bg-red-50 p-5 rounded-[1.5rem] border border-red-100 flex items-center gap-4 animate-in fade-in slide-in-from-top-3">
-                <ICONS.XCircle size={22} className="text-red-500 shrink-0" />
-                <p className="text-xs font-bold text-red-600 tracking-tight leading-snug">{error}</p>
+              <div className="mt-8 bg-red-50 p-5 rounded-[1.5rem] border border-red-100 flex flex-col gap-3.5 animate-in fade-in slide-in-from-top-3">
+                <div className="flex items-center gap-4">
+                  <ICONS.XCircle size={22} className="text-red-500 shrink-0" />
+                  <p className="text-xs font-bold text-red-600 tracking-tight leading-snug">{error}</p>
+                </div>
+                {/* Actionable guide for unauthorized-domain issues */}
+                {error && (error.includes('unauthorized-domain') || error.includes('অননুমোদিত ডোমেন') || error.includes('Unauthorized Domain')) && (
+                  <div className="bg-white/95 p-4 rounded-xl border border-red-200/80 text-[11px] leading-relaxed text-slate-700 space-y-3.5 shadow-sm text-left w-full mt-3">
+                    <p className="font-extrabold text-red-700 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                      🛠️ HOW TO FIX THIS ERROR (এটি সমাধান করার সহজ উপায়):
+                    </p>
+                    <p className="text-slate-600 font-medium text-[10.5px]">
+                      This error happens because the preview URL is not authorized in your Firebase console. Follow these steps to authorize it:
+                    </p>
+                    <ol className="list-decimal pl-4 space-y-2 text-slate-600 font-semibold text-[10px]">
+                      <li>Go to your <strong>Firebase Console</strong> ({firebaseConfig.projectId}).</li>
+                      <li>Navigate to <strong>Authentication &gt; Settings &gt; Authorized domains</strong>.</li>
+                      <li>Click <strong>"Add domain"</strong> and type/paste: <code className="bg-slate-100 text-rose-600 px-1.5 py-0.5 rounded font-mono text-[10px] select-all border border-slate-200">{typeof window !== 'undefined' ? window.location.hostname : 'this domain'}</code></li>
+                      <li>Click add, wait 10 seconds, and refresh this page. It will work perfectly!</li>
+                    </ol>
+                    <div className="border-t border-slate-200/60 my-2 pt-2"></div>
+                    <p className="font-extrabold text-slate-800 text-[10px]">বাঙালি নির্দেশনা (Bengali Guide):</p>
+                    <ol className="list-decimal pl-4 space-y-2 text-slate-600 font-semibold text-[10px]">
+                      <li>আপনার <strong>Firebase Console</strong>-এ যান।</li>
+                      <li><strong>Authentication &gt; Settings &gt; Authorized domains</strong> অপশনে যান।</li>
+                      <li><strong>"Add domain"</strong>-এ ক্লিক করে কপি করে বসান: <code className="bg-slate-100 text-rose-600 px-1.5 py-0.5 rounded font-mono text-[10px] select-all border border-slate-200">{typeof window !== 'undefined' ? window.location.hostname : 'this domain'}</code></li>
+                      <li>সেভ করে ১০ সেকেন্ড অপেক্ষা করে পেজটি রিফ্রেশ (Refresh) করুন। গুগল লগইন কাজ করবে!</li>
+                    </ol>
+                  </div>
+                )}
               </div>
             )}
 
