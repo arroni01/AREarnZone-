@@ -25,12 +25,14 @@
     "tsx": "^4.21.0"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
     "@types/node": "^22.14.0",
     "@types/nodemailer": "^8.0.1",
     "@vitejs/plugin-react": "^5.0.0",
     "esbuild": "^0.28.1",
+    "pngjs": "^7.0.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }
