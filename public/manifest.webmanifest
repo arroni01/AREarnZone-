@@ -1,8 +1,8 @@
 {
-  "id": "arearnzone-pwa",
-  "name": "AR EARN ZONE - #1 Elite Earning Ecosystem",
+  "id": "arearnzone-pwa-app",
+  "name": "AR EARN ZONE",
   "short_name": "AR EARN ZONE",
-  "description": "AR EARN ZONE is the premier elite earning ecosystem. Complete high-yield micro-jobs, watch rewarded ads, and unlock passive income streams.",
+  "description": "AR EARN ZONE is the premier elite earning ecosystem. Complete micro-jobs, watch rewarded ads, and unlock real income streams.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -11,18 +11,19 @@
   "theme_color": "#067647",
   "orientation": "portrait",
   "categories": ["finance", "business", "productivity"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/pwa-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/pwa-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/maskable-icon-192x192.png",
@@ -43,10 +44,16 @@
       "purpose": "any"
     },
     {
-      "src": "/pwa-icon.svg",
-      "sizes": "192x192 512x512",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
