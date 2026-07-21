@@ -456,13 +456,13 @@ const Dashboard: React.FC<DashboardProps> = ({
     .reduce((sum, t) => sum + t.amount, 0);
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-xl mx-auto pb-24 px-2">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-6xl mx-auto w-full pb-24 px-2 sm:px-4">
       
       {/* Top Greeting Header */}
       <div className="px-2 space-y-1">
         <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Earning Hub Portal</p>
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold dark:text-white text-slate-900 leading-none">{t('welcome')}, {user.name.split(' ')[0]}</h2>
+          <h2 className="text-xl sm:text-2xl font-bold dark:text-white text-slate-900 leading-none">{t('welcome')}, {user.name.split(' ')[0]}</h2>
           <div className="flex items-center gap-1.5 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20 shadow-sm">
             <div className={`w-1.5 h-1.5 rounded-full ${isVerified ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></div>
             <span className="text-[9px] font-bold text-slate-500 uppercase">{isVerified ? 'Verified Pro' : 'Free Member'}</span>
@@ -471,14 +471,14 @@ const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* Auto Refresh & Balance Sync Widget */}
-      <div id="live-sync-widget" className="bg-slate-100/50 dark:bg-slate-900/60 border border-slate-200/50 dark:border-white/5 py-3 px-5 rounded-3xl flex items-center justify-between shadow-sm select-none">
+      <div id="live-sync-widget" className="bg-slate-100/50 dark:bg-slate-900/60 border border-slate-200/50 dark:border-white/5 py-3 px-4 sm:px-5 rounded-2xl sm:rounded-3xl flex items-center justify-between shadow-sm select-none">
         <div className="flex items-center gap-2.5">
           <div className="relative flex items-center justify-center">
             <span className="absolute inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 opacity-75 animate-ping"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </div>
           <div className="flex flex-col">
-            <span className="text-[10px] font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest leading-none">
+            <span className="text-[9px] sm:text-[10px] font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest leading-none">
               Live Sync (লাইভ সিঙ্ক)
             </span>
             <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mt-1">
@@ -491,7 +491,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           type="button"
           onClick={handleManualRefresh}
           disabled={isRefreshing}
-          className="bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-200/50 dark:border-white/5 px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+          className="bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-200/50 dark:border-white/5 px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
         >
           <RefreshCw size={11} className={`${isRefreshing ? 'animate-spin text-emerald-500' : ''}`} />
           <span>{isRefreshing ? 'Syncing...' : 'Sync Balance'}</span>
@@ -499,121 +499,124 @@ const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* Live Status Bar */}
-      <div className="bg-emerald-600 rounded-3xl py-4 px-6 flex flex-col items-center justify-center shadow-lg shadow-emerald-500/20 border border-white/10 relative overflow-hidden">
+      <div className="bg-emerald-600 rounded-2xl sm:rounded-3xl py-3.5 px-4 sm:px-6 flex flex-col items-center justify-center shadow-lg shadow-emerald-500/20 border border-white/10 relative overflow-hidden">
         <div className="flex items-center gap-2 relative z-10">
            <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
-           <p className="text-sm font-bold text-white uppercase tracking-wide">Live Online: {liveUsers.toLocaleString()}</p>
+           <p className="text-xs sm:text-sm font-bold text-white uppercase tracking-wide">Live Online: {liveUsers.toLocaleString()}</p>
         </div>
         <div className="flex items-center gap-2 mt-1 relative z-10 opacity-90">
            <ICONS.Check size={12} className="text-white" />
-           <p className="text-[11px] font-medium text-white uppercase tracking-wide">৳{lastPayoutAmount} Paid to {lastPayoutUser}</p>
+           <p className="text-[10px] sm:text-[11px] font-medium text-white uppercase tracking-wide">৳{lastPayoutAmount} Paid to {lastPayoutUser}</p>
         </div>
       </div>
 
       {/* Account Status Banner */}
       {!isVerified && (
-        <div className="bg-orange-500 p-8 rounded-[2.5rem] text-white space-y-5 shadow-2xl relative overflow-hidden group">
+        <div className="bg-orange-500 p-6 sm:p-8 rounded-3xl sm:rounded-[2.5rem] text-white space-y-4 sm:space-y-5 shadow-2xl relative overflow-hidden group">
            <div className="absolute inset-0 bg-gradient-to-br from-orange-400 to-orange-600 opacity-50"></div>
            <div className="flex items-center gap-4 relative z-10">
-              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/20">
-                 <ICONS.Shield size={24} />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/20 shrink-0">
+                 <ICONS.Shield size={22} className="sm:w-6 sm:h-6" />
               </div>
-              <h3 className="text-lg font-bold uppercase tracking-tight">Access Restricted</h3>
+              <h3 className="text-base sm:text-lg font-bold uppercase tracking-tight">Access Restricted</h3>
            </div>
-           <p className="text-sm font-medium opacity-90 relative z-10 leading-relaxed">
+           <p className="text-xs sm:text-sm font-medium opacity-90 relative z-10 leading-relaxed">
              {t('upgradeNow')}
            </p>
            <button 
              onClick={() => navigate('/membership')}
-             className="w-full bg-white text-orange-600 font-black py-4 rounded-2xl text-[10px] uppercase tracking-[0.2em] shadow-lg active:scale-95 transition-all relative z-10"
+             className="w-full bg-white text-orange-600 font-black py-3.5 sm:py-4 rounded-xl sm:rounded-2xl text-[10px] uppercase tracking-[0.2em] shadow-lg active:scale-95 transition-all relative z-10"
            >
              {t('upgradeNow')}
            </button>
         </div>
       )}
+
       {/* Main Grid Cards */}
       <div className={`space-y-4 transition-all duration-700 ${!isVerified ? 'opacity-30 blur-[4px] pointer-events-none' : ''}`}>
         
-        {/* Total Balance Card */}
-        <div onClick={() => navigate('/withdraw')} className="bg-[#10b981] p-8 rounded-[2.5rem] shadow-xl shadow-emerald-500/10 relative overflow-hidden group active:scale-95 transition-all cursor-pointer border-2 border-white/10 flex flex-col justify-between h-44">
-          <div className="relative z-10 flex justify-between items-start">
-             <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md border border-white/20">
-                <ICONS.Wallet size={24} className="text-white" />
-             </div>
-             <div className="bg-white/10 px-3 py-1 rounded-xl border border-white/10 flex items-center gap-2">
-                <ICONS.Trend size={12} className="text-white" />
-                <span className="text-[10px] font-bold text-white uppercase">+2.5%</span>
-             </div>
+        {/* Top Tier Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Total Balance Card */}
+          <div onClick={() => navigate('/withdraw')} className="bg-[#10b981] p-5 sm:p-7 md:p-8 rounded-3xl sm:rounded-[2.5rem] shadow-xl shadow-emerald-500/10 relative overflow-hidden group active:scale-95 transition-all cursor-pointer border-2 border-white/10 flex flex-col justify-between min-h-[9.5rem] sm:h-44">
+            <div className="relative z-10 flex justify-between items-start">
+               <div className="p-2.5 sm:p-3 bg-white/20 rounded-xl sm:rounded-2xl backdrop-blur-md border border-white/20">
+                  <ICONS.Wallet size={22} className="text-white sm:w-6 sm:h-6" />
+               </div>
+               <div className="bg-white/10 px-3 py-1 rounded-xl border border-white/10 flex items-center gap-2">
+                  <ICONS.Trend size={12} className="text-white" />
+                  <span className="text-[10px] font-bold text-white uppercase">+2.5%</span>
+               </div>
+            </div>
+            <div className="relative z-10 mt-3">
+              <p className="text-[10px] sm:text-[11px] font-bold text-emerald-50 uppercase tracking-widest opacity-80 mb-1">{t('balance')}</p>
+              <LocalizedReward bdtAmount={animatedBalance} countryCode={selectedCountryCode} className="flex flex-col items-start" textClassName="text-2xl sm:text-4xl font-bold text-white tracking-tight leading-none" usdClassName="text-[10px] sm:text-xs font-bold text-emerald-100/70 mt-1 uppercase tracking-wider" />
+            </div>
           </div>
-          <div className="relative z-10">
-            <p className="text-[11px] font-bold text-emerald-50 uppercase tracking-widest opacity-80 mb-1">{t('balance')}</p>
-            <LocalizedReward bdtAmount={animatedBalance} countryCode={selectedCountryCode} className="flex flex-col items-start" textClassName="text-4xl font-bold text-white tracking-tight leading-none" usdClassName="text-xs font-bold text-emerald-100/70 mt-1 uppercase tracking-wider" />
+
+          {/* Referral Income Card */}
+          <div onClick={() => navigate('/referral')} className="bg-orange-500 p-5 sm:p-7 md:p-8 rounded-3xl sm:rounded-[2.5rem] shadow-xl shadow-orange-500/10 relative overflow-hidden group active:scale-95 transition-all cursor-pointer border-2 border-white/10 flex flex-col justify-between min-h-[9.5rem] sm:h-44">
+            <div className="relative z-10 flex justify-between items-start">
+               <div className="p-2.5 sm:p-3 bg-white/20 rounded-xl sm:rounded-2xl backdrop-blur-md border border-white/20">
+                  <ICONS.Referral size={22} className="text-white sm:w-6 sm:h-6" />
+               </div>
+               <div className="bg-white/10 px-3 py-1 rounded-xl border border-white/10 flex items-center gap-2">
+                  <ICONS.Trend size={12} className="text-white" />
+                  <span className="text-[10px] font-bold text-white uppercase">+5%</span>
+               </div>
+            </div>
+            <div className="relative z-10 mt-3">
+              <p className="text-[10px] sm:text-[11px] font-bold text-orange-50 uppercase tracking-widest opacity-80 mb-1">{t('refIncome')}</p>
+              <LocalizedReward bdtAmount={referralIncome} countryCode={selectedCountryCode} className="flex flex-col items-start" textClassName="text-2xl sm:text-4xl font-bold text-white tracking-tight leading-none" usdClassName="text-[10px] sm:text-xs font-bold text-orange-100/70 mt-1 uppercase tracking-wider" />
+            </div>
           </div>
         </div>
 
-        {/* Today's Earn & Tasks side by side */}
-        <div className="grid grid-cols-2 gap-4">
-            <div onClick={() => navigate('/tasks')} className="bg-[#14b8a6] p-7 rounded-[2.5rem] shadow-xl relative overflow-hidden group active:scale-95 transition-all cursor-pointer border-2 border-white/10 h-40 flex flex-col justify-between">
-                <div className="p-2.5 bg-white/20 rounded-xl w-fit">
-                    <ICONS.Trend size={20} className="text-white" />
+        {/* Action Quick Grid (4 items on desktop) */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div onClick={() => navigate('/tasks')} className="bg-[#14b8a6] p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] shadow-xl relative overflow-hidden group active:scale-95 transition-all cursor-pointer border-2 border-white/10 min-h-[8.5rem] sm:h-40 flex flex-col justify-between">
+                <div className="p-2 sm:p-2.5 bg-white/20 rounded-xl w-fit">
+                    <ICONS.Trend size={18} className="text-white sm:w-5 sm:h-5" />
                 </div>
                 <div className="relative z-10">
-                    <p className="text-[10px] font-bold text-teal-50 uppercase tracking-widest opacity-80">{t('todayEarn')}</p>
-                    <LocalizedReward bdtAmount={user.todayIncome} countryCode={selectedCountryCode} className="flex flex-col items-start" textClassName="text-2xl font-bold text-white tracking-tight" usdClassName="text-[10px] font-bold text-teal-100/70 mt-0.5 uppercase tracking-wider" />
+                    <p className="text-[9px] sm:text-[10px] font-bold text-teal-50 uppercase tracking-widest opacity-80">{t('todayEarn')}</p>
+                    <LocalizedReward bdtAmount={user.todayIncome} countryCode={selectedCountryCode} className="flex flex-col items-start" textClassName="text-xl sm:text-2xl font-bold text-white tracking-tight" usdClassName="text-[9px] sm:text-[10px] font-bold text-teal-100/70 mt-0.5 uppercase tracking-wider" />
                 </div>
             </div>
-            <div onClick={() => navigate('/tasks')} className="bg-slate-900 p-7 rounded-[2.5rem] shadow-xl relative overflow-hidden group active:scale-95 transition-all cursor-pointer border-2 border-white/5 h-40 flex flex-col justify-between">
-                <div className="p-2.5 bg-white/10 rounded-xl w-fit text-slate-400">
-                    <ICONS.Tasks size={20} />
+            
+            <div onClick={() => navigate('/tasks')} className="bg-slate-900 p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] shadow-xl relative overflow-hidden group active:scale-95 transition-all cursor-pointer border-2 border-white/5 min-h-[8.5rem] sm:h-40 flex flex-col justify-between">
+                <div className="p-2 sm:p-2.5 bg-white/10 rounded-xl w-fit text-slate-400">
+                    <ICONS.Tasks size={18} className="sm:w-5 sm:h-5" />
                 </div>
                 <div className="relative z-10">
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest opacity-80">{t('tasksReady')}</p>
-                    <h3 className="text-2xl font-bold text-white tracking-tight">{availableTasksCount}</h3>
+                    <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest opacity-80">{t('tasksReady')}</p>
+                    <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">{availableTasksCount}</h3>
                 </div>
             </div>
-        </div>
 
-        {/* Buy(Shop) & Telegram Verify side by side */}
-        <div className="grid grid-cols-2 gap-4">
-            <div onClick={() => navigate('/buy')} className="bg-indigo-600 p-7 rounded-[2.5rem] shadow-xl relative overflow-hidden group active:scale-95 transition-all cursor-pointer border-2 border-white/10 h-40 flex flex-col justify-between">
-                <div className="p-2.5 bg-white/20 rounded-xl w-fit">
-                    <ICONS.Buy size={20} className="text-white" />
+            <div onClick={() => navigate('/buy')} className="bg-indigo-600 p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] shadow-xl relative overflow-hidden group active:scale-95 transition-all cursor-pointer border-2 border-white/10 min-h-[8.5rem] sm:h-40 flex flex-col justify-between">
+                <div className="p-2 sm:p-2.5 bg-white/20 rounded-xl w-fit">
+                    <ICONS.Buy size={18} className="text-white sm:w-5 sm:h-5" />
                 </div>
                 <div className="relative z-10">
-                    <p className="text-[10px] font-bold text-indigo-50 uppercase tracking-widest opacity-80">Buy (Shop)</p>
-                    <h3 className="text-lg font-bold text-white tracking-tight mt-1">শপ ও অ্যাকাউন্ট</h3>
+                    <p className="text-[9px] sm:text-[10px] font-bold text-indigo-50 uppercase tracking-widest opacity-80">Buy (Shop)</p>
+                    <h3 className="text-base sm:text-lg font-bold text-white tracking-tight mt-0.5">শপ ও অ্যাকাউন্ট</h3>
                 </div>
             </div>
-            <div onClick={() => navigate('/telegram-verify')} className="bg-[#0088cc] p-7 rounded-[2.5rem] shadow-xl relative overflow-hidden group active:scale-95 transition-all cursor-pointer border-2 border-white/10 h-40 flex flex-col justify-between">
-                <div className="p-2.5 bg-white/20 rounded-xl w-fit">
-                    <ICONS.Telegram size={20} className="text-white" />
+
+            <div onClick={() => navigate('/telegram-verify')} className="bg-[#0088cc] p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] shadow-xl relative overflow-hidden group active:scale-95 transition-all cursor-pointer border-2 border-white/10 min-h-[8.5rem] sm:h-40 flex flex-col justify-between">
+                <div className="p-2 sm:p-2.5 bg-white/20 rounded-xl w-fit">
+                    <ICONS.Telegram size={18} className="text-white sm:w-5 sm:h-5" />
                 </div>
                 <div className="relative z-10">
-                    <p className="text-[10px] font-bold text-blue-50 uppercase tracking-widest opacity-80">
+                    <p className="text-[9px] sm:text-[10px] font-bold text-blue-50 uppercase tracking-widest opacity-80 truncate">
                       {user.isTelegramVerified ? "Telegram Task" : "Telegram Verify"}
                     </p>
-                    <h3 className="text-lg font-bold text-white tracking-tight mt-1">
+                    <h3 className="text-base sm:text-lg font-bold text-white tracking-tight mt-0.5 truncate">
                       {user.isTelegramVerified ? "টেলিগ্রাম টাস্ক" : "টেলিগ্রাম ভেরিফাই"}
                     </h3>
                 </div>
             </div>
-        </div>
-
-        {/* Referral Income Card */}
-        <div onClick={() => navigate('/referral')} className="bg-orange-500 p-8 rounded-[2.5rem] shadow-xl shadow-orange-500/10 relative overflow-hidden group active:scale-95 transition-all cursor-pointer border-2 border-white/10 flex flex-col justify-between h-44">
-          <div className="relative z-10 flex justify-between items-start">
-             <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md border border-white/20">
-                <ICONS.Referral size={24} className="text-white" />
-             </div>
-             <div className="bg-white/10 px-3 py-1 rounded-xl border border-white/10 flex items-center gap-2">
-                <ICONS.Trend size={12} className="text-white" />
-                <span className="text-[10px] font-bold text-white uppercase">+5%</span>
-             </div>
-          </div>
-          <div className="relative z-10">
-            <p className="text-[11px] font-bold text-orange-50 uppercase tracking-widest opacity-80 mb-1">{t('refIncome')}</p>
-            <LocalizedReward bdtAmount={referralIncome} countryCode={selectedCountryCode} className="flex flex-col items-start" textClassName="text-4xl font-bold text-white tracking-tight leading-none" usdClassName="text-xs font-bold text-orange-100/70 mt-1 uppercase tracking-wider" />
-          </div>
         </div>
       </div>
 

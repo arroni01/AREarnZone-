@@ -1,31 +1,38 @@
 /* Custom scrollbar hiding and utilities */
-body {
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
-  background-color: #020617;
-  -webkit-tap-highlight-color: transparent;
-  scroll-behavior: smooth;
+*, ::before, ::after {
+  box-sizing: border-box;
 }
 
-/* Base resets & responsiveness improvements */
 html {
   overflow-x: hidden;
   max-width: 100vw;
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
-/* Ensure box sizing and limit horizontal overflow */
-* {
-  box-sizing: border-box;
-  max-width: 100%;
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  max-width: 100vw;
+  background-color: #020617;
+  -webkit-tap-highlight-color: transparent;
+  scroll-behavior: smooth;
+  font-family: 'Inter', sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Complement font smoothness and anti-aliasing */
 body, input, button, select, textarea {
   font-family: 'Inter', sans-serif;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
+}
+
+/* Images and media containment */
+img, svg, video, canvas, audio, iframe, embed, object {
+  max-width: 100%;
+  height: auto;
 }
 
 /* Prevent text overflow and word breaks in list elements, links and code blocks */
@@ -45,11 +52,6 @@ body, input, button, select, textarea {
   scrollbar-width: none;  /* Firefox */
 }
 
-/* Prevent iframe and video embed overflow for ad templates on small screens */
-iframe, video, embed {
-  max-width: 100% !important;
-}
-
 /* Auto scrolling responsive wrapper for tables and code logs */
 .table-responsive {
   display: block;
@@ -63,38 +65,13 @@ input[type="text"], input[type="number"], input[type="email"], input[type="passw
   font-size: 16px !important;
 }
 
-/* SNUG FIT overrides for extremely small mobile viewports (e.g. iPhone SE, etc. under 480px width) */
-@media (max-width: 480px) {
-  .p-8 {
-    padding: 1.25rem !important; /* Snugger padding for cards */
-  }
-  .p-7 {
-    padding: 1.15rem !important; /* Keep columns inside grid snug and aligned */
-  }
-  .p-6 {
-    padding: 1rem !important;
-  }
-  .px-12 {
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
-  }
-  .rounded-\[2\.5rem\], .rounded-\[3rem\] {
-    border-radius: 1.5rem !important; /* Soften ultra-rounded cards to gain active pixels */
-  }
-  .text-4xl {
-    font-size: 1.75rem !important; /* Scale down giant balance typography */
-  }
-  .text-3xl {
-    font-size: 1.45rem !important;
-  }
-  .h-40 {
-    height: 8.5rem !important; /* Tighten up card heights so they stay completely on-screen */
-  }
-  .h-44 {
-    height: 9.5rem !important;
-  }
-  .gap-4 {
-    gap: 0.65rem !important; /* Narrower grid gutters */
-  }
+/* Safe area padding helper for modern smartphones */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 1rem);
 }
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 1rem);
+}
+
 

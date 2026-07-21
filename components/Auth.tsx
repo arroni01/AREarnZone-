@@ -764,57 +764,57 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] font-['Inter'] flex items-center justify-center relative overflow-hidden text-slate-100 p-0 sm:p-4 md:p-8 lg:p-12 w-full">
+    <div className="min-h-screen bg-[#020617] font-['Inter'] flex items-center justify-center relative overflow-x-hidden text-slate-100 p-3 sm:p-6 md:p-8 lg:p-12 w-full">
       {/* Cinematic Ambient Background Glows */}
       <div className="absolute inset-0 z-0 bg-cover bg-center opacity-40 filter blur-3xl pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 35% 25%, rgba(16, 185, 129, 0.15) 0%, transparent 50%), radial-gradient(circle at 75% 75%, rgba(59, 130, 246, 0.15) 0%, transparent 50%)' }}></div>
       
       {/* Responsive Grid Wrapper */}
-      <div className="w-full max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center z-10 relative">
+      <div className="w-full max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 lg:gap-12 items-center z-10 relative">
         
         {/* Cinematic Hero Section - Column 1 on Desktop, Top on Mobile */}
-        <div className="lg:col-span-5 space-y-8 text-left px-4 sm:px-0 py-6 lg:py-12">
+        <div className="lg:col-span-5 space-y-6 sm:space-y-8 text-left px-1 sm:px-0 py-4 lg:py-12">
           
           {/* Logo & Brand */}
-          <div className="flex items-center gap-4">
-            <div className="bg-[#10b981] p-2.5 rounded-[1.2rem] shadow-2xl shadow-emerald-500/30 ring-1 ring-white/10">
-              <ICONS.Logo size={36} />
+          <div className="flex items-center gap-3.5 sm:gap-4">
+            <div className="bg-[#10b981] p-2.5 rounded-[1.2rem] shadow-2xl shadow-emerald-500/30 ring-1 ring-white/10 shrink-0">
+              <ICONS.Logo size={32} className="sm:w-9 sm:h-9" />
             </div>
             <div className="flex flex-col">
-              <h1 className="text-2xl font-black text-white leading-none italic uppercase tracking-tighter">
+              <h1 className="text-xl sm:text-2xl font-black text-white leading-none italic uppercase tracking-tighter">
                 AR<span className="text-[#10b981]">EARN</span>ZONE
               </h1>
               <div className="flex items-center gap-2 mt-1">
                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981] animate-pulse"></div>
-                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">VERIFIED FREELANCER HUB</span>
+                 <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">VERIFIED FREELANCER HUB</span>
               </div>
             </div>
           </div>
 
           {/* Hero Text Content */}
-          <div className="space-y-6">
-            <div className="inline-block bg-[#10b981]/10 border border-[#10b981]/20 backdrop-blur-md px-5 py-2 rounded-full">
-              <span className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em]">GLOBAL TRUSTED PLATFORM</span>
+          <div className="space-y-4 sm:space-y-6">
+            <div className="inline-block bg-[#10b981]/10 border border-[#10b981]/20 backdrop-blur-md px-4 sm:px-5 py-1.5 sm:py-2 rounded-full">
+              <span className="text-[9px] sm:text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em]">GLOBAL TRUSTED PLATFORM</span>
             </div>
             
-            <h2 className="text-[2.6rem] md:text-5xl font-black text-white leading-[1.05] uppercase italic tracking-tighter">
+            <h2 className="text-2xl sm:text-4xl md:text-5xl font-black text-white leading-[1.1] uppercase italic tracking-tighter">
               ASIA'S #1 TRUSTED <br />
               <span className="text-[#10b981]">EARNING ECOSYSTEM.</span>
             </h2>
             
-            <div className="space-y-4">
-              <p className="text-xl font-bold text-slate-300 italic tracking-tight">
+            <div className="space-y-2 sm:space-y-4">
+              <p className="text-lg sm:text-xl font-bold text-slate-300 italic tracking-tight">
                 Don't just spend time—<span className="text-amber-400 font-black not-italic drop-shadow-[0_0_12px_rgba(251,191,36,0.6)]">invest it.</span>
               </p>
-              <p className="text-[13px] text-slate-400 font-medium leading-relaxed max-w-sm">
+              <p className="text-xs sm:text-[13px] text-slate-400 font-medium leading-relaxed max-w-sm">
                  Turn your daily smartphone usage into a sustainable income through our verified freelancer network.
               </p>
             </div>
           </div>
 
           {/* Action Promo Bar */}
-          <div className="bg-white/[0.03] border border-white/5 p-6 rounded-[2.5rem] flex items-center gap-6 backdrop-blur-sm shadow-inner group transition-all">
-             <div className="bg-[#10b981] p-4 rounded-2xl shadow-xl shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-                <ICONS.Zap size={24} className="text-white" />
+          <div className="bg-white/[0.03] border border-white/5 p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] flex items-center gap-4 sm:gap-6 backdrop-blur-sm shadow-inner group transition-all">
+             <div className="bg-[#10b981] p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-xl shadow-emerald-500/20 group-hover:scale-105 transition-transform shrink-0">
+                <ICONS.Zap size={22} className="text-white sm:w-6 sm:h-6" />
              </div>
              <p className="text-xs font-black text-white uppercase tracking-tight italic leading-snug">
                Earn income very easily by <br />completing tasks here.
@@ -822,35 +822,35 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
           </div>
 
           {/* Dynamic Stats Cards */}
-          <div className="grid grid-cols-2 gap-4 sm:gap-5 px-4 sm:px-0">
-             <div className="bg-white/[0.02] border border-white/5 p-5 sm:p-7 rounded-[2.5rem] relative overflow-hidden group backdrop-blur-md">
-                <div className="flex items-center gap-2 mb-2">
+          <div className="grid grid-cols-2 gap-3 sm:gap-5 px-0">
+             <div className="bg-white/[0.02] border border-white/5 p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] relative overflow-hidden group backdrop-blur-md">
+                <div className="flex items-center gap-1.5 sm:gap-2 mb-2">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse"></div>
                   <div className="bg-emerald-500/20 px-2 py-0.5 rounded text-[8px] font-black text-emerald-400 tracking-widest uppercase">PAYING</div>
                 </div>
-                <p className="text-2xl sm:text-3xl font-black text-white italic tracking-tighter leading-none mb-2">
+                <p className="text-xl sm:text-3xl font-black text-white italic tracking-tighter leading-none mb-2">
                   ৳{(totalPaid / 1000000).toFixed(2)}M+
                 </p>
-                <p className="text-[9px] sm:text-[10px] font-black text-[#10b981] uppercase tracking-widest mb-4">TOTAL PAID OUT</p>
+                <p className="text-[8px] sm:text-[10px] font-black text-[#10b981] uppercase tracking-widest mb-3 sm:mb-4">TOTAL PAID OUT</p>
                 <div className="flex items-center gap-1.5 opacity-90">
-                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
-                   <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">
+                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div>
+                   <span className="text-[7.5px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none truncate">
                      LAST PAYOUT: ৳{lastPayout} PROCESSED
                    </span>
                 </div>
              </div>
 
-             <div className="bg-white/[0.02] border border-white/5 p-5 sm:p-7 rounded-[2.5rem] relative overflow-hidden group backdrop-blur-md">
-                <div className="flex items-center gap-2 mb-2">
+             <div className="bg-white/[0.02] border border-white/5 p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] relative overflow-hidden group backdrop-blur-md">
+                <div className="flex items-center gap-1.5 sm:gap-2 mb-2">
                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_12px_#10b981] animate-[pulse_0.6s_infinite]"></div>
                   <div className="bg-emerald-500/20 px-2 py-0.5 rounded text-[8px] font-black text-emerald-400 tracking-widest uppercase">LIVE</div>
                 </div>
-                <p className="text-2xl sm:text-3xl font-black text-white italic tracking-tighter leading-none mb-2">
+                <p className="text-xl sm:text-3xl font-black text-white italic tracking-tighter leading-none mb-2">
                   500K+
                 </p>
-                <p className="text-[9px] sm:text-[10px] font-black text-[#10b981] uppercase tracking-widest mb-4">ACTIVE EARNERS</p>
+                <p className="text-[8px] sm:text-[10px] font-black text-[#10b981] uppercase tracking-widest mb-3 sm:mb-4">ACTIVE EARNERS</p>
                 <div className="flex items-center gap-2">
-                   <span className="text-[8px] sm:text-[9px] font-black text-blue-400 uppercase tracking-widest animate-pulse">
+                   <span className="text-[7.5px] sm:text-[9px] font-black text-blue-400 uppercase tracking-widest animate-pulse truncate">
                      {activeNow.toLocaleString()} ONLINE NOW
                    </span>
                 </div>
@@ -860,22 +860,22 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
 
         {/* Column 2: Sleek Premium White Form Card */}
         <div className="lg:col-span-7 flex justify-center w-full">
-          <div translate="no" className="w-full sm:max-w-lg bg-white border-t sm:border border-slate-100 rounded-t-[3rem] sm:rounded-[3.5rem] p-6 sm:p-8 md:p-12 shadow-2xl relative overflow-hidden notranslate">
+          <div translate="no" className="w-full max-w-md sm:max-w-lg bg-white border border-slate-100 rounded-3xl sm:rounded-[3.5rem] p-5 sm:p-8 md:p-10 shadow-2xl relative overflow-hidden notranslate mx-auto">
             
-            <div className="text-center space-y-4">
-               <div className="flex justify-center mb-6">
-                  <div className="bg-emerald-50 px-6 py-2 rounded-full border border-emerald-100 flex items-center gap-3 shadow-sm">
+            <div className="text-center space-y-3 sm:space-y-4">
+               <div className="flex justify-center mb-4 sm:mb-6">
+                  <div className="bg-emerald-50 px-4 sm:px-6 py-1.5 sm:py-2 rounded-full border border-emerald-100 flex items-center gap-2.5 sm:gap-3 shadow-sm">
                      <ICONS.Shield size={16} className="text-[#10b981]" />
-                     <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em]">
+                     <span className="text-[9px] sm:text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em]">
                        {view === 'verify' || view === 'admin-otp' ? 'SECURITY VERIFICATION' : 'HIGH-SECURITY GATEWAY'}
                      </span>
                   </div>
                </div>
-               <h3 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase italic tracking-tighter leading-none">
+               <h3 className="text-xl sm:text-3xl font-black text-slate-900 uppercase italic tracking-tighter leading-none">
                  {view === 'verify' || view === 'admin-otp' ? 'ENTER OTP CODE' : view === 'signup' ? 'CREATE ACCOUNT' : view === 'forgot' ? 'RESET PASSWORD' : 'WELCOME BACK'}
                </h3>
-               <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-relaxed">
-                 {view === 'verify' || view === 'admin-otp' ? 'Check your email for the 6-digit code.' : view === 'signup' ? 'Join the largest earning network.' : 'LOG IN TO ACCESS YOUR DASHBOARD AND TASKS.'}
+               <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-relaxed">
+                 {view === 'verify' || view === 'admin-otp' ? 'Check your email for the code.' : view === 'signup' ? 'Join the largest earning network.' : 'LOG IN TO ACCESS YOUR DASHBOARD AND TASKS.'}
                </p>
             </div>
 
