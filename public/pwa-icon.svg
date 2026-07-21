@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Rich Emerald Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a9b5e" />
+      <stop offset="50%" stop-color="#067647" />
+      <stop offset="100%" stop-color="#03482a" />
+    </linearGradient>
+
+    <!-- Gold Coin Gradient -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="50%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+
+    <!-- Badge Shadow -->
+    <filter id="badgeShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#000000" flood-opacity="0.35" />
+    </filter>
+
+    <!-- Icon Glow -->
+    <filter id="iconGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#067647" flood-opacity="0.5" />
+    </filter>
+  </defs>
+
+  <!-- Full Background for Maskable and Standard padding -->
+  <rect width="512" height="512" fill="#03482a" />
+
+  <!-- Centered Rich Emerald Squircle Box (Safe Area 80%) -->
+  <rect x="48" y="48" width="416" height="416" rx="112" fill="url(#bgGrad)" stroke="#10b981" stroke-width="4" filter="url(#iconGlow)" />
+
+  <!-- First Golden Coin (Upper Left) -->
+  <circle cx="225" cy="210" r="85" fill="url(#bgGrad)" stroke="url(#goldGrad)" stroke-width="20" />
+  <text x="225" y="235" text-anchor="middle" fill="url(#goldGrad)" font-size="76" font-weight="900" font-family="'Inter', 'Plus Jakarta Sans', system-ui, sans-serif" letter-spacing="-2">AR</text>
+
+  <!-- Second Golden Coin (Overlapping Lower Right) -->
+  <circle cx="295" cy="285" r="85" fill="url(#bgGrad)" stroke="url(#goldGrad)" stroke-width="20" />
+  <text x="295" y="312" text-anchor="middle" fill="url(#goldGrad)" font-size="80" font-weight="900" font-family="'Inter', 'Plus Jakarta Sans', system-ui, sans-serif">1</text>
+
+  <!-- Overlapping White Trend/Growth Badge (Bottom Right) -->
+  <g filter="url(#badgeShadow)">
+    <circle cx="390" cy="390" r="72" fill="#ffffff" />
+    <!-- Dynamic Green Upward Trend Arrow -->
+    <path d="M345 412 L375 382 L395 402 L430 362" stroke="#10b981" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    <path d="M400 362 H430 V392" stroke="#10b981" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  </g>
+</svg>

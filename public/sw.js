@@ -1,9 +1,17 @@
-const CACHE_NAME = 'arearnzone-cache-v1';
+const CACHE_NAME = 'arearnzone-cache-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './index.css',
-  './manifest.json'
+  './manifest.json',
+  './manifest.webmanifest',
+  './icon-192.jpg',
+  './icon-512.jpg',
+  './apple-touch-icon.jpg',
+  './pwa-icon.svg',
+  './favicon.svg',
+  './maskable-icon-192.jpg',
+  './maskable-icon-512.jpg'
 ];
 
 // Install Event
