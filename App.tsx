@@ -39,7 +39,6 @@ import Buy from './components/Buy';
 import TelegramVerify from './components/TelegramVerify';
 import AdManagerOverlay from './components/AdManagerOverlay';
 import { FAQ } from './components/FAQ';
-import { InstallAppModal } from './components/InstallAppModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { getAIRecoveryConfig, runAIHealthScanAndRecovery } from './utils/aiRecoveryEngine';
 
@@ -243,22 +242,6 @@ const App: React.FC = () => {
 
   const [storeOrders, setStoreOrders] = useState<StoreOrder[]>(getStored('arez_store_orders', []));
   const [telegramRequests, setTelegramRequests] = useState<TelegramVerificationRequest[]>(getStored('arez_telegram_reqs', []));
-
-  // PWA Install Prompt Listener
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [showInstallModal, setShowInstallModal] = useState(false);
-
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
-  }, []);
 
   // Translation Helper
   const t = (key: any): string => {
@@ -1364,9 +1347,6 @@ const App: React.FC = () => {
             isMaintenanceLocked={isMaintenanceLocked}
             dbQuotaExceeded={dbQuotaExceeded}
             refreshAllData={refreshAllData}
-            showInstallModal={showInstallModal}
-            setShowInstallModal={setShowInstallModal}
-            deferredPrompt={deferredPrompt}
           />
         </Router>
       </ErrorBoundary>
@@ -1450,9 +1430,6 @@ const AppContent: React.FC<{
   isMaintenanceLocked: boolean;
   dbQuotaExceeded: boolean;
   refreshAllData: (silent?: boolean) => Promise<void>;
-  showInstallModal: boolean;
-  setShowInstallModal: React.Dispatch<React.SetStateAction<boolean>>;
-  deferredPrompt: any;
 }> = ({
   currentUser, setCurrentUser, isDarkMode, setIsDarkMode, language, setLanguage,
   selectedCountryCode, setSelectedCountryCode, handleCountryChange, isSidebarOpen, setIsSidebarOpen,
@@ -1466,7 +1443,7 @@ const AppContent: React.FC<{
   sellCategories, setSellCategories, sellItems, setSellItems, storeOrders, setStoreOrders,
   telegramRequests, setTelegramRequests, targets, setTargets, targetHistories, setTargetHistories, t, toggleDarkMode, toggleLanguage, notify,
   handleLogin, handleUpdateUser, clearNotifications, isMaintenanceLocked, dbQuotaExceeded,
-  refreshAllData, showInstallModal, setShowInstallModal, deferredPrompt
+  refreshAllData
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -1584,7 +1561,6 @@ const AppContent: React.FC<{
               toggleSidebar={() => setIsSidebarOpen(true)}
               notifications={appNotifications}
               onClearNotifications={clearNotifications}
-              onOpenInstallModal={() => setShowInstallModal(true)}
             />
 
             {/* Scrollable Viewport Stage */}
@@ -1609,7 +1585,6 @@ const AppContent: React.FC<{
                     setUsers={setUsers}
                     setTransactions={setTransactions}
                     onUpdateUser={handleUpdateUser}
-                    onOpenInstallModal={() => setShowInstallModal(true)}
                   />
                 } />
                 <Route path="/tasks" element={(currentUser.status === 'Verified' || currentUser.role === 'admin') ? <Tasks tasks={tasks} user={currentUser} submissions={taskSubmissions} setSubmissions={setTaskSubmissions} notify={notify} t={t} selectedCountryCode={selectedCountryCode} /> : <Navigate to="/membership" />} />
@@ -1758,14 +1733,6 @@ const AppContent: React.FC<{
 
       {/* Social Join Modals */}
       {showSocialPopup && <SocialPopup links={socialLinks} onClose={() => setShowSocialPopup(false)} />}
-
-      {/* PWA Install App Modal */}
-      <InstallAppModal 
-        isOpen={showInstallModal} 
-        onClose={() => setShowInstallModal(false)} 
-        deferredPrompt={deferredPrompt} 
-        onInstallSuccess={() => notify('App installed successfully!')} 
-      />
 
       {/* Logout confirmation alert dialog */}
       {showLogoutConfirm && (

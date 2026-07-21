@@ -43,7 +43,6 @@ interface DashboardProps {
   setUsers?: React.Dispatch<React.SetStateAction<User[]>>;
   setTransactions?: React.Dispatch<React.SetStateAction<Transaction[]>>;
   onUpdateUser?: (updatedUser: User) => void;
-  onOpenInstallModal?: () => void;
 }
 
 // Custom Hook for smooth count-up animation
@@ -106,8 +105,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   setTargetHistories,
   setUsers,
   setTransactions,
-  onUpdateUser,
-  onOpenInstallModal
+  onUpdateUser
 }) => {
   const navigate = useNavigate();
   const isAdmin = user.role === 'admin';
@@ -469,40 +467,6 @@ const Dashboard: React.FC<DashboardProps> = ({
             <div className={`w-1.5 h-1.5 rounded-full ${isVerified ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></div>
             <span className="text-[9px] font-bold text-slate-500 uppercase">{isVerified ? 'Verified Pro' : 'Free Member'}</span>
           </div>
-        </div>
-      </div>
-
-      {/* Prominent Download Official App Banner Widget */}
-      <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 border border-emerald-500/30 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-xl relative overflow-hidden group">
-        <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0 border border-white/10">
-              <ICONS.Smartphone size={22} className="text-white sm:w-6 sm:h-6" />
-            </div>
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2">
-                <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full uppercase tracking-wider border border-emerald-500/30">
-                  OFFICIAL APP
-                </span>
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">PWA Ready</span>
-              </div>
-              <h3 className="text-base sm:text-lg font-black text-white uppercase italic tracking-tight">
-                DOWNLOAD AREARNZONE APP (অ্যাপ ডাউনলোড)
-              </h3>
-              <p className="text-[11px] text-slate-300 font-medium leading-tight max-w-md">
-                Install on your mobile home screen for instant task alerts, 1-tap fast access & smooth performance.
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={onOpenInstallModal}
-            className="w-full sm:w-auto bg-[#10b981] hover:bg-emerald-600 active:scale-95 text-white font-black px-5 py-3 rounded-xl sm:rounded-2xl shadow-lg shadow-emerald-500/20 text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all border border-white/10 shrink-0 cursor-pointer"
-          >
-            <ICONS.Download size={16} className="animate-bounce" />
-            <span>Install App / ইনস্টল করুন</span>
-          </button>
         </div>
       </div>
 

@@ -18,12 +18,11 @@ interface NavbarProps {
   toggleSidebar: () => void;
   notifications?: AppNotification[];
   onClearNotifications?: () => void;
-  onOpenInstallModal?: () => void;
 }
 
 const Navbar: React.FC<NavbarProps> = ({ 
   user, isDarkMode, language, selectedCountryCode = 'BD', onChangeCountry, toggleDarkMode, toggleLanguage, onLogout, notify, toggleSidebar,
-  notifications = [], onClearNotifications, onOpenInstallModal
+  notifications = [], onClearNotifications 
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -82,17 +81,6 @@ const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       <div className="flex items-center gap-2 md:gap-5">
-        {/* Prominent Download App Button */}
-        <button
-          onClick={onOpenInstallModal}
-          className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 active:scale-95 text-white px-3 sm:px-4 py-2 rounded-xl shadow-md shadow-emerald-500/20 transition-all border border-white/20 flex items-center gap-1.5 font-black text-[10px] sm:text-xs uppercase tracking-wider cursor-pointer group"
-          title="Download Official App"
-        >
-          <ICONS.Download size={14} className="animate-bounce shrink-0" />
-          <span className="hidden sm:inline">Download App</span>
-          <span className="sm:hidden">App</span>
-        </button>
-
         {/* Country Selector Dropdown */}
         <div className="relative">
           <button
