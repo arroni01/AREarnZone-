@@ -28,7 +28,11 @@ import {
   ShoppingCart,
   Upload,
   Edit,
-  ArrowRight
+  ArrowRight,
+  Download,
+  Smartphone,
+  Share2,
+  MoreVertical
 } from 'lucide-react';
 
 export const COLORS = {
@@ -126,5 +130,9 @@ export const ICONS = {
   Buy: ShoppingCart,
   Upload: Upload,
   Edit: Edit,
-  ArrowRight: ArrowRight
+  ArrowRight: ArrowRight,
+  Download: Download,
+  Smartphone: Smartphone,
+  Share2: Share2,
+  MoreVertical: MoreVertical
 };
