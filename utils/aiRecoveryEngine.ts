@@ -353,11 +353,10 @@ export async function runAIHealthScanAndRecovery(isManual: boolean = false): Pro
            r.issueType.toLowerCase().includes('connection')
     );
 
-    let notifyMsg = `AI Health Recovery active: ${resolvedIssues.length} technical issue(s) resolved automatically!`;
+    let notifyMsg = `System optimization completed successfully.`;
     
     if (criticalIssues.length > 0) {
-      const issueNames = criticalIssues.map(i => i.issueType).join(", ");
-      notifyMsg = `🚨 [SYSTEM HEALTH ALERT] Automated recovery cycle successfully identified and fixed critical component failure: ${issueNames}! All systems fully restored to healthy state.`;
+      notifyMsg = `System performance and state successfully restored to optimal condition.`;
     }
 
     const event = new CustomEvent('arearnzone_show_admin_toast', { 

@@ -49,19 +49,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
   const [copiedOrigin, setCopiedOrigin] = useState(false);
   const [fallbackNotice, setFallbackNotice] = useState('');
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
-  const [googleAuthError, setGoogleAuthError] = useState<{
-    code: string;
-    message: string;
-    stack?: string;
-    domain: string;
-    isFramed: boolean;
-    appId?: string;
-    projectId?: string;
-    authDomain?: string;
-  } | null>(null);
-  const [showDebugConsole, setShowDebugConsole] = useState(false);
-  const [isGsiActive, setIsGsiActive] = useState(false);
-  const googleBtnRef = useRef<HTMLDivElement>(null);
 
   const getOriginSafe = (): string => {
     if (typeof window === 'undefined') return '';
@@ -508,131 +495,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     }
   }, [users]);
 
-  // Dynamically load Google Identity Services for reliable iframe-resilient authentication
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
 
-    let script = document.getElementById('google-gsi-script') as HTMLScriptElement;
-    if (!script) {
-      script = document.createElement('script');
-      script.id = 'google-gsi-script';
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      document.body.appendChild(script);
-    }
-
-    const initGsi = () => {
-      try {
-        const googleObj = (window as any).google;
-        if (googleObj && googleObj.accounts && googleObj.accounts.id) {
-          console.log("[GSI] Initializing Google Identity Services with Client ID:", firebaseConfig.oAuthClientId);
-          
-          googleObj.accounts.id.initialize({
-            client_id: firebaseConfig.oAuthClientId,
-            auto_select: false,
-            callback: async (response: any) => {
-              try {
-                setIsGoogleLoading(true);
-                setError('');
-                console.log("[GSI] ID Token received from Google. Authenticating to Firebase...");
-                
-                const idToken = response.credential;
-                const credential = GoogleAuthProvider.credential(idToken);
-                const result = await signInWithCredential(auth, credential);
-                const firebaseUser = result.user;
-
-                if (!firebaseUser || !firebaseUser.email) {
-                  throw new Error("Could not retrieve user info from Google credential sign-in.");
-                }
-
-                console.log("[GSI] Firebase authentication succeeded:", firebaseUser.email);
-                
-                const googleUserPayload = {
-                  email: firebaseUser.email,
-                  name: firebaseUser.displayName || firebaseUser.email.split('@')[0] || "Google User",
-                  id: firebaseUser.uid
-                };
-
-                // Proceed with login/registration flow
-                handleGoogleAuthSuccess(googleUserPayload);
-              } catch (err: any) {
-                console.error("[GSI] Auth Error:", err);
-                const isUnauthorized = (err.code && err.code.includes('unauthorized-domain')) || (err.message && err.message.includes('unauthorized-domain'));
-                const errCode = isUnauthorized ? 'auth/unauthorized-domain' : (err.code || "gsi_auth_error");
-                const errMsg = err.message || String(err);
-                
-                const friendlyMsg = isUnauthorized 
-                  ? `অননুমোদিত ডোমেন! এই ডোমেনটি (${window.location.hostname}) ফায়ারবেস কনসোলে Authorized Domains হিসেবে যুক্ত করা নেই। (Unauthorized Domain: Please add ${window.location.hostname} to your Firebase authorized domains.)`
-                  : `GSI authentication failed: ${errMsg}`;
-                
-                setError(friendlyMsg);
-                setGoogleAuthError({
-                  code: errCode,
-                  message: errMsg,
-                  domain: window.location.hostname,
-                  isFramed: isFramed(),
-                  projectId: firebaseConfig.projectId,
-                  authDomain: firebaseConfig.authDomain,
-                  stack: err.stack
-                });
-                setIsGoogleLoading(false);
-              }
-            }
-          });
-
-          setIsGsiActive(true);
-
-          if (googleBtnRef.current) {
-            console.log("[GSI] Rendering official Google Sign-In button...");
-            googleObj.accounts.id.renderButton(
-              googleBtnRef.current,
-              { 
-                theme: "outline", 
-                size: "large",
-                text: "continue_with",
-                shape: "pill",
-                width: googleBtnRef.current.offsetWidth || 280
-              }
-            );
-          }
-        }
-      } catch (e) {
-        console.warn("[GSI] Error initializing Google Identity Services:", e);
-      }
-    };
-
-    script.onload = () => {
-      initGsi();
-    };
-
-    // If script is already loaded
-    if ((window as any).google && (window as any).google.accounts) {
-      initGsi();
-    }
-
-    // Periodically re-render button if container was initially hidden or sized differently
-    const renderInterval = setInterval(() => {
-      const googleObj = (window as any).google;
-      if (googleObj && googleObj.accounts && googleObj.accounts.id && googleBtnRef.current) {
-        // Only render if child element isn't populated yet
-        if (googleBtnRef.current.children.length === 0) {
-          googleObj.accounts.id.renderButton(
-            googleBtnRef.current,
-            { 
-              theme: "outline", 
-              size: "large",
-              text: "continue_with",
-              shape: "pill",
-              width: googleBtnRef.current.offsetWidth || 280
-            }
-          );
-        }
-      }
-    }, 1000);
-
-    return () => clearInterval(renderInterval);
-  }, [users]);
 
   const handleGoogleAuthSuccess = (googleUser: any, customReferral?: string) => {
     setIsGoogleLoading(true);
@@ -713,7 +576,58 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
         localStorage.removeItem('arez_pending_referral');
       }
 
-      console.log("[Google Auth] Initializing GoogleAuthProvider and signInWithPopup...");
+      console.log("[Google Auth] Checking server-side custom Google OAuth URL...");
+      const origin = getOriginSafe();
+      const fetchUrl = `/api/auth/google/url?origin=${encodeURIComponent(origin)}`;
+      
+      let authUrl = '';
+      try {
+        const res = await fetch(fetchUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.url) {
+            authUrl = data.url;
+          }
+        }
+      } catch (fetchErr) {
+        console.warn("[Google Auth] Could not retrieve server-side OAuth URL:", fetchErr);
+      }
+
+      if (authUrl) {
+        console.log("[Google Auth] Using server-side Google OAuth. Opening popup window:", authUrl);
+        const width = 500;
+        const height = 650;
+        const left = window.screen.width / 2 - width / 2;
+        const top = window.screen.height / 2 - height / 2;
+
+        const popup = window.open(
+          authUrl,
+          'google_oauth_popup',
+          `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,resizable=yes`
+        );
+
+        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+          // Popup blocked by browser! Redirect current frame instead of failing
+          console.log("[Google Auth] Popup blocked or failed. Performing direct page redirect instead...");
+          window.location.href = authUrl;
+          return;
+        }
+
+        // Periodically monitor popup closed state
+        const timer = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(timer);
+            setTimeout(() => {
+              setIsGoogleLoading(false);
+            }, 1000);
+          }
+        }, 500);
+
+        return;
+      }
+
+      // --- Fallback to original Firebase Auth popup if backend custom URL is not configured/available ---
+      console.log("[Google Auth] Server OAuth URL not available. Falling back to Firebase popup...");
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({
         prompt: 'select_account'
@@ -742,22 +656,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       console.error("Google Login via Firebase Auth Error:", err);
       
       const isUnauthorized = (err.code && err.code.includes('unauthorized-domain')) || (err.message && err.message.includes('unauthorized-domain'));
-      const errCode = isUnauthorized ? 'auth/unauthorized-domain' : (err.code || "unknown_code");
+      const errCode = err.code || "unknown_code";
+      const domain = typeof window !== 'undefined' ? window.location.hostname : "unknown";
       
-      // Extract detailed diagnostics for the debugger panel
-      const debugInfo = {
-        code: errCode,
-        message: err.message || "Unknown error occurred during authentication.",
-        stack: err.stack,
-        domain: typeof window !== 'undefined' ? window.location.hostname : "unknown",
-        isFramed: isFramed(),
-        appId: firebaseConfig.appId,
-        projectId: firebaseConfig.projectId,
-        authDomain: firebaseConfig.authDomain
-      };
-      setGoogleAuthError(debugInfo);
-      setShowDebugConsole(true);
-
       let friendlyError = err.message || "Google Login failed.";
       if (err.code === 'auth/popup-blocked') {
         friendlyError = "পপআপ ব্লক করা হয়েছে! অনুগ্রহ করে ব্রাউজারে পপআপ অনুমোদন করুন। (Popup blocked! Please allow popups for this site.)";
@@ -766,9 +667,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       } else if (err.code === 'auth/cancelled-popup-request') {
         friendlyError = "পূর্বের সাইন-ইন অনুরোধটি বাতিল করা হয়েছে। (Sign-in request cancelled.)";
       } else if (isUnauthorized) {
-        friendlyError = `অননুমোদিত ডোমেন! এই ডোমেনটি (${debugInfo.domain}) ফায়ারবেস কনসোলে Authorized Domains হিসেবে যুক্ত করা নেই। (Unauthorized Domain: Add ${debugInfo.domain} to your Firebase authorized domains.)`;
+        friendlyError = `অননুমোদিত ডোমেন! এই ডোমেনটি (${domain}) ফায়ারবেস কনসোলে Authorized Domains হিসেবে যুক্ত করা নেই। (Unauthorized Domain: Add ${domain} to your Firebase authorized domains.)`;
       } else {
-        friendlyError = `গুগল সাইন-ইন ব্যর্থ হয়েছে। এরর কোড: ${debugInfo.code || 'unknown_code'}। বার্তা: ${debugInfo.message} (Google Sign-In failed. Error Code: ${debugInfo.code || 'unknown_code'})`;
+        friendlyError = `গুগল সাইন-ইন ব্যর্থ হয়েছে। এরর কোড: ${errCode}। (Google Sign-In failed. Error Code: ${errCode})`;
       }
       
       setError(friendlyError);
@@ -1426,149 +1327,22 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
                     </div>
                   )}
 
-                   {/* Native Google Identity Services Button Container (Super secure, bypasses iframe cookie limitations) */}
-                   <div className="bg-slate-50 p-4 rounded-[2rem] border border-slate-100/80 space-y-3.5 flex flex-col items-center">
-                     <p className="text-[10px] font-extrabold text-[#10b981] uppercase tracking-wider">
-                       🛡️ SECURE DIRECT GOOGLE LOGIN
-                     </p>
-                     
-                     {/* GSI Container */}
-                     <div className="w-full flex justify-center items-center min-h-[44px]">
-                       <div ref={googleBtnRef} className="w-full flex justify-center"></div>
-                     </div>
-                     
-                     <p className="text-[9px] text-slate-400 font-bold leading-normal text-center uppercase tracking-wider px-2">
-                       আইফ্রেম এবং মোবাইল ব্রাউজারের জন্য এটিই সবচেয়ে নির্ভরযোগ্য মাধ্যম (Recommended & robust sign-in for sandbox/iframes)
-                     </p>
-                   </div>
-
-                   <div className="relative flex py-1 items-center">
-                     <div className="flex-grow border-t border-slate-200/50"></div>
-                     <span className="flex-shrink mx-4 text-[8px] font-black text-slate-300 uppercase tracking-widest">OR / অথবা</span>
-                     <div className="flex-grow border-t border-slate-200/50"></div>
-                   </div>
-
                    <button 
-                      type="button" onClick={startGoogleLogin}
+                      type="button" 
+                      onClick={startGoogleLogin}
                       disabled={isGoogleLoading}
-                      className="w-full border-2 border-slate-100 bg-white py-3.5 sm:py-4 px-6 sm:px-8 rounded-[1.8rem] flex items-center justify-center gap-3 sm:gap-4 hover:border-slate-300 hover:bg-slate-50 transition-all shadow-sm group active:scale-95 disabled:opacity-50"
+                      className="w-full border border-slate-200 bg-white py-3.5 sm:py-4 px-6 sm:px-8 rounded-full flex items-center justify-center gap-3 sm:gap-4 hover:border-slate-300 hover:bg-slate-50/50 transition-all shadow-sm group active:scale-[0.98] disabled:opacity-50"
                     >
                       {isGoogleLoading ? (
                         <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
                       ) : (
-                        <img src="https://www.gstatic.com/images/branding/product/2x/googleg_48dp.png" className="w-5 h-5 sm:w-6 sm:h-6" alt="G" />
+                        <img src="https://www.gstatic.com/images/branding/product/2x/googleg_48dp.png" className="w-5 h-5 sm:w-5.5 sm:h-5.5" alt="G" />
                       )}
-                      <span className="font-black text-[9.5px] sm:text-[10.5px] text-slate-600 uppercase tracking-widest">
-                        {isGoogleLoading ? 'AUTHENTICATING...' : 'FALLBACK GOOGLE AUTH'}
+                      <span className="font-extrabold text-[12px] sm:text-[13px] text-slate-700 tracking-wide">
+                        {isGoogleLoading ? 'AUTHENTICATING...' : 'Continue with Google'}
                       </span>
-                      <div className="bg-slate-100 px-1.5 sm:px-2 py-0.5 rounded text-[6.5px] sm:text-[7.5px] font-black text-slate-500 uppercase tracking-widest ml-auto">POPUPS</div>
                     </button>
 
-                    {/* Detailed Google Auth Debugger Console / ডায়াগনস্টিকস */}
-                    {googleAuthError && (
-                      <div className="text-left bg-slate-900 text-slate-100 rounded-3xl border border-red-500/30 p-5 mt-4 space-y-4 shadow-xl animate-in fade-in slide-in-from-top-4 duration-250">
-                        <div className="flex items-center gap-2.5 border-b border-slate-800 pb-3">
-                          <div className="bg-red-500/10 p-2 rounded-xl text-red-500 shrink-0">
-                            <ICONS.Shield size={18} className="animate-pulse" />
-                          </div>
-                          <div>
-                            <h4 className="text-[11px] font-black tracking-widest text-white uppercase italic">
-                              Google Auth Debugger Console
-                            </h4>
-                            <p className="text-[9px] font-bold text-red-400 uppercase tracking-wider">
-                              গুগল সাইন-ইন ডায়াগনস্টিকস
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setGoogleAuthError(null);
-                            }}
-                            className="ml-auto text-slate-400 hover:text-white transition-colors text-[9px] font-black px-2 py-1 bg-slate-800 rounded-lg"
-                          >
-                            CLEAR
-                          </button>
-                        </div>
-
-                        <div className="space-y-3 text-xs">
-                          {/* Alert for unauthorized domain */}
-                          {googleAuthError.code === 'auth/unauthorized-domain' && (
-                            <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded-xl space-y-2">
-                              <p className="font-extrabold text-[11px] uppercase tracking-wider">⚠️ REASON: Domain Unauthorized in Firebase</p>
-                              <p className="text-[11px] leading-relaxed">
-                                This domain <strong>({googleAuthError.domain})</strong> is not authorized in your Firebase console. Go to your Firebase project &gt; <strong>Authentication &gt; Settings &gt; Authorized domains</strong>, and add <code>{googleAuthError.domain}</code>.
-                              </p>
-                              <p className="text-[11px] text-amber-400/80 leading-relaxed">
-                                (আপনার ডোমেনটি Firebase-এ অনুমোদিত নয়। ফায়ারবেস কনসোলে গিয়ে Authorized domains লিস্টে <strong>{googleAuthError.domain}</strong> যোগ করুন।)
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Alert for popup blocked */}
-                          {googleAuthError.code === 'auth/popup-blocked' && (
-                            <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded-xl space-y-2">
-                              <p className="font-extrabold text-[11px] uppercase tracking-wider">⚠️ REASON: Popup Blocked by Browser</p>
-                              <p className="text-[11px] leading-relaxed">
-                                The browser blocked the sign-in window. Please enable popups in your browser settings or click the "CONTINUE WITH GOOGLE" button again.
-                              </p>
-                              <p className="text-[11px] text-amber-400/80 leading-relaxed">
-                                (ব্রাউজার পপআপ ব্লক করেছে। ব্রাউজারের পপআপ অনুমোদন করুন এবং পুনরায় চেষ্টা করুন।)
-                              </p>
-                            </div>
-                          )}
-
-                          {/* General metadata */}
-                          <div className="grid grid-cols-2 gap-2 bg-slate-950 p-3.5 rounded-xl border border-slate-800/60 font-mono text-[9.5px] leading-relaxed text-slate-300">
-                            <div>
-                              <span className="text-slate-500 uppercase block font-sans font-black text-[8px]">Error Code:</span>
-                              <span className="text-rose-400 font-bold">{googleAuthError.code}</span>
-                            </div>
-                            <div>
-                              <span className="text-slate-500 uppercase block font-sans font-black text-[8px]">App Hostname:</span>
-                              <span className="text-emerald-400 font-bold">{googleAuthError.domain}</span>
-                            </div>
-                            <div className="col-span-2 border-t border-slate-800 my-1"></div>
-                            <div>
-                              <span className="text-slate-500 uppercase block font-sans font-black text-[8px]">Firebase Client Project:</span>
-                              <span className="text-slate-300 font-semibold">{googleAuthError.projectId}</span>
-                            </div>
-                            <div>
-                              <span className="text-slate-500 uppercase block font-sans font-black text-[8px]">Firebase Auth Domain:</span>
-                              <span className="text-slate-300 font-semibold break-all">{googleAuthError.authDomain}</span>
-                            </div>
-                            <div className="col-span-2 border-t border-slate-800 my-1"></div>
-                            <div className="col-span-2">
-                              <span className="text-slate-500 uppercase block font-sans font-black text-[8px]">Iframe Environment:</span>
-                              <span className="text-slate-300 font-semibold">{googleAuthError.isFramed ? 'YES (In Sandbox Frame) / হাঁ (আইফ্রেম)' : 'NO (Direct Page) / না (সরাসরি ব্রাউজার)'}</span>
-                            </div>
-                          </div>
-
-                          <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800/60 font-mono text-[9px] text-slate-300 space-y-1 overflow-x-auto max-h-40">
-                            <span className="text-slate-500 uppercase block font-sans font-black text-[8px] mb-1">Full Trace Message:</span>
-                            <p className="text-slate-300 break-words leading-relaxed select-all">{googleAuthError.message}</p>
-                            {googleAuthError.stack && (
-                              <details className="mt-2 text-slate-400 cursor-pointer font-sans">
-                                <summary className="text-[8px] text-slate-500 uppercase font-sans font-black hover:text-slate-300">View Stack Trace</summary>
-                                <pre className="text-[8px] text-slate-500 mt-1 select-all break-all overflow-x-auto">{googleAuthError.stack}</pre>
-                              </details>
-                            )}
-                          </div>
-
-                          {/* Quick Troubleshooting Button */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const report = `=== GOOGLE AUTH DIAGNOSTICS REPORT ===\nDomain: ${googleAuthError.domain}\nCode: ${googleAuthError.code}\nMessage: ${googleAuthError.message}\nIs Framed: ${googleAuthError.isFramed}\nProject ID: ${googleAuthError.projectId}\nAuth Domain: ${googleAuthError.authDomain}\nUser Agent: ${navigator.userAgent}`;
-                              navigator.clipboard.writeText(report);
-                              notify("ডায়াগনস্টিক রিপোর্ট কপি হয়েছে! (Diagnostic report copied!)");
-                            }}
-                            className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 px-4 rounded-xl text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 border border-slate-700 active:scale-95 transition-all"
-                          >
-                            <span>📋 Copy Diagnostic Report</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
 
                    {/* Collapsible Google OAuth Guide for the Developer */}
                    {typeof window !== 'undefined' && (window.location.search.includes('config=1') || window.location.search.includes('dev=1') || showHelp) && (

@@ -142,14 +142,25 @@ export function isQuotaError(error: any): boolean {
   );
 }
 
+export function isOfflineError(error: any): boolean {
+  const msg = String(error?.message || error || '').toLowerCase();
+  return (
+    msg.includes("offline") ||
+    msg.includes("failed to get document because the client is offline") ||
+    msg.includes("unavailable") ||
+    msg.includes("network") ||
+    msg.includes("could not reach")
+  );
+}
+
 /**
  * Handle and re-throw Firestore permission errors as JSON strings
  * to assist automated platform diagnostics.
  */
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
-  if (isQuotaError(error)) {
+  if (isQuotaError(error) || isOfflineError(error)) {
     setIsQuotaExceeded(true);
-    console.warn(`[Firestore Safe-Guard] Quota exceeded on ${operationType} at path ${path}. Switched to high-performance local sandbox mode.`);
+    console.warn(`[Firestore Safe-Guard] Quota or Offline status detected on ${operationType} at path ${path}. Switched to high-performance local sandbox mode.`);
   }
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
@@ -176,9 +187,9 @@ export async function fetchCollection<T>(collectionName: string): Promise<T[]> {
     const snapshot = await getDocs(colRef);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as T));
   } catch (error) {
-    if (isQuotaError(error)) {
+    if (isQuotaError(error) || isOfflineError(error)) {
       setIsQuotaExceeded(true);
-      console.warn(`[Firestore Safe-Guard] Quota limit detected during fetchCollection of ${collectionName}. Falling back.`);
+      console.warn(`[Firestore Safe-Guard] Quota or Offline limit detected during fetchCollection of ${collectionName}. Falling back.`);
       return [];
     }
     handleFirestoreError(error, OperationType.LIST, collectionName);
@@ -198,9 +209,9 @@ export async function saveDocument(collectionName: string, docId: string, data: 
     }));
     await setDoc(docRef, sanitizedData, { merge: true });
   } catch (error) {
-    if (isQuotaError(error)) {
+    if (isQuotaError(error) || isOfflineError(error)) {
       setIsQuotaExceeded(true);
-      console.warn(`[Firestore Safe-Guard] Quota limit detected during saveDocument of ${collectionName}/${docId}. Falling back.`);
+      console.warn(`[Firestore Safe-Guard] Quota or Offline limit detected during saveDocument of ${collectionName}/${docId}. Falling back.`);
       return;
     }
     handleFirestoreError(error, OperationType.WRITE, `${collectionName}/${docId}`);
@@ -216,9 +227,9 @@ export async function deleteDocument(collectionName: string, docId: string): Pro
     const docRef = doc(db, collectionName, docId);
     await deleteDoc(docRef);
   } catch (error) {
-    if (isQuotaError(error)) {
+    if (isQuotaError(error) || isOfflineError(error)) {
       setIsQuotaExceeded(true);
-      console.warn(`[Firestore Safe-Guard] Quota limit detected during deleteDocument of ${collectionName}/${docId}. Falling back.`);
+      console.warn(`[Firestore Safe-Guard] Quota or Offline limit detected during deleteDocument of ${collectionName}/${docId}. Falling back.`);
       return;
     }
     handleFirestoreError(error, OperationType.DELETE, `${collectionName}/${docId}`);
@@ -251,9 +262,9 @@ export async function uploadInitialDataIfEmpty(collectionName: string, localData
     }
     return false;
   } catch (error) {
-    if (isQuotaError(error)) {
+    if (isQuotaError(error) || isOfflineError(error)) {
       setIsQuotaExceeded(true);
-      console.warn(`[Firestore Safe-Guard] Quota limit detected during uploadInitialData of ${collectionName}. Falling back.`);
+      console.warn(`[Firestore Safe-Guard] Quota or Offline limit detected during uploadInitialData of ${collectionName}. Falling back.`);
       return false;
     }
     handleFirestoreError(error, OperationType.WRITE, collectionName);
@@ -280,9 +291,9 @@ export async function uploadConfigIfEmpty(collectionName: string, docId: string,
     }
     return { data: null, existed: false };
   } catch (error) {
-    if (isQuotaError(error)) {
+    if (isQuotaError(error) || isOfflineError(error)) {
       setIsQuotaExceeded(true);
-      console.warn(`[Firestore Safe-Guard] Quota limit detected during uploadConfig of ${collectionName}/${docId}. Falling back.`);
+      console.warn(`[Firestore Safe-Guard] Quota or Offline limit detected during uploadConfig of ${collectionName}/${docId}. Falling back.`);
       return { data: localConfig, existed: true };
     }
     handleFirestoreError(error, OperationType.WRITE, `${collectionName}/${docId}`);

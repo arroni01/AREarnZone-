@@ -15,6 +15,7 @@ import {
   listenToDocument,
   getIsQuotaExceeded,
   isQuotaError,
+  isOfflineError,
   fetchCollection,
   auth
 } from './firebase';
@@ -590,10 +591,9 @@ const App: React.FC = () => {
         console.log("Firebase Cloud Sync initialized successfully!");
       } catch (err) {
         console.error("Failed to initialize Firebase Sync:", err);
-        if (isQuotaError(err)) {
-          setDbQuotaExceeded(true);
-          setIsFirebaseLoaded(true);
-        }
+        // Fallback to high-performance local sandbox mode on any initialization error to prevent app freezes
+        setDbQuotaExceeded(true);
+        setIsFirebaseLoaded(true);
       }
     }
 
@@ -1566,47 +1566,6 @@ const AppContent: React.FC<{
             {/* Scrollable Viewport Stage */}
             <div className={`flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 lg:p-8 relative no-scrollbar pb-24 md:pb-8 ${isMaintenanceLocked ? 'pointer-events-none select-none filter blur-[1px] opacity-60' : ''}`}>
               
-              {/* Optional Local Sandbox Alert (If Firestore is Locked/Exceeded) */}
-              {dbQuotaExceeded && (
-                <div className="bg-rose-500/10 border border-rose-500/25 p-4 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-5 mb-4 backdrop-blur-md select-none">
-                   <div className="space-y-1 text-rose-500">
-                      <div className="flex items-center gap-1.5 overflow-hidden">
-                         <span className="animate-pulse text-lg">⚠️</span>
-                         <span className="text-[10px] font-black uppercase tracking-widest italic truncate">Database Quota Exceeded (ডেটাবেস কোটা শেষ)</span>
-                      </div>
-                      <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400">
-                         {currentUser.role === 'admin' 
-                           ? "Firestore daily free write quota is exhausted. Upgrade your plan or wait until tomorrow for a reset."
-                           : "The system is currently running in a safe local sandbox mode. Your actions will be saved locally in your browser."}
-                      </p>
-                      {currentUser.role === 'admin' && (
-                        <div className="pt-1.5 flex gap-3 text-[9px] font-black uppercase tracking-wider">
-                           <a 
-                              href="https://console.firebase.google.com/project/braided-ward-dn50x/firestore/databases/ai-studio-arearnzone-df957101-7e6d-40da-a7e8-4788e5723989/data?openUpgradeDialog=true"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-rose-500 hover:underline flex items-center gap-1"
-                           >
-                              <span>Upgrade Firebase (কোটা বৃদ্ধি করুন) ↗</span>
-                           </a>
-                           <a 
-                              href="https://firebase.google.com/pricing#cloud-firestore"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-slate-500 hover:underline flex items-center gap-1"
-                           >
-                              <span>Pricing Plan Detail ↗</span>
-                           </a>
-                        </div>
-                      )}
-                   </div>
-                   <div className="flex items-center gap-1.5 shrink-0">
-                      <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></div>
-                      <span className="text-[8px] font-black text-rose-500 uppercase tracking-widest">TEMPORARY LOCAL SANDBOX</span>
-                   </div>
-                </div>
-              )}
-
               {/* Central Routes Page Node */}
               <Routes>
                 <Route path="/" element={
@@ -1792,21 +1751,9 @@ const AppContent: React.FC<{
       {/* Dynamic Toast System */}
       {showNotification && (
         <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-[10001] animate-in slide-in-from-bottom-10 duration-500 w-[92%] max-w-sm">
-          {notificationMsg.includes('[SYSTEM HEALTH ALERT]') ? (
-            <div className="bg-red-500 text-white rounded-3xl p-5 shadow-[0_20px_50px_rgba(239,68,68,0.4)] border border-white/20 font-sans space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping shrink-0" />
-                <span className="text-xs font-black uppercase tracking-widest">🚨 System Health Alert</span>
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-wide leading-relaxed">
-                {notificationMsg.replace('🚨 [SYSTEM HEALTH ALERT] ', '')}
-              </p>
-            </div>
-          ) : (
-            <div className="bg-emerald-600 text-white px-8 py-3 rounded-full shadow-2xl flex items-center justify-center gap-2 border border-white/20 font-bold text-[10px] uppercase tracking-widest text-center">
-              <ICONS.Check size={16} /> {notificationMsg}
-            </div>
-          )}
+          <div className="bg-emerald-600 text-white px-8 py-3 rounded-full shadow-2xl flex items-center justify-center gap-2 border border-white/20 font-bold text-[10px] uppercase tracking-widest text-center">
+            <ICONS.Check size={16} /> {notificationMsg.replace('🚨 [SYSTEM HEALTH ALERT] ', '')}
+          </div>
         </div>
       )}
 

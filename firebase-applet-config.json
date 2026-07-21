@@ -1,11 +1,11 @@
 {
-  "projectId": "braided-ward-dn50x",
-  "appId": "1:818768496606:web:61f0d3cf89753d48bf3f4f",
-  "apiKey": "AIzaSyD55HAUBpJ-glDdg5MbJEE93nRGHxbS-xg",
-  "authDomain": "braided-ward-dn50x.firebaseapp.com",
+  "projectId": "arearnzone",
+  "appId": "1:1090367277778:web:851e2b633f4ec91e2e3b0b",
+  "apiKey": "AIzaSyAJphW_sXQzgt2cKovLfZ6A91QUrnRXiFU",
+  "authDomain": "arearnzone.firebaseapp.com",
   "firestoreDatabaseId": "ai-studio-arearnzone-df957101-7e6d-40da-a7e8-4788e5723989",
-  "storageBucket": "braided-ward-dn50x.firebasestorage.app",
-  "messagingSenderId": "818768496606",
-  "measurementId": "",
-  "oAuthClientId": "818768496606-tc0imtr78bsivegri344lo4cctvs2k7h.apps.googleusercontent.com"
+  "storageBucket": "arearnzone.firebasestorage.app",
+  "messagingSenderId": "1090367277778",
+  "measurementId": "G-69XDTXHCZC",
+  "oAuthClientId": "1090367277778-4qagq4vk5a3jb0kb8a6bdqgrdbnies6e.apps.googleusercontent.com"
 }
