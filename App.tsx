@@ -1481,6 +1481,9 @@ const App: React.FC = () => {
             isMaintenanceLocked={isMaintenanceLocked}
             dbQuotaExceeded={dbQuotaExceeded}
             refreshAllData={refreshAllData}
+            sessionExpiredNotice={sessionExpiredNotice}
+            setSessionExpiredNotice={setSessionExpiredNotice}
+            performAutoLogout={performAutoLogout}
           />
         </Router>
       </ErrorBoundary>
@@ -1564,6 +1567,9 @@ const AppContent: React.FC<{
   isMaintenanceLocked: boolean;
   dbQuotaExceeded: boolean;
   refreshAllData: (silent?: boolean) => Promise<void>;
+  sessionExpiredNotice: string | null;
+  setSessionExpiredNotice: React.Dispatch<React.SetStateAction<string | null>>;
+  performAutoLogout: (reasonMsg?: string) => void;
 }> = ({
   currentUser, setCurrentUser, isDarkMode, setIsDarkMode, language, setLanguage,
   selectedCountryCode, setSelectedCountryCode, handleCountryChange, isSidebarOpen, setIsSidebarOpen,
@@ -1577,7 +1583,7 @@ const AppContent: React.FC<{
   sellCategories, setSellCategories, sellItems, setSellItems, storeOrders, setStoreOrders,
   telegramRequests, setTelegramRequests, targets, setTargets, targetHistories, setTargetHistories, t, toggleDarkMode, toggleLanguage, notify,
   handleLogin, handleUpdateUser, clearNotifications, isMaintenanceLocked, dbQuotaExceeded,
-  refreshAllData
+  refreshAllData, sessionExpiredNotice, setSessionExpiredNotice, performAutoLogout
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
