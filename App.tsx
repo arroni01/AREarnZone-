@@ -143,6 +143,124 @@ const App: React.FC = () => {
   const [isAdminVerified, setIsAdminVerified] = useState(false);
   const [dbQuotaExceeded, setDbQuotaExceeded] = useState(false);
   
+  // 5-Minute Auto-Session Timeout & Security Auto-Logout System (300 seconds)
+  const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
+  const lastActivityRef = React.useRef<number>(Date.now());
+  const [sessionExpiredNotice, setSessionExpiredNotice] = useState<string | null>(null);
+
+  const performAutoLogout = React.useCallback((reasonMsg?: string) => {
+    const msg = reasonMsg || "Session Expired: You were logged out due to 5 minutes of inactivity for your security.";
+    setCurrentUser(null);
+    localStorage.removeItem('arez_current_user');
+    localStorage.removeItem('arez_last_activity_time');
+    try {
+      sessionStorage.clear();
+    } catch (e) {}
+
+    signOut(auth).catch(err => {
+      console.warn("Firebase Auth signOut during auto-logout error:", err);
+    });
+
+    setShowLogoutConfirm(false);
+    setIsSidebarOpen(false);
+
+    setNotificationMsg(msg);
+    setShowNotification(true);
+    setSessionExpiredNotice(msg);
+    setTimeout(() => setShowNotification(false), 7000);
+  }, []);
+
+  // Check stored inactivity state on app startup
+  useEffect(() => {
+    const lastActiveStr = localStorage.getItem('arez_last_activity_time');
+    if (currentUser && lastActiveStr) {
+      const lastActiveTime = parseInt(lastActiveStr, 10);
+      if (!isNaN(lastActiveTime) && (Date.now() - lastActiveTime >= INACTIVITY_TIMEOUT_MS)) {
+        console.log("[Auto-Logout] Session expired on app load due to 5+ minutes of inactivity.");
+        performAutoLogout("Session Expired: You were logged out due to 5 minutes of inactivity for your security.");
+        return;
+      }
+    }
+    if (currentUser) {
+      const now = Date.now();
+      lastActivityRef.current = now;
+      localStorage.setItem('arez_last_activity_time', now.toString());
+    }
+  }, []);
+
+  // Track user interaction events (mouse, keyboard, touch, scroll)
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const handleUserActivity = () => {
+      const now = Date.now();
+      if (now - lastActivityRef.current >= 1000) {
+        lastActivityRef.current = now;
+        localStorage.setItem('arez_last_activity_time', now.toString());
+      }
+    };
+
+    const activityEvents = [
+      'mousemove',
+      'mousedown',
+      'keydown',
+      'touchstart',
+      'touchmove',
+      'scroll',
+      'click',
+      'pointermove',
+      'wheel'
+    ];
+
+    activityEvents.forEach(evt => {
+      window.addEventListener(evt, handleUserActivity, { passive: true });
+    });
+
+    return () => {
+      activityEvents.forEach(evt => {
+        window.removeEventListener(evt, handleUserActivity);
+      });
+    };
+  }, [currentUser]);
+
+  // Periodic inactivity checker & tab visibility/focus/background security
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const checkInactivityTimeout = () => {
+      const now = Date.now();
+      const storedLastStr = localStorage.getItem('arez_last_activity_time');
+      const storedLast = storedLastStr ? parseInt(storedLastStr, 10) : lastActivityRef.current;
+      const effectiveLast = Math.max(lastActivityRef.current, storedLast || 0);
+
+      if (now - effectiveLast >= INACTIVITY_TIMEOUT_MS) {
+        console.log("[Auto-Logout] 5 minutes of user inactivity detected. Triggering secure auto-logout.");
+        performAutoLogout("Session Expired: You were logged out due to 5 minutes of inactivity for your security.");
+      }
+    };
+
+    const timerId = setInterval(checkInactivityTimeout, 5000);
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        checkInactivityTimeout();
+      } else {
+        localStorage.setItem('arez_last_activity_time', Date.now().toString());
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    window.addEventListener('pageshow', handleVisibilityOrFocus);
+
+    return () => {
+      clearInterval(timerId);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      window.removeEventListener('pageshow', handleVisibilityOrFocus);
+    };
+  }, [currentUser, performAutoLogout]);
+  
   // GLOBAL CONFIG STATE
   const [globalConfig, setGlobalConfig] = useState<GlobalConfig>(getStored('arez_global_config', {
     appName: "AREARNZONE",
@@ -621,6 +739,18 @@ const App: React.FC = () => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser && firebaseUser.email) {
         console.log("[Firebase Auth] Auth state changed: user is logged in:", firebaseUser.email);
+        
+        // Prevent auto-restore if 5+ minutes of inactivity occurred
+        const lastActiveStr = localStorage.getItem('arez_last_activity_time');
+        if (lastActiveStr) {
+          const lastActiveTime = parseInt(lastActiveStr, 10);
+          if (!isNaN(lastActiveTime) && (Date.now() - lastActiveTime >= INACTIVITY_TIMEOUT_MS)) {
+            console.log("[Firebase Auth] Inactivity limit reached (>5m). Suppressing auto-restore and signing out.");
+            signOut(auth).catch(() => {});
+            return;
+          }
+        }
+
         const existing = users.find(u => u.email.toLowerCase().trim() === firebaseUser.email!.toLowerCase().trim());
         if (existing) {
           if (!currentUser || currentUser.email.toLowerCase().trim() !== firebaseUser.email.toLowerCase().trim()) {
@@ -634,7 +764,7 @@ const App: React.FC = () => {
       }
     });
     return () => unsubscribe();
-  }, [users, currentUser]);
+  }, [users, currentUser, INACTIVITY_TIMEOUT_MS]);
 
   // AI App Health Recovery background scanning effect
   useEffect(() => {
@@ -1228,6 +1358,10 @@ const App: React.FC = () => {
       }
     }
     notify(`Connected: ${finalUser.name}`);
+    const now = Date.now();
+    lastActivityRef.current = now;
+    localStorage.setItem('arez_last_activity_time', now.toString());
+    setSessionExpiredNotice(null);
     sessionStorage.removeItem('arez_social_shown');
     setShowSocialPopup(true);
   };
@@ -1723,6 +1857,23 @@ const AppContent: React.FC<{
       ) : (
         /* RESPONSIVE FULL-SCREEN AUTH GATEWAY (Logged Out) */
         <div className="flex-1 w-full flex flex-col relative z-10 min-h-screen">
+          {sessionExpiredNotice && (
+            <div className="fixed top-5 inset-x-4 max-w-md mx-auto z-[10005] bg-amber-500 text-white p-4 rounded-2xl shadow-2xl border border-white/20 flex items-start gap-3 animate-in slide-in-from-top-5 duration-300">
+              <div className="p-2 bg-white/20 rounded-xl shrink-0 mt-0.5">
+                <ICONS.Shield size={20} className="text-white" />
+              </div>
+              <div className="flex-1 text-left">
+                <h4 className="text-xs font-black uppercase tracking-wider">Security Notice</h4>
+                <p className="text-[11px] font-bold leading-snug mt-0.5 opacity-95">{sessionExpiredNotice}</p>
+              </div>
+              <button 
+                onClick={() => setSessionExpiredNotice(null)}
+                className="p-1 hover:bg-white/20 rounded-lg transition-all text-white font-bold text-xs"
+              >
+                ✕
+              </button>
+            </div>
+          )}
           <Routes>
             <Route path="*" element={
               <Auth onLogin={handleLogin} users={users} notify={notify} globalConfig={globalConfig} setGlobalConfig={setGlobalConfig} />
@@ -1741,7 +1892,7 @@ const AppContent: React.FC<{
             <div className="w-16 h-16 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto"><ICONS.Logout size={32} /></div>
             <h3 className="text-xl font-bold dark:text-white uppercase tracking-tighter">Confirm Logout</h3>
             <div className="flex flex-col gap-3 font-sans">
-              <button onClick={() => { setShowLogoutConfirm(false); setCurrentUser(null); localStorage.removeItem('arez_current_user'); sessionStorage.removeItem('arez_social_shown'); signOut(auth).catch(err => console.warn("Firebase Auth signOut failed:", err)); notify("Session Ended."); }} className="w-full py-4 bg-red-500 text-white font-bold rounded-xl shadow-lg uppercase tracking-widest text-[10px]">LOGOUT</button>
+              <button onClick={() => { performAutoLogout("Session Ended."); }} className="w-full py-4 bg-red-500 text-white font-bold rounded-xl shadow-lg uppercase tracking-widest text-[10px]">LOGOUT</button>
               <button onClick={() => setShowLogoutConfirm(false)} className="w-full py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold rounded-xl uppercase tracking-widest text-[10px]">CANCEL</button>
             </div>
           </div>
