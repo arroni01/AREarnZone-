@@ -1495,7 +1495,7 @@ const AppContent: React.FC<{
   const isBuy = location.pathname === '/buy';
 
   return (
-    <div className={`min-h-screen min-h-[100dvh] w-full flex flex-col transition-all duration-500 relative ${isDarkMode ? 'bg-[#020617] text-slate-100' : 'bg-slate-50 text-slate-900'} overflow-x-hidden font-sans`}>
+    <div className={`min-h-screen w-full flex flex-col transition-all duration-500 relative ${isDarkMode ? 'bg-[#020617] text-slate-100' : 'bg-slate-50 text-slate-900'} overflow-x-hidden font-sans`}>
       <Helmet>
         <title>AREARNZONE - #1 Elite Earning Ecosystem</title>
         <meta name="description" content="AREARNZONE is the premier elite earning ecosystem. Complete high-yield micro-jobs, perform secure tasks, watch rewarded ads, and unlock powerful passive income streams." />
@@ -1533,7 +1533,7 @@ const AppContent: React.FC<{
       
       {currentUser ? (
         /* RESPONSIVE FULL-SCREEN APPLICATION WORKSPACE (Logged In) */
-        <div className="flex-1 flex flex-row relative overflow-hidden z-10 w-full min-h-0 h-[100dvh]">
+        <div className="flex-1 flex flex-row relative overflow-hidden z-10 w-full min-h-0">
           
           {/* Responsive Sidebar Menu (Persistent on medium+ screens, overlay drawer on mobile) */}
           <Sidebar 
@@ -1545,7 +1545,7 @@ const AppContent: React.FC<{
           />
 
           {/* Main Application Container */}
-          <div className="flex-1 flex flex-col min-w-0 h-[100dvh] relative overflow-hidden">
+          <div className="flex-1 flex flex-col min-w-0 h-screen relative">
             
             {/* Standard AppBar Navigation Header */}
             <Navbar 
