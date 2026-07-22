@@ -1,29 +1,28 @@
-const CACHE_NAME = 'arearnzone-cache-v4';
+const CACHE_NAME = 'arearnzone-cache-v5';
 const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './index.css',
-  './manifest.json',
-  './manifest.webmanifest',
-  './pwa-192x192.png',
-  './pwa-512x512.png',
-  './maskable-icon-192x192.png',
-  './maskable-icon-512x512.png',
-  './apple-touch-icon.png',
-  './favicon.ico',
-  './favicon-32x32.png',
-  './pwa-icon.svg',
-  './icon-192.png',
-  './icon-512.png'
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/manifest.webmanifest',
+  '/pwa-192x192.png',
+  '/pwa-512x512.png',
+  '/maskable-icon-192x192.png',
+  '/maskable-icon-512x512.png',
+  '/apple-touch-icon.png',
+  '/favicon.ico',
+  '/favicon-32x32.png',
+  '/pwa-icon.svg',
+  '/icon-192.png',
+  '/icon-512.png'
 ];
 
 // Install Event
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[Service Worker] Pre-caching offline assets');
+      console.log('[Service Worker] Pre-caching offline assets v5');
       return cache.addAll(ASSETS_TO_CACHE).catch(err => {
-        console.warn('[Service Worker] Failed to cache some assets during install:', err);
+        console.warn('[Service Worker] Caching warning:', err);
       });
     })
   );
@@ -49,7 +48,6 @@ self.addEventListener('activate', (event) => {
 
 // Fetch Event (Network-first falling back to cache strategy)
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests and skip browser extensions or non-http requests
   if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
     return;
   }
@@ -57,7 +55,6 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // If valid response, clone and save in cache
         if (response && response.status === 200 && response.type === 'basic') {
           const responseToCache = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -67,14 +64,12 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() => {
-        // If network fails, try to return from cache
         return caches.match(event.request).then((cachedResponse) => {
           if (cachedResponse) {
             return cachedResponse;
           }
-          // Fallback if index.html is requested but offline
           if (event.request.mode === 'navigate') {
-            return caches.match('./index.html') || caches.match('./');
+            return caches.match('/index.html') || caches.match('/');
           }
         });
       })
