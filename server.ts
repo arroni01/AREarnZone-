@@ -1818,6 +1818,23 @@ async function startServer() {
     }
   });
 
+  // Manifest route handler with correct application/manifest+json MIME type
+  app.get(["/manifest.json", "/manifest.webmanifest", "/site.webmanifest"], (req, res) => {
+    res.setHeader("Content-Type", "application/manifest+json");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    const isProd = process.env.NODE_ENV === "production";
+    const webmanifestPath = path.join(process.cwd(), isProd ? "dist" : "public", "manifest.webmanifest");
+    const jsonPath = path.join(process.cwd(), isProd ? "dist" : "public", "manifest.json");
+
+    if (fs.existsSync(webmanifestPath)) {
+      return res.sendFile(webmanifestPath);
+    }
+    if (fs.existsSync(jsonPath)) {
+      return res.sendFile(jsonPath);
+    }
+    return res.status(404).json({ error: "Manifest not found" });
+  });
+
   // Vite integration
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

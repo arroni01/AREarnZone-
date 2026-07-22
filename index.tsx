@@ -89,9 +89,11 @@ root.render(
 // Register Service Worker for PWA support
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
+    navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
         console.log('AREARNZONE ServiceWorker registered successfully with scope: ', registration.scope);
+        // Force service worker update check so new PWA icons are fetched immediately
+        registration.update();
       })
       .catch((error) => {
         console.error('AREARNZONE ServiceWorker registration failed: ', error);
