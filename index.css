@@ -67,11 +67,39 @@ input[type="text"], input[type="number"], input[type="email"], input[type="passw
 
 /* Safe area padding helper for modern smartphones */
 .pb-safe {
-  padding-bottom: env(safe-area-inset-bottom, 1rem);
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 1rem));
 }
 
 .pt-safe {
-  padding-top: env(safe-area-inset-top, 1rem);
+  padding-top: max(1rem, env(safe-area-inset-top, 1rem));
+}
+
+.mb-safe {
+  margin-bottom: max(0rem, env(safe-area-inset-bottom, 0rem));
+}
+
+/* Material Design Android touch target min sizes */
+button, a, input[type="button"], input[type="submit"] {
+  min-height: 44px;
+}
+
+/* Subtle Material elevation shadows */
+.shadow-material-sm {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+}
+
+.shadow-material-md {
+  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.08), 0 2px 4px 0 rgba(0, 0, 0, 0.04);
+}
+
+.shadow-material-lg {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+}
+
+/* Smooth active ripple emulation */
+.active-ripple:active {
+  transform: scale(0.97);
+  transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 
