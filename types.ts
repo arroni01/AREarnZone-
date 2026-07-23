@@ -13,6 +13,12 @@ export interface Ad {
   viewLimit?: number; // Unlimited if 0 or undefined, or holds custom limit
 }
 
+export interface WelcomeSettings {
+  imageUrl: string;
+  durationSeconds: number;
+  isEnabled: boolean;
+}
+
 export interface GlobalConfig {
   appName: string;
   maintenanceMode: boolean;
@@ -29,6 +35,7 @@ export interface GlobalConfig {
   adsList?: Ad[];
   adLoginDelaySeconds?: number;
   isSeeded?: boolean;
+  welcomeSettings?: WelcomeSettings;
 }
 
 export interface MonitorPermissions {

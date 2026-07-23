@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { saveDocument } from "../firebase";
-import { Eye, EyeOff, Plus, Edit, Trash2, Play, Image as ImageIcon, Globe, ArrowUpDown, PlusCircle, CheckCircle2, XCircle, RefreshCw, Download, Activity, TrendingUp, TrendingDown, DollarSign, Calendar, Terminal, AlertTriangle, Search, Folder, ArrowLeft, CheckSquare, Square, ShieldCheck } from "lucide-react";
+import { compressImage } from "../utils/imageCompressor";
+import { Eye, EyeOff, Plus, Edit, Trash2, Play, Image as ImageIcon, Globe, ArrowUpDown, PlusCircle, CheckCircle2, XCircle, RefreshCw, Download, Activity, TrendingUp, TrendingDown, DollarSign, Calendar, Terminal, AlertTriangle, Search, Folder, ArrowLeft, CheckSquare, Square, ShieldCheck, Shield } from "lucide-react";
 import {
   Task,
   WithdrawRequest,
@@ -15,6 +16,7 @@ import {
   AppNotification,
   SocialLink,
   GlobalConfig,
+  WelcomeSettings,
   SellCategory,
   SellItem,
   MonitorPermissions,
@@ -153,10 +155,61 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     | "ads"
     | "audit_logs"
     | "targets"
+    | "welcome"
   >("settings");
   const [approvalSubTab, setApprovalSubTab] = useState<
     "membership" | "tasks" | "deposit"
   >("membership");
+
+  // Welcome Screen Settings State
+  const [welcomeForm, setWelcomeForm] = useState<WelcomeSettings>({
+    imageUrl: globalConfig.welcomeSettings?.imageUrl || "/ar_group_welcome.jpg",
+    durationSeconds: globalConfig.welcomeSettings?.durationSeconds ?? 3,
+    isEnabled: globalConfig.welcomeSettings?.isEnabled ?? true,
+  });
+  const [isCompressingWelcomeImg, setIsCompressingWelcomeImg] = useState(false);
+
+  useEffect(() => {
+    if (globalConfig.welcomeSettings) {
+      setWelcomeForm({
+        imageUrl: globalConfig.welcomeSettings.imageUrl || "/ar_group_welcome.jpg",
+        durationSeconds: globalConfig.welcomeSettings.durationSeconds ?? 3,
+        isEnabled: globalConfig.welcomeSettings.isEnabled ?? true,
+      });
+    }
+  }, [globalConfig.welcomeSettings]);
+
+  const handleWelcomeImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsCompressingWelcomeImg(true);
+    try {
+      const compressed = await compressImage(file, 1600, 1600, 0.90);
+      setWelcomeForm(prev => ({ ...prev, imageUrl: compressed }));
+      notify("Welcome Image uploaded and compressed successfully!");
+    } catch (err) {
+      console.error("Error compressing welcome image:", err);
+      notify("Failed to process image. Please try another image or URL.");
+    } finally {
+      setIsCompressingWelcomeImg(false);
+    }
+  };
+
+  const handleSaveWelcomeSettings = async () => {
+    const updatedConfig: GlobalConfig = {
+      ...globalConfig,
+      welcomeSettings: welcomeForm,
+    };
+    setGlobalConfig(updatedConfig);
+    try {
+      localStorage.setItem("arez_global_config", JSON.stringify(updatedConfig));
+      localStorage.setItem("arez_welcome_settings", JSON.stringify(welcomeForm));
+      await saveDocument("config", "global", updatedConfig);
+    } catch (err) {
+      console.error("Error saving welcome screen settings:", err);
+    }
+    notify("Welcome Screen Settings saved successfully! 🎉");
+  };
 
   // Custom reject prompt modal state
   const [rejectModal, setRejectModal] = useState<{
@@ -2922,6 +2975,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         )}
         {!isMonitor && (
           <AdminTab
+            active={activeTab === "welcome"}
+            onClick={() => setActiveTab("welcome")}
+            label="WELCOME SCREEN"
+            icon={<ImageIcon size={14} />}
+          />
+        )}
+        {!isMonitor && (
+          <AdminTab
             active={activeTab === "settings"}
             onClick={() => setActiveTab("settings")}
             label="HQ SETTINGS"
@@ -3067,6 +3128,186 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           />
         )}
       </div>
+
+      {/* WELCOME SCREEN MANAGEMENT TAB CONTENT */}
+      {activeTab === "welcome" && (
+        <div className="space-y-8 animate-in slide-in-from-bottom-4">
+          <div className="bg-white dark:bg-slate-900 rounded-[3rem] p-8 md:p-12 border border-slate-100 dark:border-white/5 shadow-sm space-y-10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-white/5 pb-6">
+              <div>
+                <h3 className="text-xl font-black italic uppercase dark:text-white leading-none tracking-tighter mb-2 flex items-center gap-3">
+                  <ImageIcon className="text-blue-500" size={24} />
+                  WELCOME SCREEN MANAGEMENT (ওয়েলকাম স্ক্রিন সেটিংস)
+                </h3>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
+                  ইউজার লগইন করার সময় প্রদর্শিত ওয়েলকাম স্ক্রিনের ছবি, সময়কাল ও সক্রিয়তা নিয়ন্ত্রণ করুন
+                </p>
+              </div>
+
+              {/* Toggle Enable Welcome Screen */}
+              <button
+                onClick={() =>
+                  setWelcomeForm((prev) => ({
+                    ...prev,
+                    isEnabled: !prev.isEnabled,
+                  }))
+                }
+                className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center gap-2 shadow-md ${
+                  welcomeForm.isEnabled
+                    ? "bg-emerald-500 text-white shadow-emerald-500/20"
+                    : "bg-slate-200 dark:bg-slate-800 text-slate-500"
+                }`}
+              >
+                <span className={`w-2.5 h-2.5 rounded-full ${welcomeForm.isEnabled ? "bg-white animate-pulse" : "bg-slate-400"}`} />
+                {welcomeForm.isEnabled ? "FEATURE ENABLED" : "FEATURE DISABLED"}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Left Column: Form Controls */}
+              <div className="space-y-6">
+                {/* Image Upload Input */}
+                <div className="space-y-3">
+                  <label className="text-[11px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-[0.2em] flex items-center justify-between">
+                    <span>1. Upload Welcome Image (ছবি আপলোড করুন)</span>
+                    {isCompressingWelcomeImg && (
+                      <span className="text-blue-500 font-bold animate-pulse text-[10px]">Processing image...</span>
+                    )}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleWelcomeImageUpload}
+                      disabled={isCompressingWelcomeImg}
+                      className="w-full bg-slate-50 dark:bg-slate-800/80 p-4 rounded-2xl text-xs font-bold border border-slate-200 dark:border-white/10 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer dark:text-slate-300"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    * গ্যালারি বা ফোল্ডার থেকে ছবি সিলেক্ট করুন। সাইজ অটোমেটিক কমপ্রেস হয়ে ফাস্ট লোড হবে।
+                  </p>
+                </div>
+
+                {/* Direct Image URL Input */}
+                <div className="space-y-3">
+                  <label className="text-[11px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-[0.2em]">
+                    2. Or Paste Image URL (অথবা ছবির লিংক দিন)
+                  </label>
+                  <input
+                    type="text"
+                    value={welcomeForm.imageUrl}
+                    onChange={(e) => setWelcomeForm((prev) => ({ ...prev, imageUrl: e.target.value }))}
+                    placeholder="https://domain.com/welcome-logo.jpg"
+                    className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl font-mono text-xs outline-none border border-slate-200 dark:border-white/10 focus:border-blue-500 dark:text-white"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setWelcomeForm((prev) => ({ ...prev, imageUrl: "/ar_group_welcome.jpg" }))}
+                      className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-[10px] font-bold uppercase transition-all"
+                    >
+                      Reset to Default Image
+                    </button>
+                  </div>
+                </div>
+
+                {/* Duration Input */}
+                <div className="space-y-3">
+                  <label className="text-[11px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-[0.2em] flex items-center justify-between">
+                    <span>3. Display Duration (কত সেকেন্ড দেখাবে)</span>
+                    <span className="text-blue-500 font-extrabold text-xs">{welcomeForm.durationSeconds} SECONDS</span>
+                  </label>
+                  <div className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-white/10">
+                    <input
+                      type="range"
+                      min={1}
+                      max={10}
+                      step={1}
+                      value={welcomeForm.durationSeconds}
+                      onChange={(e) => setWelcomeForm((prev) => ({ ...prev, durationSeconds: parseInt(e.target.value, 10) || 2 }))}
+                      className="w-full accent-blue-600 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer"
+                    />
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={welcomeForm.durationSeconds}
+                      onChange={(e) => setWelcomeForm((prev) => ({ ...prev, durationSeconds: Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 2)) }))}
+                      className="w-20 bg-white dark:bg-slate-900 px-3 py-2 rounded-xl text-center font-black text-sm border border-slate-200 dark:border-white/10 dark:text-white"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    * ১ থেকে ১০ সেকেন্ডের মধ্যে নির্বাচন করুন। ডিফল্ট: ৩ সেকেন্ড।
+                  </p>
+                </div>
+
+                {/* Save Button */}
+                <div className="pt-4">
+                  <button
+                    onClick={handleSaveWelcomeSettings}
+                    className="w-full py-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs uppercase tracking-[0.25em] rounded-2xl shadow-xl hover:shadow-blue-500/25 active:scale-[0.99] transition-all flex items-center justify-center gap-3"
+                  >
+                    <CheckCircle2 size={18} />
+                    SAVE WELCOME SETTINGS (সেভ করুন)
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Column: Live Image Preview */}
+              <div className="space-y-4">
+                <label className="text-[11px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-[0.2em] flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                  LIVE PREVIEW (ইউজার যা দেখতে পাবে)
+                </label>
+
+                <div className="relative rounded-[2.5rem] bg-[#0d131f] border-4 border-slate-800 p-4 shadow-2xl overflow-hidden flex flex-col items-center justify-center min-h-[360px] text-center">
+                  {/* Subtle Background Radial Pattern */}
+                  <div
+                    className="absolute inset-0 opacity-20 pointer-events-none"
+                    style={{
+                      background: `radial-gradient(circle at 50% 45%, #1c283c 0%, #111827 60%, #080d15 100%)`,
+                    }}
+                  />
+
+                  {/* Header Badge */}
+                  <div className="relative z-10 mb-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/90 border border-slate-700/60 shadow-md">
+                    <Shield className="w-3 h-3 text-sky-400" />
+                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-200">
+                      AR GROUP OFFICIAL PORTAL
+                    </span>
+                  </div>
+
+                  {/* Image Display */}
+                  <div className="relative z-10 p-1 bg-[#131b2a] border border-slate-700/60 rounded-2xl shadow-xl max-w-full">
+                    <img
+                      src={welcomeForm.imageUrl || "/ar_group_welcome.jpg"}
+                      alt="Welcome Preview"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "/ar_group_welcome.jpg";
+                      }}
+                      className="max-h-[220px] w-auto object-contain rounded-xl shadow-md"
+                    />
+                  </div>
+
+                  {/* Preview Footer Info */}
+                  <div className="relative z-10 mt-5 w-full max-w-xs space-y-2">
+                    <div className="flex justify-between items-center text-[9px] font-black text-slate-300 px-1 uppercase tracking-wider">
+                      <span className="text-sky-400">DISPLAY TIME: {welcomeForm.durationSeconds}s</span>
+                      <span className={welcomeForm.isEnabled ? "text-emerald-400" : "text-rose-400"}>
+                        {welcomeForm.isEnabled ? "STATUS: ACTIVE" : "STATUS: DISABLED"}
+                      </span>
+                    </div>
+
+                    <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                      <div className="h-full bg-gradient-to-r from-blue-500 to-sky-400 w-3/4 rounded-full" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* AD MANAGER TAB CONTENT */}
       {activeTab === "ads" && (

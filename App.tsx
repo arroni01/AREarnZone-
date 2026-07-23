@@ -41,6 +41,7 @@ import AdManagerOverlay from './components/AdManagerOverlay';
 import { FAQ } from './components/FAQ';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { getAIRecoveryConfig, runAIHealthScanAndRecovery } from './utils/aiRecoveryEngine';
+import { WelcomeSplashScreen } from './components/WelcomeSplashScreen';
 
 // Global Translations Dictionary (Expanded)
 const TRANSLATIONS = {
@@ -142,6 +143,22 @@ const App: React.FC = () => {
   const [showSocialPopup, setShowSocialPopup] = useState(false);
   const [isAdminVerified, setIsAdminVerified] = useState(false);
   const [dbQuotaExceeded, setDbQuotaExceeded] = useState(false);
+
+  // Single-time "AR Group" Welcome Screen state after login
+  const [showWelcomeSplash, setShowWelcomeSplash] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('arez_show_welcome_splash') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleWelcomeComplete = React.useCallback(() => {
+    setShowWelcomeSplash(false);
+    try {
+      sessionStorage.removeItem('arez_show_welcome_splash');
+    } catch {}
+  }, []);
   
   // 5-Minute Auto-Session Timeout & Security Auto-Logout System (300 seconds)
   const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
@@ -297,7 +314,12 @@ const App: React.FC = () => {
         orderNumber: 2
       }
     ],
-    adLoginDelaySeconds: 30
+    adLoginDelaySeconds: 30,
+    welcomeSettings: {
+      imageUrl: "/ar_group_welcome.jpg",
+      durationSeconds: 3,
+      isEnabled: true,
+    }
   }));
 
   // Fast Loading State
@@ -1363,6 +1385,10 @@ const App: React.FC = () => {
     localStorage.setItem('arez_last_activity_time', now.toString());
     setSessionExpiredNotice(null);
     sessionStorage.removeItem('arez_social_shown');
+    try {
+      sessionStorage.setItem('arez_show_welcome_splash', 'true');
+    } catch {}
+    setShowWelcomeSplash(true);
     setShowSocialPopup(true);
   };
 
@@ -1484,6 +1510,8 @@ const App: React.FC = () => {
             sessionExpiredNotice={sessionExpiredNotice}
             setSessionExpiredNotice={setSessionExpiredNotice}
             performAutoLogout={performAutoLogout}
+            showWelcomeSplash={showWelcomeSplash}
+            handleWelcomeComplete={handleWelcomeComplete}
           />
         </Router>
       </ErrorBoundary>
@@ -1570,6 +1598,8 @@ const AppContent: React.FC<{
   sessionExpiredNotice: string | null;
   setSessionExpiredNotice: React.Dispatch<React.SetStateAction<string | null>>;
   performAutoLogout: (reasonMsg?: string) => void;
+  showWelcomeSplash: boolean;
+  handleWelcomeComplete: () => void;
 }> = ({
   currentUser, setCurrentUser, isDarkMode, setIsDarkMode, language, setLanguage,
   selectedCountryCode, setSelectedCountryCode, handleCountryChange, isSidebarOpen, setIsSidebarOpen,
@@ -1583,7 +1613,8 @@ const AppContent: React.FC<{
   sellCategories, setSellCategories, sellItems, setSellItems, storeOrders, setStoreOrders,
   telegramRequests, setTelegramRequests, targets, setTargets, targetHistories, setTargetHistories, t, toggleDarkMode, toggleLanguage, notify,
   handleLogin, handleUpdateUser, clearNotifications, isMaintenanceLocked, dbQuotaExceeded,
-  refreshAllData, sessionExpiredNotice, setSessionExpiredNotice, performAutoLogout
+  refreshAllData, sessionExpiredNotice, setSessionExpiredNotice, performAutoLogout,
+  showWelcomeSplash, handleWelcomeComplete
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -1886,6 +1917,16 @@ const AppContent: React.FC<{
             } />
           </Routes>
         </div>
+      )}
+
+      {/* Single-time Full-Screen AR Group Welcome Screen on Login */}
+      {showWelcomeSplash && (globalConfig?.welcomeSettings?.isEnabled ?? true) && (
+        <WelcomeSplashScreen
+          userName={currentUser?.name}
+          imageUrl={globalConfig?.welcomeSettings?.imageUrl || "/welcome_asset.png"}
+          durationSeconds={globalConfig?.welcomeSettings?.durationSeconds ?? 2}
+          onComplete={handleWelcomeComplete}
+        />
       )}
 
       {/* Social Join Modals */}
