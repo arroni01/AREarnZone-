@@ -80,7 +80,7 @@ export const WelcomeSplashScreen: React.FC<WelcomeSplashScreenProps> = ({
 
       {/* 2. Top Sleek Dark Blue Badge */}
       <div className="absolute top-4 sm:top-6 inset-x-0 z-20 flex items-center justify-center px-4 pointer-events-none">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#0d1829]/90 border border-blue-500/30 backdrop-blur-md shadow-2xl">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#0d1829] border border-blue-500/30 shadow-2xl">
           <Globe className="w-3.5 h-3.5 text-sky-400 animate-spin" style={{ animationDuration: '8s' }} />
           <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] text-white">
             AR GROUP OFFICIAL PORTAL
