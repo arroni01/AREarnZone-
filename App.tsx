@@ -261,8 +261,6 @@ const App: React.FC = () => {
     const handleVisibilityOrFocus = () => {
       if (document.visibilityState === 'visible') {
         checkInactivityTimeout();
-      } else {
-        localStorage.setItem('arez_last_activity_time', Date.now().toString());
       }
     };
 
