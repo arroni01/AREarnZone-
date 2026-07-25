@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { motion } from 'motion/react';
 import { User } from '../types';
 import { ICONS } from '../constants';
 import { auth } from '../firebase';
@@ -16,9 +17,497 @@ interface AuthProps {
 
 type AuthView = 'login' | 'signup' | 'verify' | 'forgot' | 'admin-otp';
 
+// Staggered Animation Variants for Smooth Entrance
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+const staggerItem = {
+  hidden: { opacity: 0, y: 18, filter: 'blur(4px)' },
+  visible: {
+    opacity: 1,
+    y: 0,
+    filter: 'blur(0px)',
+    transition: {
+      duration: 0.45,
+      ease: [0.22, 1, 0.36, 1],
+    },
+  },
+};
+
 // Updated credentials as per user request
 const ADMIN_EMAIL = 'abdurrahman714915@gmail.com';
 const ADMIN_PASSWORD = 'AREranZone@71';
+
+// Performance-Optimized Canvas Particle Overlay Component
+const ParticleCanvas = React.memo(() => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { alpha: true });
+    if (!ctx) return;
+
+    let animId: number;
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let width = (canvas.width = window.innerWidth * dpr);
+    let height = (canvas.height = window.innerHeight * dpr);
+
+    const isMobile = window.innerWidth < 768;
+    const particleCount = isMobile ? 25 : 50;
+    const maxDistance = (isMobile ? 80 : 120) * dpr;
+
+    interface Particle {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      radius: number;
+      color: string;
+      alpha: number;
+    }
+
+    const colorPalettes = [
+      'rgba(16, 185, 129, ', // Emerald
+      'rgba(6, 182, 212, ',  // Cyan
+      'rgba(245, 158, 11, ', // Amber
+      'rgba(20, 184, 166, ', // Teal
+    ];
+
+    const particles: Particle[] = [];
+
+    for (let i = 0; i < particleCount; i++) {
+      particles.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.35 * dpr,
+        vy: (Math.random() - 0.6) * 0.35 * dpr,
+        radius: (Math.random() * 1.8 + 0.8) * dpr,
+        color: colorPalettes[Math.floor(Math.random() * colorPalettes.length)],
+        alpha: Math.random() * 0.45 + 0.2,
+      });
+    }
+
+    const handleResize = () => {
+      if (!canvas) return;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = canvas.width = window.innerWidth * dpr;
+      height = canvas.height = window.innerHeight * dpr;
+    };
+
+    window.addEventListener('resize', handleResize, { passive: true });
+
+    let time = 0;
+    const render = () => {
+      time += 0.015;
+      ctx.clearRect(0, 0, width, height);
+
+      // Draw subtle proximity lines between nearby particles
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < maxDistance) {
+            const lineAlpha = (1 - dist / maxDistance) * 0.12;
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.strokeStyle = 'rgba(16, 185, 129, ' + lineAlpha + ')';
+            ctx.lineWidth = 0.5 * dpr;
+            ctx.stroke();
+          }
+        }
+      }
+
+      // Draw and update particle positions
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+
+        p.x += p.vx;
+        p.y += p.vy;
+
+        // Wrap around viewport edges smoothly
+        if (p.x < -10 * dpr) p.x = width + 10 * dpr;
+        if (p.x > width + 10 * dpr) p.x = -10 * dpr;
+        if (p.y < -10 * dpr) p.y = height + 10 * dpr;
+        if (p.y > height + 10 * dpr) p.y = -10 * dpr;
+
+        const currentAlpha = p.alpha + Math.sin(time + i) * 0.12;
+        const safeAlpha = Math.max(0.08, Math.min(0.7, currentAlpha));
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = p.color + safeAlpha + ')';
+        ctx.fill();
+
+        // Soft outer radial aura for glow effect
+        if (p.radius > 1.5 * dpr) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius * 2.2, 0, Math.PI * 2);
+          ctx.fillStyle = p.color + (safeAlpha * 0.2) + ')';
+          ctx.fill();
+        }
+      }
+
+      animId = requestAnimationFrame(render);
+    };
+
+    animId = requestAnimationFrame(render);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      cancelAnimationFrame(animId);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 w-full h-full z-0 pointer-events-none opacity-80"
+      style={{ willChange: 'transform' }}
+    />
+  );
+});
+
+// Memoized Ambient Background Component (Prevents re-renders on keystrokes/state changes)
+const AuthBackground = React.memo(() => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const targetRef = useRef({ x: 0, y: 0 });
+  const currentRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    let animFrameId: number;
+
+    const handlePointerMove = (clientX: number, clientY: number) => {
+      const width = window.innerWidth || 1000;
+      const height = window.innerHeight || 800;
+      const nx = (clientX / width - 0.5) * 2;
+      const ny = (clientY / height - 0.5) * 2;
+      targetRef.current = { x: nx, y: ny };
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      handlePointerMove(e.clientX, e.clientY);
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches && e.touches.length > 0) {
+        handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+
+    window.addEventListener('mousemove', onMouseMove, { passive: true });
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+
+    const updateParallax = () => {
+      // Smooth linear interpolation (lerp) for buttery 60fps movement
+      currentRef.current.x += (targetRef.current.x - currentRef.current.x) * 0.05;
+      currentRef.current.y += (targetRef.current.y - currentRef.current.y) * 0.05;
+
+      if (containerRef.current) {
+        containerRef.current.style.setProperty('--px', currentRef.current.x.toFixed(4));
+        containerRef.current.style.setProperty('--py', currentRef.current.y.toFixed(4));
+      }
+
+      animFrameId = requestAnimationFrame(updateParallax);
+    };
+
+    animFrameId = requestAnimationFrame(updateParallax);
+
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('touchmove', onTouchMove);
+      cancelAnimationFrame(animFrameId);
+    };
+  }, []);
+
+  return (
+    <div ref={containerRef} className="absolute inset-0 z-0 overflow-hidden pointer-events-none select-none">
+      {/* Ultra-Fast Canvas Particle Overlay Layer */}
+      <ParticleCanvas />
+      {/* Central Spotlight Glow & Cybernetic Pulsing Rings Layer */}
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          transform: 'translate3d(calc(var(--px, 0) * 18px), calc(var(--py, 0) * 18px), 0)',
+          willChange: 'transform'
+        }}
+      >
+        {/* Central Spotlight Glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] sm:w-[650px] h-[350px] sm:h-[650px] rounded-full bg-emerald-500/12 blur-[90px] sm:blur-[150px] animate-spotlight pointer-events-none" />
+
+        {/* Cybernetic Pulsing Rings behind login card */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] sm:w-[580px] h-[320px] sm:h-[580px] rounded-full border border-emerald-500/15 animate-pulse-ring pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] sm:w-[820px] h-[480px] sm:h-[820px] rounded-full border border-cyan-500/10 animate-pulse-ring pointer-events-none" style={{ animationDelay: '3s' }} />
+
+        {/* Rotating Tech Mesh Ring */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] sm:w-[700px] h-[400px] sm:h-[700px] rounded-full border border-dashed border-emerald-400/10 animate-mesh-rotate pointer-events-none" />
+      </div>
+
+      {/* Floating Aurora Blob 1 - Top Left Emerald Layer */}
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          transform: 'translate3d(calc(var(--px, 0) * -38px), calc(var(--py, 0) * -38px), 0)',
+          willChange: 'transform'
+        }}
+      >
+        <div 
+          className="absolute -top-32 -left-32 w-[380px] sm:w-[560px] h-[380px] sm:h-[560px] rounded-full bg-gradient-to-br from-emerald-500/25 via-teal-500/20 to-transparent blur-[70px] sm:blur-[110px] gpu-accelerated-blob"
+          style={{ animation: 'blobFloat1 18s ease-in-out infinite' }}
+        />
+      </div>
+
+      {/* Floating Aurora Blob 2 - Bottom Right Sapphire Layer */}
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          transform: 'translate3d(calc(var(--px, 0) * 45px), calc(var(--py, 0) * 45px), 0)',
+          willChange: 'transform'
+        }}
+      >
+        <div 
+          className="absolute -bottom-40 -right-32 w-[420px] sm:w-[650px] h-[420px] sm:h-[650px] rounded-full bg-gradient-to-tl from-indigo-600/25 via-cyan-500/20 to-transparent blur-[80px] sm:blur-[130px] gpu-accelerated-blob"
+          style={{ animation: 'blobFloat2 22s ease-in-out infinite' }}
+        />
+      </div>
+
+      {/* Floating Aurora Blob 3 - Center Top Amethyst Layer */}
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          transform: 'translate3d(calc(var(--px, 0) * -22px), calc(var(--py, 0) * -22px), 0)',
+          willChange: 'transform'
+        }}
+      >
+        <div 
+          className="absolute top-10 left-1/2 -translate-x-1/2 w-[340px] sm:w-[520px] h-[340px] sm:h-[520px] rounded-full bg-gradient-to-r from-purple-600/15 via-amber-500/15 to-transparent blur-[75px] sm:blur-[120px] gpu-accelerated-blob"
+          style={{ animation: 'blobFloat3 25s ease-in-out infinite' }}
+        />
+      </div>
+
+      {/* Diagonal Promotional Laser Light Sweep */}
+      <div className="absolute -inset-full w-[200%] h-[200%] bg-gradient-to-r from-transparent via-emerald-400/12 to-transparent transform -rotate-45 animate-laser-sweep pointer-events-none" />
+
+      {/* Floating Currency Symbols & Sparkles Interactive Parallax Layer */}
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          transform: 'translate3d(calc(var(--px, 0) * 28px), calc(var(--py, 0) * 28px), 0)',
+          willChange: 'transform'
+        }}
+      >
+        {/* Floating Global Currency Symbols (GPU-Accelerated Smooth Drifting) */}
+        <div className="absolute top-[22%] left-[6%] font-black text-emerald-400/50 text-xl sm:text-3xl animate-float-up-1 shadow-[0_0_15px_#10b981]">৳</div>
+        <div className="absolute top-[62%] left-[10%] font-black text-cyan-400/50 text-xl sm:text-3xl animate-float-up-2 shadow-[0_0_15px_#06b6d4]">$</div>
+        <div className="absolute top-[18%] right-[8%] font-black text-amber-400/50 text-xl sm:text-3xl animate-float-up-3 shadow-[0_0_15px_#f59e0b]">€</div>
+        <div className="absolute top-[66%] right-[12%] font-black text-purple-400/50 text-lg sm:text-2xl animate-float-up-1" style={{ animationDelay: '3s' }}>£</div>
+        <div className="absolute top-[40%] left-[4%] font-black text-teal-300/40 text-lg sm:text-2xl animate-float-up-3" style={{ animationDelay: '2s' }}>₹</div>
+        <div className="absolute top-[45%] right-[5%] font-black text-yellow-400/50 text-lg sm:text-2xl animate-float-up-2" style={{ animationDelay: '4s' }}>₿</div>
+        <div className="absolute top-[80%] left-[20%] font-black text-indigo-400/40 text-base sm:text-xl animate-float-up-1" style={{ animationDelay: '5s' }}>¥</div>
+        <div className="absolute top-[12%] left-[25%] font-black text-emerald-300/40 text-base sm:text-xl animate-float-up-2" style={{ animationDelay: '1s' }}>₮</div>
+        <div className="absolute top-[82%] right-[22%] font-black text-rose-400/40 text-base sm:text-xl animate-float-up-3" style={{ animationDelay: '6s' }}>₩</div>
+        <div className="absolute top-[15%] right-[30%] font-black text-sky-300/40 text-xs sm:text-sm animate-float-up-1" style={{ animationDelay: '2.5s' }}>AED</div>
+
+        {/* Orbiting Global Payment Badges in Background Space */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-0 h-0 animate-orbit-1 pointer-events-none hidden md:block">
+          <div className="px-3 py-1 rounded-full bg-slate-900/70 border border-emerald-500/40 text-[10px] font-black text-emerald-300 backdrop-blur-md shadow-lg flex items-center gap-1.5 whitespace-nowrap">
+            <span>🇧🇩 bKash & Nagad</span>
+          </div>
+        </div>
+
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-0 h-0 animate-orbit-2 pointer-events-none hidden md:block">
+          <div className="px-3 py-1 rounded-full bg-slate-900/70 border border-cyan-500/40 text-[10px] font-black text-cyan-300 backdrop-blur-md shadow-lg flex items-center gap-1.5 whitespace-nowrap">
+            <span>💳 VISA | Mastercard</span>
+          </div>
+        </div>
+
+        {/* Floating Micro Particle Sparkles */}
+        <div className="absolute top-1/4 left-1/6 w-2 h-2 rounded-full bg-emerald-400/80 shadow-[0_0_12px_#10b981] animate-particle-1" />
+        <div className="absolute top-3/4 left-1/5 w-1.5 h-1.5 rounded-full bg-amber-400/70 shadow-[0_0_10px_#f59e0b] animate-particle-2" />
+        <div className="absolute top-1/3 right-1/6 w-2 h-2 rounded-full bg-cyan-400/80 shadow-[0_0_12px_#06b6d4] animate-particle-1" style={{ animationDelay: '2s' }} />
+        <div className="absolute bottom-1/4 right-1/5 w-2.5 h-2.5 rounded-full bg-emerald-300/60 shadow-[0_0_14px_#34d399] animate-particle-2" style={{ animationDelay: '4s' }} />
+      </div>
+
+      {/* Floating Promotional Badges Parallax Layer */}
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          transform: 'translate3d(calc(var(--px, 0) * 14px), calc(var(--py, 0) * 14px), 0)',
+          willChange: 'transform'
+        }}
+      >
+        {/* Floating Promotional Badges (Visible on lg/xl screens) */}
+        <div className="hidden lg:flex items-center gap-2.5 absolute top-12 left-10 px-4 py-2 rounded-full bg-slate-900/70 border border-emerald-500/40 backdrop-blur-xl shadow-2xl shadow-emerald-950/40 animate-float-slow">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_#10b981]"></span>
+          <span className="text-[10px] font-black tracking-widest text-emerald-300 uppercase">✨ AREarnZone Global Platform</span>
+        </div>
+
+        <div className="hidden lg:flex items-center gap-2.5 absolute top-16 right-10 px-4 py-2 rounded-full bg-slate-900/70 border border-cyan-500/40 backdrop-blur-xl shadow-2xl shadow-cyan-950/40 animate-float-reverse">
+          <span className="text-cyan-400 text-[12px]">⚡</span>
+          <span className="text-[10px] font-black tracking-widest text-cyan-300 uppercase">Instant Local & Global Payouts</span>
+        </div>
+
+        <div className="hidden lg:flex items-center gap-2.5 absolute bottom-20 left-12 px-4 py-2 rounded-full bg-slate-900/70 border border-purple-500/40 backdrop-blur-xl shadow-2xl shadow-purple-950/40 animate-float-reverse">
+          <span className="text-purple-400 text-[12px]">🛡️</span>
+          <span className="text-[10px] font-black tracking-widest text-purple-300 uppercase">256-Bit SSL Encrypted & Secured</span>
+        </div>
+
+        <div className="hidden lg:flex items-center gap-2.5 absolute bottom-24 right-12 px-4 py-2 rounded-full bg-slate-900/70 border border-amber-500/40 backdrop-blur-xl shadow-2xl shadow-amber-950/40 animate-float-slow">
+          <span className="text-amber-400 text-[12px]">💰</span>
+          <span className="text-[10px] font-black tracking-widest text-amber-300 uppercase">৳5.4M+ Paid to 500K+ Global Users</span>
+        </div>
+
+        {/* Floating International Payment Method Badges (Desktop/Tablet Sides) */}
+        <div className="hidden xl:flex items-center gap-2 absolute top-1/3 left-6 px-3 py-1.5 rounded-2xl bg-slate-950/70 border border-emerald-500/30 backdrop-blur-md shadow-lg animate-float-slow">
+          <span className="text-xs">🇧🇩</span>
+          <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-wider">bKash | Nagad | CellFin</span>
+        </div>
+
+        <div className="hidden xl:flex items-center gap-2 absolute top-1/2 right-6 px-3 py-1.5 rounded-2xl bg-slate-950/70 border border-cyan-500/30 backdrop-blur-md shadow-lg animate-float-reverse">
+          <span className="text-xs">💳</span>
+          <span className="text-[10px] font-extrabold text-cyan-400 uppercase tracking-wider">Visa | Mastercard | PayPal</span>
+        </div>
+
+        <div className="hidden xl:flex items-center gap-2 absolute bottom-1/3 left-8 px-3 py-1.5 rounded-2xl bg-slate-950/70 border border-amber-500/30 backdrop-blur-md shadow-lg animate-float-slow" style={{ animationDelay: '1.5s' }}>
+          <span className="text-xs">🪙</span>
+          <span className="text-[10px] font-extrabold text-amber-400 uppercase tracking-wider">Binance | USDT | Payeer</span>
+        </div>
+      </div>
+
+      {/* Mobile-Friendly Compact Promotional Live Strip */}
+      <div className="flex lg:hidden items-center justify-center gap-2 absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/40 backdrop-blur-md shadow-lg pointer-events-none z-20">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#10b981]"></span>
+        <span className="text-[9px] font-black tracking-wider text-emerald-300 uppercase">⚡ 100% Verified Global Payouts</span>
+      </div>
+
+      {/* Multi-Currency & International Payment Method Live Stream Marquee Ticker */}
+      <div className="absolute bottom-0 left-0 right-0 h-9 bg-slate-950/85 border-t border-emerald-500/30 backdrop-blur-md overflow-hidden flex items-center z-10">
+        <div className="flex items-center whitespace-nowrap animate-marquee-ticker gap-8 text-[10px] font-bold text-slate-300">
+          <span className="flex items-center gap-1.5 text-emerald-400"><span className="text-amber-400">⚡</span> @Tanvir withdrew <strong className="text-white font-extrabold">৳1,500</strong> via bKash 🇧🇩</span>
+          <span className="text-slate-600">•</span>
+          <span className="flex items-center gap-1.5 text-cyan-400"><span className="text-emerald-400">💳</span> @Alex withdrew <strong className="text-white font-extrabold">$85.00</strong> via PayPal 🇺🇸</span>
+          <span className="text-slate-600">•</span>
+          <span className="flex items-center gap-1.5 text-amber-400"><span className="text-yellow-400">🪙</span> @Elena withdrew <strong className="text-white font-extrabold">120 USDT</strong> via Binance 🌐</span>
+          <span className="text-slate-600">•</span>
+          <span className="flex items-center gap-1.5 text-rose-400"><span className="text-orange-400">🚀</span> @Fatema withdrew <strong className="text-white font-extrabold">৳2,800</strong> via Nagad 🇧🇩</span>
+          <span className="text-slate-600">•</span>
+          <span className="flex items-center gap-1.5 text-indigo-400"><span className="text-blue-400">🇪🇺</span> @Marco withdrew <strong className="text-white font-extrabold">€65.00</strong> via Visa 🇪🇺</span>
+          <span className="text-slate-600">•</span>
+          <span className="flex items-center gap-1.5 text-purple-400"><span className="text-red-400">🇬🇧</span> @Oliver withdrew <strong className="text-white font-extrabold">£45.00</strong> via Mastercard 🇬🇧</span>
+          <span className="text-slate-600">•</span>
+          <span className="flex items-center gap-1.5 text-teal-300"><span className="text-orange-400">🇮🇳</span> @Rahul withdrew <strong className="text-white font-extrabold">₹2,500</strong> via Payeer 🇮🇳</span>
+          <span className="text-slate-600">•</span>
+          <span className="flex items-center gap-1.5 text-emerald-300"><span className="text-emerald-400">👑</span> @Sabbir upgraded to VIP Platinum Tier</span>
+          <span className="text-slate-600">•</span>
+          <span className="flex items-center gap-1.5 text-cyan-300"><span className="text-emerald-400">🔒</span> 100% Instant Global & Local Auto-Payouts Guaranteed</span>
+          <span className="text-slate-600">•</span>
+
+          {/* Duplicated for seamless continuous looping */}
+          <span className="flex items-center gap-1.5 text-emerald-400"><span className="text-amber-400">⚡</span> @Tanvir withdrew <strong className="text-white font-extrabold">৳1,500</strong> via bKash 🇧🇩</span>
+          <span className="text-slate-600">•</span>
+          <span className="flex items-center gap-1.5 text-cyan-400"><span className="text-emerald-400">💳</span> @Alex withdrew <strong className="text-white font-extrabold">$85.00</strong> via PayPal 🇺🇸</span>
+          <span className="text-slate-600">•</span>
+          <span className="flex items-center gap-1.5 text-amber-400"><span className="text-yellow-400">🪙</span> @Elena withdrew <strong className="text-white font-extrabold">120 USDT</strong> via Binance 🌐</span>
+          <span className="text-slate-600">•</span>
+          <span className="flex items-center gap-1.5 text-rose-400"><span className="text-orange-400">🚀</span> @Fatema withdrew <strong className="text-white font-extrabold">৳2,800</strong> via Nagad 🇧🇩</span>
+          <span className="text-slate-600">•</span>
+          <span className="flex items-center gap-1.5 text-indigo-400"><span className="text-blue-400">🇪🇺</span> @Marco withdrew <strong className="text-white font-extrabold">€65.00</strong> via Visa 🇪🇺</span>
+          <span className="text-slate-600">•</span>
+          <span className="flex items-center gap-1.5 text-purple-400"><span className="text-red-400">🇬🇧</span> @Oliver withdrew <strong className="text-white font-extrabold">£45.00</strong> via Mastercard 🇬🇧</span>
+          <span className="text-slate-600">•</span>
+          <span className="flex items-center gap-1.5 text-teal-300"><span className="text-orange-400">🇮🇳</span> @Rahul withdrew <strong className="text-white font-extrabold">₹2,500</strong> via Payeer 🇮🇳</span>
+          <span className="text-slate-600">•</span>
+          <span className="flex items-center gap-1.5 text-emerald-300"><span className="text-emerald-400">👑</span> @Sabbir upgraded to VIP Platinum Tier</span>
+          <span className="text-slate-600">•</span>
+          <span className="flex items-center gap-1.5 text-cyan-300"><span className="text-emerald-400">🔒</span> 100% Instant Global & Local Auto-Payouts Guaranteed</span>
+          <span className="text-slate-600">•</span>
+        </div>
+      </div>
+
+      {/* Radial Tech Grid Backplate */}
+      <div 
+        className="absolute inset-0 opacity-[0.035]"
+        style={{
+          backgroundImage: `radial-gradient(rgba(255, 255, 255, 0.45) 1px, transparent 1px)`,
+          backgroundSize: '32px 32px'
+        }}
+      />
+      
+      {/* Dark Vignette Overlay */}
+      <div className="absolute inset-0 bg-radial from-transparent via-[#030712]/60 to-[#030712] pointer-events-none" />
+    </div>
+  );
+});
+
+// Memoized Real-time Fluctuating Stats Simulation (Isolates 4s interval from parent login form)
+const LiveStatsCard = React.memo(() => {
+  const [totalPaid, setTotalPaid] = useState(5485710);
+  const [activeNow, setActiveNow] = useState(12479);
+  const [lastPayout, setLastPayout] = useState(1350);
+
+  useEffect(() => {
+    const statsInterval = setInterval(() => {
+      setTotalPaid(prev => prev + Math.floor(Math.random() * 85) + 15);
+      setActiveNow(prev => {
+        const change = Math.floor(Math.random() * 31) - 15;
+        const next = prev + change;
+        return next < 11000 ? 11000 : (next > 15000 ? 15000 : next);
+      });
+      if (Math.random() > 0.7) {
+        setLastPayout([600, 1000, 750, 2000, 1200, 1800, 380, 570, 1600, 1370][Math.floor(Math.random() * 10)]);
+      }
+    }, 4000);
+    return () => clearInterval(statsInterval);
+  }, []);
+
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:gap-5 px-0">
+       <div className="bg-white/[0.02] border border-white/5 p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] relative overflow-hidden group backdrop-blur-md">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse"></div>
+            <div className="bg-emerald-500/20 px-2 py-0.5 rounded text-[8px] font-black text-emerald-400 tracking-widest uppercase">PAYING</div>
+          </div>
+          <p className="text-xl sm:text-3xl font-black text-white italic tracking-tighter leading-none mb-2">
+            ৳{(totalPaid / 1000000).toFixed(2)}M+
+          </p>
+          <p className="text-[8px] sm:text-[10px] font-black text-[#10b981] uppercase tracking-widest mb-3 sm:mb-4">TOTAL PAID OUT</p>
+          <div className="flex items-center gap-1.5 opacity-90">
+             <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div>
+             <span className="text-[7.5px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none truncate">
+               LAST PAYOUT: ৳{lastPayout} PROCESSED
+             </span>
+          </div>
+       </div>
+
+       <div className="bg-white/[0.02] border border-white/5 p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] relative overflow-hidden group backdrop-blur-md">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_12px_#10b981] animate-[pulse_0.6s_infinite]"></div>
+            <div className="bg-emerald-500/20 px-2 py-0.5 rounded text-[8px] font-black text-emerald-400 tracking-widest uppercase">LIVE</div>
+          </div>
+          <p className="text-xl sm:text-3xl font-black text-white italic tracking-tighter leading-none mb-2">
+            500K+
+          </p>
+          <p className="text-[8px] sm:text-[10px] font-black text-[#10b981] uppercase tracking-widest mb-3 sm:mb-4">ACTIVE EARNERS</p>
+          <div className="flex items-center gap-2">
+             <span className="text-[7.5px] sm:text-[9px] font-black text-blue-400 uppercase tracking-widest animate-pulse truncate">
+               {activeNow.toLocaleString()} ONLINE NOW
+             </span>
+          </div>
+       </div>
+    </div>
+  );
+});
 
 const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGlobalConfig }) => {
   const [view, setView] = useState<AuthView>('login');
@@ -32,6 +521,22 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // 3D Perspective Card Tilt State on Hover
+  const [cardTilt, setCardTilt] = useState({ x: 0, y: 0, isHovered: false });
+
+  const handleCardMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left - rect.width / 2;
+    const y = e.clientY - rect.top - rect.height / 2;
+    const rotateY = (x / (rect.width / 2)) * 7;
+    const rotateX = -(y / (rect.height / 2)) * 7;
+    setCardTilt({ x: rotateX, y: rotateY, isHovered: true });
+  };
+
+  const handleCardMouseLeave = () => {
+    setCardTilt({ x: 0, y: 0, isHovered: false });
+  };
   
   // Forgot Password step states
   const [forgotStep, setForgotStep] = useState<1 | 2 | 3>(1);
@@ -103,6 +608,12 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     return { devUri, preUri, liveUri };
   };
 
+  const getApiUrl = (endpoint: string): string => {
+    const origin = getOriginSafe().replace(/\/$/, "");
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    return origin && origin !== 'null' ? `${origin}${cleanEndpoint}` : cleanEndpoint;
+  };
+
   const isCurrentlyInApp = (): boolean => {
     if (typeof window === 'undefined') return false;
     const ua = window.navigator.userAgent || window.navigator.vendor || (window as any).opera || '';
@@ -149,38 +660,33 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
   }, [cooldownSeconds]);
   
   useEffect(() => {
-    const fetchUrl = '/api/auth/google/url';
-    fetch(fetchUrl)
-      .then(res => res.json())
-      .then(data => {
-        if (data.redirectUri) {
-          setGRedirectUri(data.redirectUri);
-        }
-      })
-      .catch(err => console.error("Could not fetch redirect URI for help panel:", err));
+    try {
+      const safeOrigin = getOriginSafe();
+      const fetchUrl = getApiUrl(`/api/auth/google/url?origin=${encodeURIComponent(safeOrigin || '')}`);
+      
+      fetch(fetchUrl)
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP status ${res.status}`);
+          return res.json();
+        })
+        .then(data => {
+          if (data && data.redirectUri) {
+            setGRedirectUri(data.redirectUri);
+          } else {
+            setGRedirectUri(getBothRedirectUris().devUri);
+          }
+        })
+        .catch(err => {
+          console.warn("[Google Auth] Using calculated fallback redirect URI for help panel:", err);
+          setGRedirectUri(getBothRedirectUris().devUri);
+        });
+    } catch (e) {
+      console.warn("[Google Auth] Exception during redirect URI resolution:", e);
+      setGRedirectUri(getBothRedirectUris().devUri);
+    }
   }, []);
   
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  // Real-time Fluctuating Stats Simulation
-  const [totalPaid, setTotalPaid] = useState(5485710);
-  const [activeNow, setActiveNow] = useState(12479);
-  const [lastPayout, setLastPayout] = useState(1350);
-
-  useEffect(() => {
-    const statsInterval = setInterval(() => {
-      setTotalPaid(prev => prev + Math.floor(Math.random() * 85) + 15);
-      setActiveNow(prev => {
-        const change = Math.floor(Math.random() * 31) - 15;
-        const next = prev + change;
-        return next < 11000 ? 11000 : (next > 15000 ? 15000 : next);
-      });
-      if (Math.random() > 0.7) {
-        setLastPayout([600, 1000, 750, 2000, 1200, 1800, 380, 570, 1600, 1370][Math.floor(Math.random() * 10)]);
-      }
-    }, 4000);
-    return () => clearInterval(statsInterval);
-  }, []);
 
   const handleOtpChange = (index: number, value: string) => {
     const cleanValue = value.replace(/\D/g, '');
@@ -375,7 +881,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     }
 
     try {
-      const res = await fetch('/api/auth/send-otp', {
+      const res = await fetch(getApiUrl('/api/auth/send-otp'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, name }),
@@ -415,7 +921,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     setFallbackNotice('');
 
     try {
-      const res = await fetch('/api/auth/send-otp', {
+      const res = await fetch(getApiUrl('/api/auth/send-otp'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, name }),
@@ -458,6 +964,11 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       if (event.data?.type === 'GOOGLE_AUTH_SUCCESS') {
         const googleUser = event.data.user;
         handleGoogleAuthSuccess(googleUser);
+      } else if (event.data?.type === 'GOOGLE_AUTH_ERROR') {
+        setIsGoogleLoading(false);
+        const errorMsg = event.data.error || "Google authentication failed. Please try again.";
+        setError(errorMsg);
+        notify(errorMsg);
       }
     };
 
@@ -580,7 +1091,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
 
       console.log("[Google Auth] Checking server-side custom Google OAuth URL...");
       const origin = getOriginSafe();
-      const fetchUrl = `/api/auth/google/url?origin=${encodeURIComponent(origin)}`;
+      const fetchUrl = getApiUrl(`/api/auth/google/url?origin=${encodeURIComponent(origin || '')}`);
       
       let authUrl = '';
       try {
@@ -719,7 +1230,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     }
 
     try {
-      const res = await fetch('/api/auth/verify-otp', {
+      const res = await fetch(getApiUrl('/api/auth/verify-otp'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code: finalOtp }),
@@ -766,18 +1277,22 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] font-['Inter'] flex items-center justify-center relative overflow-x-hidden text-slate-100 p-3 sm:p-6 md:p-8 lg:p-12 w-full">
-      {/* Cinematic Ambient Background Glows */}
-      <div className="absolute inset-0 z-0 bg-cover bg-center opacity-40 filter blur-3xl pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 35% 25%, rgba(16, 185, 129, 0.15) 0%, transparent 50%), radial-gradient(circle at 75% 75%, rgba(59, 130, 246, 0.15) 0%, transparent 50%)' }}></div>
+    <div className="min-h-screen bg-[#030712] font-['Inter'] flex items-center justify-center relative overflow-hidden text-slate-100 p-3 sm:p-6 md:p-8 lg:p-12 w-full select-none">
+      {/* Live Animated Ambient Background */}
+      <AuthBackground />
       
       {/* Responsive Grid Wrapper */}
       <div className="w-full max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 lg:gap-12 items-center z-10 relative">
         
         {/* Cinematic Hero Section - Column 1 on Desktop, Top on Mobile */}
-        <div className="lg:col-span-5 space-y-6 sm:space-y-8 text-left px-1 sm:px-0 py-4 lg:py-12">
-          
+        <motion.div 
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          className="lg:col-span-5 space-y-6 sm:space-y-8 text-left px-1 sm:px-0 py-4 lg:py-12"
+        >
           {/* Logo & Brand */}
-          <div className="flex items-center gap-3.5 sm:gap-4">
+          <motion.div variants={staggerItem} className="flex items-center gap-3.5 sm:gap-4">
             <div className="bg-[#10b981] p-2.5 rounded-[1.2rem] shadow-2xl shadow-emerald-500/30 ring-1 ring-white/10 shrink-0">
               <ICONS.Logo size={32} className="sm:w-9 sm:h-9" />
             </div>
@@ -790,10 +1305,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
                  <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">VERIFIED FREELANCER HUB</span>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* Hero Text Content */}
-          <div className="space-y-4 sm:space-y-6">
+          <motion.div variants={staggerItem} className="space-y-4 sm:space-y-6">
             <div className="inline-block bg-[#10b981]/10 border border-[#10b981]/20 backdrop-blur-md px-4 sm:px-5 py-1.5 sm:py-2 rounded-full">
               <span className="text-[9px] sm:text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em]">GLOBAL TRUSTED PLATFORM</span>
             </div>
@@ -811,78 +1326,74 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
                  Turn your daily smartphone usage into a sustainable income through our verified freelancer network.
               </p>
             </div>
-          </div>
+          </motion.div>
 
           {/* Action Promo Bar */}
-          <div className="bg-white/[0.03] border border-white/5 p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] flex items-center gap-4 sm:gap-6 backdrop-blur-sm shadow-inner group transition-all">
+          <motion.div variants={staggerItem} className="bg-white/[0.03] border border-white/5 p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] flex items-center gap-4 sm:gap-6 backdrop-blur-sm shadow-inner group transition-all">
              <div className="bg-[#10b981] p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-xl shadow-emerald-500/20 group-hover:scale-105 transition-transform shrink-0">
                 <ICONS.Zap size={22} className="text-white sm:w-6 sm:h-6" />
              </div>
              <p className="text-xs font-black text-white uppercase tracking-tight italic leading-snug">
                Earn income very easily by <br />completing tasks here.
              </p>
-          </div>
+          </motion.div>
 
-          {/* Dynamic Stats Cards */}
-          <div className="grid grid-cols-2 gap-3 sm:gap-5 px-0">
-             <div className="bg-white/[0.02] border border-white/5 p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] relative overflow-hidden group backdrop-blur-md">
-                <div className="flex items-center gap-1.5 sm:gap-2 mb-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse"></div>
-                  <div className="bg-emerald-500/20 px-2 py-0.5 rounded text-[8px] font-black text-emerald-400 tracking-widest uppercase">PAYING</div>
-                </div>
-                <p className="text-xl sm:text-3xl font-black text-white italic tracking-tighter leading-none mb-2">
-                  ৳{(totalPaid / 1000000).toFixed(2)}M+
-                </p>
-                <p className="text-[8px] sm:text-[10px] font-black text-[#10b981] uppercase tracking-widest mb-3 sm:mb-4">TOTAL PAID OUT</p>
-                <div className="flex items-center gap-1.5 opacity-90">
-                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div>
-                   <span className="text-[7.5px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none truncate">
-                     LAST PAYOUT: ৳{lastPayout} PROCESSED
-                   </span>
-                </div>
-             </div>
+          {/* Dynamic Stats Cards (Isolated Sub-component) */}
+          <motion.div variants={staggerItem}>
+            <LiveStatsCard />
+          </motion.div>
+        </motion.div>
 
-             <div className="bg-white/[0.02] border border-white/5 p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] relative overflow-hidden group backdrop-blur-md">
-                <div className="flex items-center gap-1.5 sm:gap-2 mb-2">
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_12px_#10b981] animate-[pulse_0.6s_infinite]"></div>
-                  <div className="bg-emerald-500/20 px-2 py-0.5 rounded text-[8px] font-black text-emerald-400 tracking-widest uppercase">LIVE</div>
-                </div>
-                <p className="text-xl sm:text-3xl font-black text-white italic tracking-tighter leading-none mb-2">
-                  500K+
-                </p>
-                <p className="text-[8px] sm:text-[10px] font-black text-[#10b981] uppercase tracking-widest mb-3 sm:mb-4">ACTIVE EARNERS</p>
-                <div className="flex items-center gap-2">
-                   <span className="text-[7.5px] sm:text-[9px] font-black text-blue-400 uppercase tracking-widest animate-pulse truncate">
-                     {activeNow.toLocaleString()} ONLINE NOW
-                   </span>
-                </div>
-             </div>
-          </div>
-        </div>
+        {/* Right Glassmorphism Form Card with Perspective 3D Tilt & Floating Breathing Animation */}
+        <div className="lg:col-span-7 flex justify-center w-full [perspective:1200px]">
+          <motion.div 
+            translate="no" 
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+            key={view}
+            onMouseMove={handleCardMouseMove}
+            onMouseLeave={handleCardMouseLeave}
+            className={`w-full max-w-md sm:max-w-lg bg-slate-950/60 backdrop-blur-2xl border border-white/10 rounded-[24px] sm:rounded-[2.5rem] p-6 sm:p-8 md:p-10 relative overflow-hidden notranslate mx-auto transition-all duration-300 ${!cardTilt.isHovered ? 'animate-card-float' : ''}`}
+            style={{
+              background: 'rgba(255, 255, 255, 0.04)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: cardTilt.isHovered 
+                ? '0 25px 60px -10px rgba(16, 185, 129, 0.25), 0 15px 35px -5px rgba(0, 0, 0, 0.6)' 
+                : '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
+              transform: cardTilt.isHovered 
+                ? `perspective(1000px) rotateX(${cardTilt.x.toFixed(2)}deg) rotateY(${cardTilt.y.toFixed(2)}deg) scale3d(1.015, 1.015, 1)`
+                : undefined,
+              transition: cardTilt.isHovered 
+                ? 'transform 0.12s ease-out, box-shadow 0.3s ease-out' 
+                : 'transform 0.5s ease-out, box-shadow 0.5s ease-out',
+              transformStyle: 'preserve-3d',
+            }}
+          >
+            {/* Top Glass Accent Gradient Bar */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500 opacity-80" />
 
-        {/* Column 2: Sleek Premium White Form Card */}
-        <div className="lg:col-span-7 flex justify-center w-full">
-          <div translate="no" className="w-full max-w-md sm:max-w-lg bg-white border border-slate-100 rounded-3xl sm:rounded-[3.5rem] p-5 sm:p-8 md:p-10 shadow-2xl relative overflow-hidden notranslate mx-auto">
-            
-            <div className="text-center space-y-3 sm:space-y-4">
-               <div className="flex justify-center mb-4 sm:mb-6">
-                  <div className="bg-emerald-50 px-4 sm:px-6 py-1.5 sm:py-2 rounded-full border border-emerald-100 flex items-center gap-2.5 sm:gap-3 shadow-sm">
-                     <ICONS.Shield size={16} className="text-[#10b981]" />
-                     <span className="text-[9px] sm:text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em]">
+            <motion.div variants={staggerItem} className="text-center space-y-3 sm:space-y-4">
+               <div className="flex justify-center mb-3 sm:mb-5">
+                  <div className="bg-emerald-500/10 px-4 sm:px-6 py-1.5 sm:py-2 rounded-full border border-emerald-500/25 flex items-center gap-2.5 sm:gap-3 shadow-inner backdrop-blur-md">
+                     <ICONS.Shield size={16} className="text-emerald-400 animate-pulse" />
+                     <span className="text-[9px] sm:text-[10px] font-black text-emerald-300 uppercase tracking-[0.2em]">
                        {view === 'verify' || view === 'admin-otp' ? 'SECURITY VERIFICATION' : 'HIGH-SECURITY GATEWAY'}
                      </span>
                   </div>
                </div>
-               <h3 className="text-xl sm:text-3xl font-black text-slate-900 uppercase italic tracking-tighter leading-none">
+               <h3 className="text-2xl sm:text-3xl font-black text-white uppercase italic tracking-tighter leading-none">
                  {view === 'verify' || view === 'admin-otp' ? 'ENTER OTP CODE' : view === 'signup' ? 'CREATE ACCOUNT' : view === 'forgot' ? 'RESET PASSWORD' : 'WELCOME BACK'}
                </h3>
                <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-relaxed">
                  {view === 'verify' || view === 'admin-otp' ? 'Check your email for the code.' : view === 'signup' ? 'Join the largest earning network.' : 'LOG IN TO ACCESS YOUR DASHBOARD AND TASKS.'}
                </p>
-            </div>
+            </motion.div>
 
             {error && (
-              <div className="mt-8 bg-red-50 p-5 rounded-[1.5rem] border border-red-100 flex flex-col gap-3.5 animate-in fade-in slide-in-from-top-3">
+              <motion.div variants={staggerItem} className="mt-8 bg-red-50 p-5 rounded-[1.5rem] border border-red-100 flex flex-col gap-3.5">
                 <div className="flex items-center gap-4">
                   <ICONS.XCircle size={22} className="text-red-500 shrink-0" />
                   <p className="text-xs font-bold text-red-600 tracking-tight leading-snug">{error}</p>
@@ -912,7 +1423,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
                     </ol>
                   </div>
                 )}
-              </div>
+              </motion.div>
             )}
 
             {/* Form element with dynamic views */}
@@ -920,167 +1431,179 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
               {/* LOGIN VIEW */}
               {view === 'login' && (
                 <form onSubmit={handleLoginSubmit} className="space-y-8">
-                   <div className="space-y-6">
-                      <div className="space-y-3">
-                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 leading-none">REGISTERED EMAIL</label>
+                   <div className="space-y-5">
+                      <motion.div variants={staggerItem} className="space-y-2">
+                         <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1 leading-none">REGISTERED EMAIL</label>
                          <div className="relative group">
-                            <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#10b981] transition-colors">
-                               <ICONS.Bell size={20} />
+                            <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-400 transition-colors">
+                               <ICONS.Bell size={18} />
                             </div>
                             <input 
                               type="email" required value={email} onChange={e => setEmail(e.target.value)}
                               placeholder="name@example.com"
                               translate="no"
-                              className="w-full bg-[#f8f9fc] border border-slate-100 focus:border-[#10b981]/30 focus:bg-white rounded-[1.8rem] py-5 pl-16 pr-8 text-slate-900 font-bold text-sm outline-none transition-all notranslate"
+                              className="w-full bg-white/[0.05] border border-white/10 focus:border-emerald-400/80 focus:bg-white/[0.08] focus:ring-4 focus:ring-emerald-500/10 rounded-2xl py-4 pl-14 pr-6 text-white placeholder-slate-500 font-bold text-sm outline-none transition-all notranslate"
                             />
                          </div>
-                      </div>
-                      <div className="space-y-3">
+                      </motion.div>
+                      <motion.div variants={staggerItem} className="space-y-2">
                          <div className="flex justify-between items-center ml-1">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">SECURITY PASSWORD</label>
-                            <button type="button" onClick={() => setView('forgot')} className="text-[10px] font-black text-[#10b981] uppercase italic tracking-widest hover:underline underline-offset-4">FORGOT?</button>
+                            <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none">SECURITY PASSWORD</label>
+                            <button type="button" onClick={() => setView('forgot')} className="text-[10px] font-black text-emerald-400 hover:text-emerald-300 uppercase italic tracking-widest hover:underline underline-offset-4 transition-all">FORGOT?</button>
                          </div>
                          <div className="relative group">
-                            <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#10b981] transition-colors">
-                               <ICONS.Shield size={20} />
+                            <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-400 transition-colors">
+                               <ICONS.Shield size={18} />
                             </div>
                             <input 
                               type={showPassword ? "text" : "password"} required value={password} onChange={e => setPassword(e.target.value)}
                               placeholder="••••••••"
-                              className="w-full bg-[#f8f9fc] border border-slate-100 focus:border-[#10b981] focus:ring-4 focus:ring-emerald-500/10 focus:bg-white rounded-[1.8rem] py-5 pl-16 pr-12 text-slate-900 font-bold text-sm outline-none transition-all"
+                              className="w-full bg-white/[0.05] border border-white/10 focus:border-emerald-400/80 focus:bg-white/[0.08] focus:ring-4 focus:ring-emerald-500/10 rounded-2xl py-4 pl-14 pr-12 text-white placeholder-slate-500 font-bold text-sm outline-none transition-all"
                             />
                             <button
                               type="button"
                               onClick={() => setShowPassword(!showPassword)}
-                              className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1"
+                              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 focus:outline-none p-1"
                               title={showPassword ? "Hide password" : "Show password"}
                             >
                               {showPassword ? (
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                               ) : (
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                               )}
                             </button>
                          </div>
-                      </div>
+                      </motion.div>
                    </div>
-                   <button type="submit" disabled={isLoading} className="w-full bg-[#10b981] hover:bg-[#0fa472] text-white font-black italic py-5 rounded-[1.8rem] shadow-2xl shadow-emerald-500/20 uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-3 active:scale-95 transition-all">
-                     {isLoading ? <div className="w-6 h-6 border-4 border-white/20 border-t-white rounded-full animate-spin"></div> : <>SIGN IN SECURELY <ICONS.Zap size={18} /></>}
-                   </button>
+                   <motion.div variants={staggerItem}>
+                     <button 
+                       type="submit" 
+                       disabled={isLoading} 
+                       className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black italic py-4 rounded-2xl shadow-xl shadow-emerald-500/25 uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-3 active:scale-[0.98] transition-all duration-300 ring-2 ring-emerald-400/20 hover:ring-emerald-400/40"
+                     >
+                       {isLoading ? <div className="w-5 h-5 border-3 border-white/20 border-t-white rounded-full animate-spin"></div> : <>SIGN IN SECURELY <ICONS.Zap size={18} /></>}
+                     </button>
+                   </motion.div>
                 </form>
               )}
 
               {/* SIGNUP VIEW */}
               {view === 'signup' && (
-                 <form onSubmit={handleSignupSubmit} className="space-y-6">
+                 <form onSubmit={handleSignupSubmit} className="space-y-5">
                     <div className="space-y-4">
-                       <div className="p-4 bg-amber-50 border border-amber-100 text-amber-800 rounded-[1.5rem] text-[11px] font-sans font-medium leading-relaxed space-y-1.5 text-left">
-                         <div className="flex items-center gap-2 text-amber-600 font-black">
-                           <ICONS.Shield className="w-4 h-4 flex-shrink-0 animate-pulse text-amber-600" />
+                       <motion.div variants={staggerItem} className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-200 rounded-2xl text-[11px] font-sans font-medium leading-relaxed space-y-1 text-left backdrop-blur-md">
+                         <div className="flex items-center gap-2 text-amber-400 font-black">
+                           <ICONS.Shield className="w-4 h-4 flex-shrink-0 animate-pulse text-amber-400" />
                            <span className="font-extrabold uppercase tracking-widest text-[9px]">OTP Verification Protection</span>
                          </div>
-                         <p>আপনার রিয়েল একাউন্ট দিয়ে সাইন আপ করুন। ফেক অ্যাকাউন্ট বা বটের আক্রমণ রোধ করতে একটি ভেরিফিকেশন কোড (OTP) আপনার জিমেইলে পাঠানো হবে। ৩০ মিনিট পর পর কোড রিকোয়েস্ট করতে পারবেন।</p>
-                       </div>
+                         <p className="text-slate-300 text-[10.5px]">আপনার রিয়েল একাউন্ট দিয়ে সাইন আপ করুন। ফেক অ্যাকাউন্ট বা বটের আক্রমণ রোধ করতে একটি ভেরিফিকেশন কোড (OTP) আপনার জিমেইলে পাঠানো হবে। ৩০ মিনিট পর পর কোড রিকোয়েস্ট করতে পারবেন।</p>
+                       </motion.div>
 
-                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 leading-none">আপনার সম্পূর্ণ নাম (FULL NAME)</label>
+                       <motion.div variants={staggerItem} className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1 leading-none">আপনার সম্পূর্ণ নাম (FULL NAME)</label>
                           <div className="relative group">
-                             <div className="absolute left-5 sm:left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#10b981] transition-colors">
-                                <ICONS.Dashboard size={20} />
+                             <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-400 transition-colors">
+                                <ICONS.Dashboard size={18} />
                              </div>
                              <input 
                                type="text" required value={name} onChange={e => setName(e.target.value)}
                                placeholder="যেমন: MD. ABDUR RAHMAN"
-                               className="w-full bg-[#f8f9fc] border border-slate-100 focus:border-[#10b981]/30 focus:bg-white rounded-[1.8rem] py-5 pl-14 sm:pl-16 pr-6 sm:pr-8 text-slate-900 font-bold text-sm outline-none transition-all"
+                               className="w-full bg-white/[0.05] border border-white/10 focus:border-emerald-400/80 focus:bg-white/[0.08] focus:ring-4 focus:ring-emerald-500/10 rounded-2xl py-4 pl-14 pr-6 text-white placeholder-slate-500 font-bold text-sm outline-none transition-all"
                              />
                           </div>
-                       </div>
+                       </motion.div>
 
-                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 leading-none">সঠিক জিমেইল এড্রেস (EMAIL ADDRESS)</label>
+                       <motion.div variants={staggerItem} className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1 leading-none">সঠিক জিমেইল এড্রেস (EMAIL ADDRESS)</label>
                           <div className="relative group">
-                             <div className="absolute left-5 sm:left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#10b981] transition-colors">
-                                <ICONS.Bell size={20} />
+                             <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-400 transition-colors">
+                                <ICONS.Bell size={18} />
                              </div>
                              <input 
                                type="email" required value={email} onChange={e => setEmail(e.target.value)}
                                placeholder="name@example.com"
                                translate="no"
-                               className="w-full bg-[#f8f9fc] border border-slate-100 focus:border-[#10b981]/30 focus:bg-white rounded-[1.8rem] py-5 pl-14 sm:pl-16 pr-6 sm:pr-8 text-slate-900 font-bold text-sm outline-none transition-all notranslate"
+                               className="w-full bg-white/[0.05] border border-white/10 focus:border-emerald-400/80 focus:bg-white/[0.08] focus:ring-4 focus:ring-emerald-500/10 rounded-2xl py-4 pl-14 pr-6 text-white placeholder-slate-500 font-bold text-sm outline-none transition-all notranslate"
                              />
                           </div>
-                       </div>
+                       </motion.div>
 
-                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 leading-none">সিকিউরিটি পাসওয়ার্ড (PASSWORD)</label>
+                       <motion.div variants={staggerItem} className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1 leading-none">সিকিউরিটি পাসওয়ার্ড (PASSWORD)</label>
                           <div className="relative group">
-                             <div className="absolute left-5 sm:left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#10b981] transition-colors">
-                                <ICONS.Lock size={20} />
+                             <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-400 transition-colors">
+                                <ICONS.Lock size={18} />
                              </div>
                              <input 
                                type={showPassword ? "text" : "password"} required value={password} onChange={e => setPassword(e.target.value)}
                                placeholder="••••••••"
-                               className="w-full bg-[#f8f9fc] border border-slate-100 focus:border-[#10b981] focus:ring-4 focus:ring-emerald-500/10 focus:bg-white rounded-[1.8rem] py-5 pl-14 sm:pl-16 pr-12 text-slate-900 font-bold text-sm outline-none transition-all"
+                               className="w-full bg-white/[0.05] border border-white/10 focus:border-emerald-400/80 focus:bg-white/[0.08] focus:ring-4 focus:ring-emerald-500/10 rounded-2xl py-4 pl-14 pr-12 text-white placeholder-slate-500 font-bold text-sm outline-none transition-all"
                              />
                              <button
                                type="button"
                                onClick={() => setShowPassword(!showPassword)}
-                               className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1"
+                               className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 focus:outline-none p-1"
                                title={showPassword ? "Hide password" : "Show password"}
                              >
                                {showPassword ? (
-                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                                ) : (
-                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                                )}
                              </button>
                           </div>
-                       </div>
+                       </motion.div>
 
-                        <div className="space-y-2">
-                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 leading-none">কনফার্ম পাসওয়ার্ড (CONFIRM PASSWORD)</label>
+                        <motion.div variants={staggerItem} className="space-y-1.5">
+                           <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1 leading-none">কনফার্ম পাসওয়ার্ড (CONFIRM PASSWORD)</label>
                            <div className="relative group">
-                              <div className="absolute left-5 sm:left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#10b981] transition-colors">
-                                 <ICONS.Lock size={20} />
+                              <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-400 transition-colors">
+                                 <ICONS.Lock size={18} />
                               </div>
                               <input 
                                 type={showConfirmPassword ? "text" : "password"} required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
                                 placeholder="••••••••"
-                                className="w-full bg-[#f8f9fc] border border-slate-100 focus:border-[#10b981] focus:ring-4 focus:ring-emerald-500/10 focus:bg-white rounded-[1.8rem] py-5 pl-14 sm:pl-16 pr-12 text-slate-900 font-bold text-sm outline-none transition-all"
+                                className="w-full bg-white/[0.05] border border-white/10 focus:border-emerald-400/80 focus:bg-white/[0.08] focus:ring-4 focus:ring-emerald-500/10 rounded-2xl py-4 pl-14 pr-12 text-white placeholder-slate-500 font-bold text-sm outline-none transition-all"
                               />
                               <button
                                 type="button"
                                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1"
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 focus:outline-none p-1"
                                 title={showConfirmPassword ? "Hide password" : "Show password"}
                               >
                                 {showConfirmPassword ? (
-                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                                 ) : (
-                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                                 )}
                               </button>
                            </div>
-                        </div>
+                        </motion.div>
 
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 leading-none">রেফার কোড / REFER CODE (ঐচ্ছিক)</label>
+                        <motion.div variants={staggerItem} className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1 leading-none">রেফার কোড / REFER CODE (ঐচ্ছিক)</label>
                           <div className="relative group">
-                             <div className="absolute left-5 sm:left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#10b981] transition-colors">
-                                <ICONS.Zap size={20} />
+                             <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-400 transition-colors">
+                                <ICONS.Zap size={18} />
                              </div>
                              <input 
                                type="text" value={referral} onChange={e => setReferral(e.target.value)}
                                placeholder="রেফার কোড থাকলে লিখুন (OPTIONAL)"
-                               className="w-full bg-[#f8f9fc] border border-slate-100 focus:border-[#10b981]/30 focus:bg-white rounded-[1.8rem] py-5 pl-14 sm:pl-16 pr-6 sm:pr-8 text-slate-900 font-bold text-sm outline-none transition-all"
+                               className="w-full bg-white/[0.05] border border-white/10 focus:border-emerald-400/80 focus:bg-white/[0.08] focus:ring-4 focus:ring-emerald-500/10 rounded-2xl py-4 pl-14 pr-6 text-white placeholder-slate-500 font-bold text-sm outline-none transition-all"
                              />
                           </div>
-                       </div>
+                       </motion.div>
                     </div>
 
-                    <button type="submit" disabled={isLoading} className="w-full bg-[#10b981] hover:bg-[#0fa472] text-white font-black italic py-5 rounded-[1.8rem] shadow-2xl shadow-emerald-500/20 uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-3 active:scale-95 transition-all">
-                      {isLoading ? <div className="w-6 h-6 border-4 border-white/20 border-t-white rounded-full animate-spin"></div> : <>SEND VERIFICATION CODE <ICONS.Send size={18} /></>}
-                    </button>
+                    <motion.div variants={staggerItem}>
+                      <button 
+                        type="submit" 
+                        disabled={isLoading} 
+                        className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black italic py-4 rounded-2xl shadow-xl shadow-emerald-500/25 uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-3 active:scale-[0.98] transition-all duration-300 ring-2 ring-emerald-400/20"
+                      >
+                        {isLoading ? <div className="w-5 h-5 border-3 border-white/20 border-t-white rounded-full animate-spin"></div> : <>SEND VERIFICATION CODE <ICONS.Send size={18} /></>}
+                      </button>
+                    </motion.div>
                  </form>
               )}
 
@@ -1097,7 +1620,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
                             onChange={e => handleOtpChange(idx, e.target.value)}
                             onKeyDown={e => handleKeyDown(idx, e)}
                             onPaste={handlePaste}
-                            className="w-full aspect-square bg-[#f8f9fc] border border-slate-100 focus:border-[#10b981] rounded-2xl text-center text-xl font-black text-slate-900 outline-none shadow-sm" />
+                            className="w-full aspect-square bg-white/[0.05] border border-white/10 focus:border-emerald-400 rounded-2xl text-center text-xl font-black text-white outline-none shadow-sm backdrop-blur-md focus:bg-white/10" />
                          ))}
                       </div>
                       <p className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
@@ -1107,14 +1630,14 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
                           <>
                             Didn't receive code?{' '}
                             {cooldownSeconds > 0 ? (
-                              <span className="text-amber-600 font-extrabold animate-pulse block sm:inline mt-1 sm:mt-0 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-100">
+                              <span className="text-amber-300 font-extrabold animate-pulse block sm:inline mt-1 sm:mt-0 bg-amber-500/10 px-3 py-1.5 rounded-full border border-amber-500/20">
                                 নতুন কোড পাঠান (অপেক্ষা করুন: {Math.floor(cooldownSeconds / 60)}m {cooldownSeconds % 60}s)
                               </span>
                             ) : (
                               <button
                                 type="button"
                                 onClick={handleResendOtp}
-                                className="text-[#10b981] hover:underline font-extrabold cursor-pointer border-none bg-transparent inline ml-1"
+                                className="text-emerald-400 hover:underline font-extrabold cursor-pointer border-none bg-transparent inline ml-1"
                               >
                                 রিসেন্ড কোড (Resend)
                               </button>
@@ -1123,10 +1646,14 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
                         )}
                       </p>
                    </div>
-                   <button type="submit" disabled={isLoading} className="w-full bg-[#10b981] hover:bg-[#0fa472] text-white font-black italic py-5 rounded-[1.8rem] shadow-2xl shadow-emerald-500/20 uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-3 active:scale-95 transition-all">
-                     {isLoading ? <div className="w-6 h-6 border-4 border-white/20 border-t-white rounded-full animate-spin"></div> : <>COMPLETE VERIFICATION <ICONS.Check size={18} /></>}
+                   <button 
+                     type="submit" 
+                     disabled={isLoading} 
+                     className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black italic py-4 rounded-2xl shadow-xl shadow-emerald-500/25 uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-3 active:scale-[0.98] transition-all"
+                   >
+                     {isLoading ? <div className="w-5 h-5 border-3 border-white/20 border-t-white rounded-full animate-spin"></div> : <>COMPLETE VERIFICATION <ICONS.Check size={18} /></>}
                    </button>
-                   <button type="button" onClick={() => setView('login')} className="w-full text-slate-400 hover:text-slate-600 font-bold uppercase text-[10px] tracking-widest">Return to Login</button>
+                   <button type="button" onClick={() => setView('login')} className="w-full text-slate-400 hover:text-slate-200 font-bold uppercase text-[10px] tracking-widest">Return to Login</button>
                </form>
              )}
 
@@ -1149,7 +1676,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
 
                       setIsLoading(true);
                       try {
-                        const res = await fetch('/api/auth/send-otp', {
+                        const res = await fetch(getApiUrl('/api/auth/send-otp'), {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ email: targetEmail, name: 'Password Recovery' }),
@@ -1228,7 +1755,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
                           const finalOtp = forgotOtp.join('');
 
                           try {
-                            const res = await fetch('/api/auth/verify-otp', {
+                            const res = await fetch(getApiUrl('/api/auth/verify-otp'), {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ email: forgotEmail.toLowerCase().trim(), code: finalOtp }),
@@ -1315,25 +1842,29 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
                             placeholder="Enter new password"
                             value={forgotNewPassword}
                             onChange={e => setForgotNewPassword(e.target.value)}
-                            className="w-full bg-[#f8f9fc] border border-slate-100 focus:border-[#10b981]/30 focus:bg-white rounded-[1.8rem] py-5 px-6 sm:px-8 text-slate-900 font-bold text-sm outline-none transition-all"
+                            className="w-full bg-white/[0.05] border border-white/10 focus:border-emerald-400/80 focus:bg-white/[0.08] focus:ring-4 focus:ring-emerald-500/10 rounded-2xl py-4 px-6 text-white font-bold text-sm outline-none transition-all"
                           />
                         </div>
                         
                         <div className="space-y-3">
-                          <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider font-extrabold font-sans">CONFIRM PASSWORD (পাসওয়ার্ড নিশ্চিত করুন)</label>
+                          <label className="text-[9px] font-black uppercase text-slate-300 tracking-wider font-extrabold font-sans">CONFIRM PASSWORD (পাসওয়ার্ড নিশ্চিত করুন)</label>
                           <input
                             type="password"
                             required
                             placeholder="Confirm new password"
                             value={forgotConfirmPassword}
                             onChange={e => setForgotConfirmPassword(e.target.value)}
-                            className="w-full bg-[#f8f9fc] border border-slate-100 focus:border-[#10b981]/30 focus:bg-white rounded-[1.8rem] py-5 px-6 sm:px-8 text-slate-900 font-bold text-sm outline-none transition-all"
+                            className="w-full bg-white/[0.05] border border-white/10 focus:border-emerald-400/80 focus:bg-white/[0.08] focus:ring-4 focus:ring-emerald-500/10 rounded-2xl py-4 px-6 text-white font-bold text-sm outline-none transition-all"
                           />
                         </div>
                       </div>
 
-                      <button type="submit" disabled={isLoading} className="w-full bg-[#10b981] hover:bg-[#0fa472] text-white font-black italic py-5 rounded-[1.8rem] shadow-2xl shadow-emerald-500/20 uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-3 active:scale-95 transition-all">
-                        {isLoading ? <div className="w-6 h-6 border-4 border-white/20 border-t-white rounded-full animate-spin"></div> : <>SET NEW PASSWORD <ICONS.Shield size={18} /></>}
+                      <button 
+                        type="submit" 
+                        disabled={isLoading} 
+                        className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black italic py-4 rounded-2xl shadow-xl shadow-emerald-500/25 uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-3 active:scale-[0.98] transition-all"
+                      >
+                        {isLoading ? <div className="w-5 h-5 border-3 border-white/20 border-t-white rounded-full animate-spin"></div> : <>SET NEW PASSWORD <ICONS.Shield size={18} /></>}
                       </button>
                       <button type="button" onClick={() => { setForgotStep(1); setView('login'); }} className="w-full text-slate-400 hover:text-white font-bold uppercase text-[10px] tracking-widest text-center mt-4">Back to Login</button>
                     </form>
@@ -1344,12 +1875,12 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
 
             {/* Social Connect & Switcher */}
             {view !== 'verify' && view !== 'admin-otp' && (
-               <div className="space-y-8 text-center pt-8 border-t border-slate-100 mt-8">
-                   <div className="relative flex py-2 items-center">
+               <div className="space-y-6 text-center pt-6 border-t border-white/10 mt-6">
+                   <motion.div variants={staggerItem} className="relative flex py-2 items-center">
                      <div className="flex-grow border-t border-slate-100"></div>
                      <span className="flex-shrink mx-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">AUTHORIZED CONNECT</span>
                      <div className="flex-grow border-t border-slate-100"></div>
-                  </div>
+                  </motion.div>
 
                   {isCurrentlyInApp() && (
                     <div className="p-4 bg-amber-50 border border-amber-100 text-amber-700 rounded-2xl text-[11px] font-bold text-left space-y-1.5 animate-pulse">
@@ -1365,21 +1896,23 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
                     </div>
                   )}
 
-                   <button 
-                      type="button" 
-                      onClick={startGoogleLogin}
-                      disabled={isGoogleLoading}
-                      className="w-full border border-slate-200 bg-white py-3.5 sm:py-4 px-6 sm:px-8 rounded-full flex items-center justify-center gap-3 sm:gap-4 hover:border-slate-300 hover:bg-slate-50/50 transition-all shadow-sm group active:scale-[0.98] disabled:opacity-50"
-                    >
-                      {isGoogleLoading ? (
-                        <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                      ) : (
-                        <img src="https://www.gstatic.com/images/branding/product/2x/googleg_48dp.png" className="w-5 h-5 sm:w-5.5 sm:h-5.5" alt="G" />
-                      )}
-                      <span className="font-extrabold text-[12px] sm:text-[13px] text-slate-700 tracking-wide">
-                        {isGoogleLoading ? 'AUTHENTICATING...' : 'Continue with Google'}
-                      </span>
-                    </button>
+                   <motion.div variants={staggerItem}>
+                     <button 
+                        type="button" 
+                        onClick={startGoogleLogin}
+                        disabled={isGoogleLoading}
+                        className="w-full border border-white/15 bg-white/[0.05] hover:bg-white/[0.1] py-3.5 sm:py-4 px-6 sm:px-8 rounded-2xl flex items-center justify-center gap-3 sm:gap-4 transition-all duration-300 shadow-md group active:scale-[0.98] disabled:opacity-50 hover:border-white/30 backdrop-blur-md"
+                      >
+                        {isGoogleLoading ? (
+                          <div className="w-5 h-5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <img src="https://www.gstatic.com/images/branding/product/2x/googleg_48dp.png" className="w-5 h-5 sm:w-5.5 sm:h-5.5" alt="G" />
+                        )}
+                        <span className="font-extrabold text-[12px] sm:text-[13px] text-slate-100 tracking-wide">
+                          {isGoogleLoading ? 'AUTHENTICATING...' : 'Continue with Google'}
+                        </span>
+                      </button>
+                   </motion.div>
 
 
                    {/* Collapsible Google OAuth Guide for the Developer */}
@@ -1466,15 +1999,15 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
                    </div>
                    )}
 
-                  <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest leading-none mt-6">
+                  <motion.p variants={staggerItem} className="text-[11px] font-black text-slate-400 uppercase tracking-widest leading-none mt-6">
                      {view === 'login' ? "DON'T HAVE AN ACCOUNT?" : "ALREADY HAVE AN ACCOUNT?"} 
                      <button onClick={() => setView(view === 'login' ? 'signup' : 'login')} className="text-[#10b981] font-black underline underline-offset-[10px] ml-1">
                         {view === 'login' ? 'SIGN UP FREE' : 'LOG IN NOW'}
                      </button>
-                  </p>
+                  </motion.p>
                </div>
             )}
-          </div>
+          </motion.div>
         </div>
       </div>
 

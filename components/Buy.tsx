@@ -257,11 +257,11 @@ const Buy: React.FC<BuyProps> = ({
       </div>
 
       {/* Tabs Menu */}
-      <div className="flex gap-2 p-1.5 bg-white/5 border border-white/5 rounded-2xl w-fit mx-auto backdrop-blur-md">
+      <div className="flex gap-2 p-1.5 bg-slate-900 border-2 border-white/10 rounded-2xl w-fit mx-auto shadow-xl">
         <button 
           onClick={() => setActiveTab('store')} 
-          className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-            activeTab === 'store' ? 'bg-[#10b981] text-white shadow-lg' : 'text-slate-400 hover:text-white'
+          className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
+            activeTab === 'store' ? 'bg-[#10b981] text-slate-950 shadow-lg scale-105' : 'text-slate-300 hover:text-white hover:bg-slate-800'
           }`}
           id="btn-store-browse"
         >
@@ -269,14 +269,14 @@ const Buy: React.FC<BuyProps> = ({
         </button>
         <button 
           onClick={() => setActiveTab('purchases')} 
-          className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all relative ${
-            activeTab === 'purchases' ? 'bg-[#10b981] text-white shadow-lg' : 'text-slate-400 hover:text-white'
+          className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all relative cursor-pointer ${
+            activeTab === 'purchases' ? 'bg-[#10b981] text-slate-950 shadow-lg scale-105' : 'text-slate-300 hover:text-white hover:bg-slate-800'
           }`}
           id="btn-store-purchases"
         >
           My Purchases
           {(myStoreOrders.filter(o => o.status === 'pending').length > 0) && (
-            <span className="absolute -top-1 -right-1 bg-amber-500 text-black text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-pulse">
+            <span className="absolute -top-1 -right-1 bg-amber-400 text-slate-950 text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse border border-slate-950">
               {myStoreOrders.filter(o => o.status === 'pending').length}
             </span>
           )}
@@ -287,15 +287,15 @@ const Buy: React.FC<BuyProps> = ({
         /* Store Browsing Grid */
         <div className="space-y-6">
           {/* Categories scroller & Search bar */}
-          <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white/5 border border-white/5 p-6 rounded-[2rem] backdrop-blur-xl">
+          <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-slate-900 border-2 border-white/10 p-6 rounded-[2rem] shadow-xl">
             {/* Category horizontal scroller */}
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full md:w-auto pb-2 md:pb-0">
               <button
                 onClick={() => setSelectedCategory('All')}
-                className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all border ${
+                className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all border-2 ${
                   selectedCategory === 'All' 
-                    ? 'bg-[#10b981] text-white border-transparent' 
-                    : 'bg-white/5 text-slate-300 border-white/5 hover:border-white/10'
+                    ? 'bg-[#10b981] text-slate-950 border-[#10b981]' 
+                    : 'bg-slate-800 text-white border-white/10 hover:border-emerald-500/40'
                 }`}
               >
                 All Items
@@ -304,10 +304,10 @@ const Buy: React.FC<BuyProps> = ({
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.name)}
-                  className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all border ${
+                  className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all border-2 ${
                     selectedCategory === cat.name
-                      ? 'bg-[#10b981] text-white border-transparent'
-                      : 'bg-white/5 text-slate-300 border-white/5 hover:border-white/10'
+                      ? 'bg-[#10b981] text-slate-950 border-[#10b981]'
+                      : 'bg-slate-800 text-white border-white/10 hover:border-emerald-500/40'
                   }`}
                 >
                   {cat.name}
@@ -322,10 +322,10 @@ const Buy: React.FC<BuyProps> = ({
                 placeholder="সার্চ করুন..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-black/40 border-2 border-transparent focus:border-[#10b981]/30 rounded-xl py-3 pl-10 pr-4 text-white font-extrabold text-xs outline-none transition-all placeholder:text-slate-700"
+                className="w-full bg-slate-950 border-2 border-white/20 focus:border-[#10b981] rounded-xl py-3 pl-10 pr-4 text-white font-extrabold text-sm outline-none transition-all placeholder:text-slate-500"
               />
-              <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-600">
-                <ICONS.Buy size={14} />
+              <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-400">
+                <ICONS.Buy size={16} />
               </div>
             </div>
           </div>
@@ -338,26 +338,24 @@ const Buy: React.FC<BuyProps> = ({
               return (
                 <div 
                   key={item.id} 
-                  className="bg-white/5 border border-white/5 rounded-[2.5rem] p-7 flex flex-col justify-between transition-all hover:scale-[1.02] hover:border-[#10b981]/30 hover:shadow-2xl hover:shadow-emerald-500/5 group relative overflow-hidden backdrop-blur-2xl"
+                  className="bg-slate-900 border-2 border-white/10 rounded-[2.5rem] p-7 flex flex-col justify-between transition-all hover:scale-[1.02] hover:border-[#10b981] hover:shadow-2xl shadow-xl group relative overflow-hidden"
                 >
-                  <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-[0.03] pointer-events-none"></div>
-                  
                   <div className="space-y-4 relative z-10">
                     <div className="flex justify-between items-start gap-2">
                       <div className="flex flex-col gap-1.5">
-                        <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 bg-emerald-500/10 text-[#10b981] rounded-full w-fit">
+                        <span className="text-xs font-black uppercase tracking-widest px-3 py-1.5 bg-emerald-950 text-[#10b981] border border-emerald-500/40 rounded-full w-fit">
                           {item.category}
                         </span>
                         {item.enableSD && (
-                          <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-md w-fit inline-flex items-center gap-1">
+                          <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 bg-indigo-950 text-indigo-300 border border-indigo-500/50 rounded-md w-fit inline-flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span> SD Option
                           </span>
                         )}
                       </div>
                       <div className="text-right">
-                        <LocalizedReward bdtAmount={item.price} countryCode={selectedCountryCode} className="flex flex-col items-end" textClassName="text-xl font-black italic text-white tracking-tight leading-none" usdClassName="text-[9px] font-bold text-slate-500 mt-1 uppercase" />
+                        <LocalizedReward bdtAmount={item.price} countryCode={selectedCountryCode} className="flex flex-col items-end" textClassName="text-2xl font-black italic text-white tracking-tight leading-none" usdClassName="text-xs font-bold text-emerald-300 mt-1 uppercase" />
                         {limit > 0 && (
-                          <p className="text-[8px] font-black text-slate-500 uppercase mt-1">
+                          <p className="text-xs font-black text-amber-300 uppercase mt-1">
                             Limit: {count}/{limit}
                           </p>
                         )}
@@ -365,17 +363,17 @@ const Buy: React.FC<BuyProps> = ({
                     </div>
 
                     <div>
-                      <h3 className="text-lg font-black text-white uppercase italic tracking-tight mb-2 group-hover:text-[#10b981] transition-colors leading-none leading-tight">
+                      <h3 className="text-xl font-black text-white uppercase italic tracking-tight mb-2 group-hover:text-[#10b981] transition-colors leading-tight">
                         {item.title}
                       </h3>
-                      <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                      <p className="text-xs text-slate-300 font-semibold leading-relaxed">
                         {item.description}
                       </p>
                     </div>
                   </div>
 
-                  <div className="pt-6 mt-6 border-t border-white/5 flex items-center justify-between relative z-10">
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                  <div className="pt-6 mt-6 border-t border-white/10 flex items-center justify-between relative z-10">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                       Added: {item.createdAt}
                     </span>
                     <button

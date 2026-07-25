@@ -102,4 +102,427 @@ button, a, input[type="button"], input[type="submit"] {
   transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+@keyframes shimmer {
+  0% { transform: translate3d(-100%, 0, 0); }
+  100% { transform: translate3d(220%, 0, 0); }
+}
 
+@keyframes floatOrb1 {
+  0%, 100% { 
+    transform: translate3d(0px, 0px, 0) scale(1); 
+    background-color: rgba(16, 185, 129, 0.22); 
+  }
+  33% { 
+    background-color: rgba(234, 179, 8, 0.22); 
+  }
+  50% { 
+    transform: translate3d(35px, -30px, 0) scale(1.12); 
+  }
+  66% { 
+    background-color: rgba(59, 130, 246, 0.22); 
+  }
+}
+
+@keyframes floatOrb2 {
+  0%, 100% { 
+    transform: translate3d(0px, 0px, 0) scale(1); 
+    background-color: rgba(124, 58, 237, 0.22); 
+  }
+  33% { 
+    background-color: rgba(59, 130, 246, 0.22); 
+  }
+  50% { 
+    transform: translate3d(-30px, 25px, 0) scale(1.18); 
+  }
+  66% { 
+    background-color: rgba(245, 158, 11, 0.22); 
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { 
+    opacity: 0.35; 
+    filter: blur(45px); 
+    background-color: rgba(6, 182, 212, 0.22); 
+  }
+  33% { 
+    background-color: rgba(234, 179, 8, 0.22); 
+  }
+  50% { 
+    opacity: 0.65; 
+    filter: blur(65px); 
+  }
+  66% { 
+    background-color: rgba(59, 130, 246, 0.22); 
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 4.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+.animate-float-slow {
+  animation: floatOrb1 14s ease-in-out infinite;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+.animate-float-reverse {
+  animation: floatOrb2 18s ease-in-out infinite;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 7s ease-in-out infinite;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+.glass-card-premium {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.glass-card-light {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* Cyberpunk & Web3 Neon Utilities */
+.neon-glow-emerald {
+  border: 2px solid #10b981 !important;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.45), inset 0 0 12px rgba(16, 185, 129, 0.2) !important;
+}
+
+.neon-glow-amber {
+  border: 2px solid #f59e0b !important;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.45), inset 0 0 12px rgba(245, 158, 11, 0.2) !important;
+}
+
+.neon-glow-cyan {
+  border: 2px solid #06b6d4 !important;
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.45), inset 0 0 12px rgba(6, 182, 212, 0.2) !important;
+}
+
+.neon-glow-violet {
+  border: 2px solid #8b5cf6 !important;
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.45), inset 0 0 12px rgba(139, 92, 246, 0.2) !important;
+}
+
+.glow-text-emerald {
+  text-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
+}
+
+.glow-text-amber {
+  text-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+}
+
+.glow-text-white {
+  text-shadow: 0 0 14px rgba(255, 255, 255, 0.7);
+}
+
+.cyber-card {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.85) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.cyber-card-glow {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(16, 185, 129, 0.1) 100%);
+  border: 1.5px solid rgba(16, 185, 129, 0.4);
+  box-shadow: 0 12px 35px -10px rgba(16, 185, 129, 0.25);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.btn-cyber-primary {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #020617;
+  font-weight: 900;
+  box-shadow: 0 0 22px rgba(16, 185, 129, 0.45);
+  border: 1px solid #34d399;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+.btn-cyber-primary:hover {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  box-shadow: 0 0 30px rgba(16, 185, 129, 0.65);
+  transform: translate3d(0, -2px, 0);
+}
+
+/* Cyberpunk Sidebar Responsive Layout & Styles */
+@media (max-width: 767px) {
+  .cyberpunk-sidebar {
+    /* 1. Alignment & Overlay Fixes */
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    height: 100dvh; /* Dynamic Viewport Height for Mobile Browsers */
+    width: 280px; /* Adjust sidebar width as needed */
+    z-index: 10000;
+    
+    /* 2. Cyberpunk Glass-morphism Effect */
+    background: rgba(15, 15, 26, 0.95); /* Optimized opacity for fluid mobile animation */
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%); /* Safari Support */
+    
+    /* Cyberpunk Borders & Neon Accents */
+    border-right: 1px solid rgba(0, 243, 255, 0.3); /* Neon Cyan border */
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5), 
+                inset 0 0 15px rgba(0, 243, 255, 0.1);
+  }
+}
+
+/* Desktop View Layout (768px and above) */
+@media (min-width: 768px) {
+  .cyberpunk-sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+}
+
+/* GPU-Accelerated Hardware-Optimized Ambient Blob Keyframes for Smooth 60fps Mobile Performance */
+@keyframes blobFloat1 {
+  0%, 100% { transform: translate3d(0px, 0px, 0) scale(1) rotate(0deg); }
+  33% { transform: translate3d(40px, -50px, 0) scale(1.1) rotate(60deg); }
+  66% { transform: translate3d(-30px, 35px, 0) scale(0.95) rotate(120deg); }
+}
+
+@keyframes blobFloat2 {
+  0%, 100% { transform: translate3d(0px, 0px, 0) scale(1) rotate(0deg); }
+  33% { transform: translate3d(-50px, 40px, 0) scale(1.12) rotate(-60deg); }
+  66% { transform: translate3d(35px, -30px, 0) scale(0.9) rotate(-120deg); }
+}
+
+@keyframes blobFloat3 {
+  0%, 100% { transform: translate3d(0px, 0px, 0) scale(1); }
+  50% { transform: translate3d(45px, 45px, 0) scale(1.08); }
+}
+
+@keyframes laserSweep {
+  0% { transform: translate3d(-100%, -100%, 0) rotate(25deg); opacity: 0; }
+  20% { opacity: 0.15; }
+  50% { opacity: 0.25; }
+  80% { opacity: 0.15; }
+  100% { transform: translate3d(200%, 200%, 0) rotate(25deg); opacity: 0; }
+}
+
+@keyframes particleFloat1 {
+  0% { transform: translate3d(0, 0, 0) scale(0.8); opacity: 0.3; }
+  50% { transform: translate3d(25px, -35px, 0) scale(1.2); opacity: 0.9; }
+  100% { transform: translate3d(-15px, -70px, 0) scale(0.8); opacity: 0.2; }
+}
+
+@keyframes particleFloat2 {
+  0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.2; }
+  50% { transform: translate3d(-30px, -50px, 0) scale(1.3); opacity: 0.85; }
+  100% { transform: translate3d(20px, -100px, 0) scale(0.9); opacity: 0.1; }
+}
+
+@keyframes glowSpotlight {
+  0%, 100% { opacity: 0.35; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.65; transform: translate(-50%, -50%) scale(1.15); }
+}
+
+@keyframes floatUpFade1 {
+  0% { transform: translate3d(0, 30px, 0) scale(0.85) rotate(-10deg); opacity: 0; }
+  20% { opacity: 0.75; }
+  80% { opacity: 0.75; }
+  100% { transform: translate3d(20px, -90px, 0) scale(1.15) rotate(15deg); opacity: 0; }
+}
+
+@keyframes floatUpFade2 {
+  0% { transform: translate3d(0, 40px, 0) scale(0.9) rotate(12deg); opacity: 0; }
+  25% { opacity: 0.8; }
+  75% { opacity: 0.8; }
+  100% { transform: translate3d(-25px, -110px, 0) scale(1.2) rotate(-18deg); opacity: 0; }
+}
+
+@keyframes floatUpFade3 {
+  0% { transform: translate3d(0, 50px, 0) scale(0.8) rotate(-15deg); opacity: 0; }
+  30% { opacity: 0.85; }
+  70% { opacity: 0.85; }
+  100% { transform: translate3d(-30px, -130px, 0) scale(1.1) rotate(20deg); opacity: 0; }
+}
+
+@keyframes currencyOrbit {
+  0% { transform: rotate(0deg) translateY(-140px) rotate(0deg) scale(0.9); opacity: 0.6; }
+  50% { transform: rotate(180deg) translateY(-160px) rotate(-180deg) scale(1.1); opacity: 0.95; }
+  100% { transform: rotate(360deg) translateY(-140px) rotate(-360deg) scale(0.9); opacity: 0.6; }
+}
+
+@keyframes currencyOrbitRev {
+  0% { transform: rotate(360deg) translateY(-220px) rotate(-360deg) scale(0.85); opacity: 0.5; }
+  50% { transform: rotate(180deg) translateY(-240px) rotate(-180deg) scale(1.15); opacity: 0.95; }
+  100% { transform: rotate(0deg) translateY(-220px) rotate(0deg) scale(0.85); opacity: 0.5; }
+}
+
+@keyframes meshRotateSlow {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.1); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+@keyframes pulseGlowRing {
+  0%, 100% { transform: scale(0.95); opacity: 0.25; }
+  50% { transform: scale(1.2); opacity: 0.55; }
+}
+
+@keyframes marqueeTicker {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-50%, 0, 0); }
+}
+
+.animate-marquee-ticker {
+  animation: marqueeTicker 25s linear infinite;
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+.gpu-accelerated-blob {
+  transform: translateZ(0);
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.animate-laser-sweep {
+  animation: laserSweep 12s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.animate-spotlight {
+  animation: glowSpotlight 8s ease-in-out infinite;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.animate-particle-1 {
+  animation: particleFloat1 8s ease-in-out infinite;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+.animate-particle-2 {
+  animation: particleFloat2 11s ease-in-out infinite;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+.animate-float-up-1 {
+  animation: floatUpFade1 9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+.animate-float-up-2 {
+  animation: floatUpFade2 12s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+.animate-float-up-3 {
+  animation: floatUpFade3 14s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+.animate-orbit-1 {
+  animation: currencyOrbit 28s linear infinite;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+.animate-orbit-2 {
+  animation: currencyOrbitRev 36s linear infinite;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+.animate-mesh-rotate {
+  animation: meshRotateSlow 35s linear infinite;
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+.animate-pulse-ring {
+  animation: pulseGlowRing 6s ease-in-out infinite;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gpu-accelerated-blob,
+  .animate-laser-sweep,
+  .animate-spotlight,
+  .animate-particle-1,
+  .animate-particle-2,
+  .animate-float-up-1,
+  .animate-float-up-2,
+  .animate-mesh-rotate,
+  .animate-pulse-ring,
+  .animate-shimmer,
+  .animate-float-slow,
+  .animate-float-reverse {
+    animation: none !important;
+  }
+}
+
+
+
+
+
+
+/* Subtle Breathing Float Animation for Form Container */
+@keyframes formCardBreathe {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(0.15deg);
+  }
+}
+
+.animate-card-float {
+  animation: formCardBreathe 7s ease-in-out infinite;
+  will-change: transform;
+}

@@ -174,14 +174,14 @@ const Withdraw: React.FC<WithdrawProps> = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter leading-none">Withdraw <span className="text-[#10b981]">Assets</span></h2>
-            <p className="text-slate-400 font-black text-[10px] tracking-widest uppercase italic opacity-60">Verified Payout System • Permanent Access</p>
+            <p className="text-emerald-400 font-black text-xs tracking-widest uppercase italic">Verified Payout System • Permanent Access</p>
           </div>
-          <div className="bg-white/5 backdrop-blur-3xl px-8 py-5 rounded-[2.5rem] border border-white/5 shadow-2xl flex items-center gap-6 group hover:border-[#10b981]/30 transition-all">
+          <div className="bg-slate-900 px-8 py-5 rounded-[2.5rem] border-2 border-emerald-500/30 shadow-2xl flex items-center gap-6 group hover:border-[#10b981] transition-all">
               <div className="text-right">
-                  <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest block mb-1">ব্যালেন্স</span>
-                  <LocalizedReward bdtAmount={user.balance} countryCode={selectedCountryCode} className="flex flex-col items-end" textClassName="text-3xl font-black text-[#10b981] leading-none" usdClassName="text-[10px] font-bold text-slate-400 mt-1 uppercase" />
+                  <span className="text-xs font-black uppercase text-emerald-400 tracking-widest block mb-1">ব্যালেন্স</span>
+                  <LocalizedReward bdtAmount={user.balance} countryCode={selectedCountryCode} className="flex flex-col items-end" textClassName="text-3xl font-black text-[#10b981] leading-none" usdClassName="text-xs font-black text-emerald-300 mt-1 uppercase" />
               </div>
-              <div className="p-4 bg-emerald-500/10 text-[#10b981] rounded-2xl group-hover:scale-110 transition-transform shadow-inner border border-emerald-500/10">
+              <div className="p-4 bg-emerald-950/90 text-[#10b981] rounded-2xl group-hover:scale-110 transition-transform shadow-inner border border-emerald-500/40">
                   <ICONS.Wallet size={32} />
               </div>
           </div>
@@ -189,22 +189,22 @@ const Withdraw: React.FC<WithdrawProps> = ({
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 mt-10">
           <div className="lg:col-span-2 space-y-8">
-            <div className="bg-slate-900/30 backdrop-blur-3xl rounded-[3rem] p-8 md:p-12 border border-white/5 shadow-2xl space-y-12 relative overflow-hidden">
+            <div className="bg-slate-900 rounded-[3rem] p-8 md:p-12 border-2 border-white/10 shadow-2xl space-y-12 relative overflow-hidden">
               <form onSubmit={handleWithdraw} className="space-y-12 relative z-10">
                 <div className="space-y-6">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2 italic">১. টায়ার সিলেক্ট করুন</label>
+                  <label className="text-xs font-black uppercase text-emerald-400 tracking-[0.2em] ml-2 italic block">১. টায়ার সিলেক্ট করুন</label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {activeOptions.map(opt => (
                       <button
                         key={opt.id} type="button" onClick={() => setSelectedOption(opt)}
-                        className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center justify-center text-center gap-1 backdrop-blur-md ${
+                        className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center justify-center text-center gap-1 cursor-pointer ${
                           selectedOption?.id === opt.id 
-                            ? 'bg-[#10b981] border-[#10b981] text-white shadow-2xl shadow-emerald-500/30' 
-                            : 'bg-white/5 border-transparent text-slate-400 hover:bg-white/10'
+                            ? 'neon-glow-emerald bg-emerald-950 text-white scale-[1.03]' 
+                            : 'bg-slate-800 border-white/10 text-white hover:bg-slate-700 hover:border-emerald-500/40'
                         }`}
                       >
-                        <span className="text-[10px] font-black uppercase opacity-60 leading-none mb-1">{opt.label}</span>
-                        <span className="text-xl font-black italic tracking-tighter">
+                        <span className="text-xs font-black uppercase tracking-wider leading-none mb-1 text-slate-300">{opt.label}</span>
+                        <span className="text-2xl font-black italic tracking-tighter text-white">
                           {opt.amount === 'all' ? 'FULL' : (
                             selectedCountryCode === 'BD' ? `৳${opt.amount}` : (
                               `${convertCurrency(Number(opt.amount), selectedCountryCode).symbol}${convertCurrency(Number(opt.amount), selectedCountryCode).mainVal.toFixed(0)}`
@@ -212,7 +212,7 @@ const Withdraw: React.FC<WithdrawProps> = ({
                           )}
                         </span>
                         {opt.amount !== 'all' && selectedCountryCode !== 'BD' && (
-                          <span className="text-[9px] font-bold opacity-65 leading-none">
+                          <span className="text-xs font-black text-emerald-300 leading-none">
                             (${convertCurrency(Number(opt.amount), selectedCountryCode).usdVal.toFixed(1)})
                           </span>
                         )}
@@ -222,7 +222,7 @@ const Withdraw: React.FC<WithdrawProps> = ({
                 </div>
 
                 <div className="space-y-6">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2 italic">২. গেটওয়ে সিলেক্ট করুন</label>
+                  <label className="text-xs font-black uppercase text-emerald-400 tracking-[0.2em] ml-2 italic block">২. গেটওয়ে সিলেক্ট করুন</label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {activeMethods.map(method => {
                       const isLimitExceeded = method.isLimitExceeded || method.status === 'Unavailable';
@@ -232,23 +232,23 @@ const Withdraw: React.FC<WithdrawProps> = ({
                           type="button" 
                           disabled={isLimitExceeded}
                           onClick={() => setSelectedMethod(method)}
-                          className={`p-5 rounded-2xl border-2 transition-all flex flex-col items-center justify-center text-center backdrop-blur-md gap-1 ${
+                          className={`p-5 rounded-2xl border-2 transition-all flex flex-col items-center justify-center text-center gap-1 cursor-pointer ${
                             isLimitExceeded
-                              ? 'bg-red-500/5 border-red-500/10 text-red-500/50 opacity-40 cursor-not-allowed'
+                              ? 'bg-red-950/40 border-red-500/20 text-red-400 opacity-50 cursor-not-allowed'
                               : selectedMethod?.id === method.id 
-                                ? 'bg-[#10b981] border-[#10b981] text-white shadow-xl shadow-emerald-500/20' 
-                                : 'bg-white/5 border-transparent text-slate-400 hover:bg-white/10'
+                                ? 'neon-glow-emerald bg-emerald-950 text-white scale-[1.03]' 
+                                : 'bg-slate-800 border-white/10 text-white hover:bg-slate-700 hover:border-emerald-500/40'
                           }`}
                         >
-                          <span className="text-base font-black tracking-tight uppercase italic leading-none mb-1">{method.name}</span>
-                          <span className="text-[9px] font-black uppercase opacity-60 leading-none">{method.type}</span>
+                          <span className="text-lg font-black tracking-tight uppercase italic leading-none mb-1 text-white">{method.name}</span>
+                          <span className="text-xs font-black uppercase text-slate-300 leading-none">{method.type}</span>
                           {method.minWithdraw > 0 && (
-                            <span className="text-[9px] font-bold opacity-80">
+                            <span className="text-xs font-black text-emerald-300">
                               Min: ৳{method.minWithdraw}
                             </span>
                           )}
-                          <span className={`text-[8px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded-md ${
-                            isLimitExceeded ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'
+                          <span className={`text-[10px] font-black uppercase tracking-tighter px-2 py-0.5 rounded-md ${
+                            isLimitExceeded ? 'bg-red-500/30 text-red-300' : 'bg-emerald-500/30 text-emerald-300'
                           }`}>
                             {isLimitExceeded ? "Unavailable" : "Available"}
                           </span>
@@ -259,32 +259,32 @@ const Withdraw: React.FC<WithdrawProps> = ({
                 </div>
 
                 <div className="space-y-4">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2 italic">৩. অ্যাকাউন্ট নম্বর</label>
+                  <label className="text-xs font-black uppercase text-emerald-400 tracking-[0.2em] ml-2 italic block">৩. অ্যাকাউন্ট নম্বর</label>
                   <div className="relative group">
-                      <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-[#10b981] transition-colors">
+                      <div className="absolute left-6 top-1/2 -translate-y-1/2 text-emerald-400 group-focus-within:text-emerald-300 transition-colors">
                           <ICONS.Zap size={22} />
                       </div>
                       <input 
                         type="text" required value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)}
                         placeholder="অ্যাকাউন্ট নম্বরটি দিন..."
-                        className="w-full bg-black/40 border-2 border-transparent focus:border-[#10b981]/30 rounded-[2.5rem] py-6 pl-16 pr-8 text-white font-black text-lg outline-none transition-all shadow-inner placeholder:text-slate-800"
+                        className="w-full bg-slate-950 border-2 border-white/20 focus:border-emerald-400 rounded-[2.5rem] py-6 pl-16 pr-8 text-white font-black text-xl outline-none transition-all shadow-inner placeholder:text-slate-500"
                       />
                   </div>
                 </div>
 
-                <div className="bg-black/40 backdrop-blur-xl p-8 rounded-[3rem] border border-white/5 space-y-6 relative overflow-hidden">
+                <div className="bg-slate-950 p-8 rounded-[3rem] border-2 border-emerald-500/30 space-y-6 relative overflow-hidden">
                   <div className="flex justify-between items-end px-2">
                       <div className="space-y-1">
-                          <span className="text-sm font-black text-white uppercase italic tracking-tighter">নিট অ্যামাউন্ট</span>
-                          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-none italic">আপনি পাবেন</p>
+                          <span className="text-base font-black text-white uppercase italic tracking-tighter">নিট অ্যামাউন্ট</span>
+                          <p className="text-xs text-emerald-300 font-bold uppercase tracking-widest leading-none italic">আপনি পাবেন</p>
                       </div>
-                      <LocalizedReward bdtAmount={net} countryCode={selectedCountryCode} className="flex flex-col items-end" textClassName="text-5xl font-black text-[#10b981] tracking-tighter italic leading-none" usdClassName="text-xs font-bold text-slate-400 mt-1 uppercase" />
+                      <LocalizedReward bdtAmount={net} countryCode={selectedCountryCode} className="flex flex-col items-end" textClassName="text-5xl font-black text-[#10b981] tracking-tighter italic leading-none" usdClassName="text-xs font-black text-emerald-300 mt-1 uppercase" />
                   </div>
                 </div>
 
                 {selectedMethod && base < selectedMethod.minWithdraw && (
-                  <div className="bg-rose-500/10 border border-rose-500/20 p-5 rounded-2xl flex items-center gap-3 text-rose-400 font-bold text-xs uppercase tracking-wide animate-in fade-in slide-in-from-top-2">
-                    <AlertTriangle className="text-rose-500 shrink-0" size={18} />
+                  <div className="bg-rose-950/80 border-2 border-rose-500 p-5 rounded-2xl flex items-center gap-3 text-rose-300 font-black text-xs uppercase tracking-wide">
+                    <AlertTriangle className="text-rose-400 shrink-0" size={20} />
                     <span>
                       দুঃখিত, {selectedMethod.name} গেটওয়ের জন্য নূন্যতম উইথড্র পরিমাণ ৳{selectedMethod.minWithdraw}। অনুগ্রহ করে অন্য গেটওয়ে বা উচ্চতর টায়ার সিলেক্ট করুন।
                     </span>
@@ -295,8 +295,8 @@ const Withdraw: React.FC<WithdrawProps> = ({
                   disabled={isProcessing || !selectedOption || !selectedMethod || base > user.balance || (selectedMethod && base < selectedMethod.minWithdraw)}
                   className={`w-full font-black py-7 rounded-[3rem] shadow-2xl transition-all text-2xl uppercase tracking-[0.1em] flex items-center justify-center gap-4 ${
                       isProcessing || !selectedOption || !selectedMethod || base > user.balance || (selectedMethod && base < selectedMethod.minWithdraw)
-                      ? 'bg-white/5 text-slate-700 cursor-not-allowed'
-                      : 'bg-[#10b981] text-white shadow-emerald-500/40 hover:scale-[1.02] active:scale-95'
+                      ? 'bg-slate-800 text-slate-500 border border-white/5 cursor-not-allowed'
+                      : 'bg-[#10b981] hover:bg-emerald-400 text-slate-950 shadow-emerald-500/40 hover:scale-[1.02] active:scale-95'
                   }`}
                 >
                   {isProcessing ? 'প্রসেসিং...' : 'উইথড্র সাবমিট করুন'}
@@ -306,37 +306,37 @@ const Withdraw: React.FC<WithdrawProps> = ({
           </div>
 
           <div className="space-y-6">
-            <div className="bg-slate-900/40 backdrop-blur-3xl rounded-[3rem] p-8 border border-white/5 shadow-2xl h-full flex flex-col min-h-[500px] relative overflow-hidden">
+            <div className="bg-slate-900 rounded-[3rem] p-8 border-2 border-white/10 shadow-2xl h-full flex flex-col min-h-[500px] relative overflow-hidden">
               <div className="flex items-center gap-3 mb-10 px-2 relative z-10">
                   <ICONS.Clock size={24} className="text-[#10b981]" />
                   <h3 className="text-xl font-black text-white uppercase tracking-tighter italic">History</h3>
               </div>
               <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar relative z-10">
                   {userHistory.length === 0 ? (
-                      <p className="text-center opacity-20 font-black uppercase text-[10px] py-10 italic">No payouts recorded</p>
+                      <p className="text-center text-slate-400 font-black uppercase text-xs py-10 italic">No payouts recorded</p>
                   ) : (
                       userHistory.map(req => (
-                          <div key={req.id} className="p-6 bg-white/5 rounded-[2rem] border border-white/5 hover:border-[#10b981]/40 transition-all backdrop-blur-md space-y-4">
+                          <div key={req.id} className="p-6 bg-slate-950 rounded-[2rem] border-2 border-white/10 hover:border-[#10b981] transition-all space-y-4">
                               <div className="flex justify-between items-center">
-                                  <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${
-                                      req.status === 'pending' ? 'bg-amber-500/20 text-amber-500' : 
-                                      req.status === 'approved' ? 'bg-emerald-500/20 text-emerald-500' :
-                                      'bg-red-500/20 text-red-500'
+                                  <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest ${
+                                      req.status === 'pending' ? 'bg-amber-500/30 text-amber-300 border border-amber-500/50' : 
+                                      req.status === 'approved' ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/50' :
+                                      'bg-red-500/30 text-red-300 border border-red-500/50'
                                   }`}>{req.status}</span>
-                                  <span className="text-[9px] text-slate-500 font-black uppercase italic">{req.date}</span>
+                                  <span className="text-xs text-slate-300 font-black uppercase italic">{req.date}</span>
                               </div>
-                              <div className="grid grid-cols-2 gap-2 bg-black/30 p-4 rounded-xl text-left border border-white/5">
+                              <div className="grid grid-cols-2 gap-2 bg-slate-900 p-4 rounded-xl text-left border border-white/10">
                                   <div>
-                                      <span className="text-[8px] font-black uppercase text-slate-500 tracking-wider">Amount ({selectedCountryCode === 'BD' ? 'টাকা' : 'Net'})</span>
-                                      <LocalizedReward bdtAmount={req.amount - req.fee} countryCode={selectedCountryCode} className="flex flex-col items-start" textClassName="font-black text-white text-base leading-none" usdClassName="text-[8px] font-bold text-slate-400 mt-1 uppercase" />
+                                      <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider block mb-1">Amount ({selectedCountryCode === 'BD' ? 'টাকা' : 'Net'})</span>
+                                      <LocalizedReward bdtAmount={req.amount - req.fee} countryCode={selectedCountryCode} className="flex flex-col items-start" textClassName="font-black text-white text-lg leading-none" usdClassName="text-xs font-bold text-emerald-300 mt-1 uppercase" />
                                   </div>
                                   <div>
-                                      <span className="text-[8px] font-black uppercase text-slate-500 tracking-wider">Gateway (মাধ্যম)</span>
-                                      <p className="font-black text-[#10b981] text-xs uppercase italic">{req.method}</p>
+                                      <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider block mb-1">Gateway (মাধ্যম)</span>
+                                      <p className="font-black text-white text-sm uppercase italic">{req.method}</p>
                                   </div>
-                                  <div className="col-span-2 border-t border-white/5 pt-2 mt-1">
-                                      <span className="text-[8px] font-black uppercase text-slate-500 tracking-wider block">Sent To (নম্বর)</span>
-                                      <p className="font-mono text-slate-300 text-xs font-bold">{req.accountNumber}</p>
+                                  <div className="col-span-2 border-t border-white/10 pt-2 mt-1">
+                                      <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-0.5">Sent To (নম্বর)</span>
+                                      <p className="font-mono text-white text-sm font-bold">{req.accountNumber}</p>
                                   </div>
                               </div>
                           </div>

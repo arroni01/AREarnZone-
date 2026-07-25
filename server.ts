@@ -647,6 +647,11 @@ async function startServer() {
 
     const expectedRedirect = `${origin}/api/auth/callback/google`;
     const oauth2Client = new OAuth2Client(client_id, client_secret, expectedRedirect);
+    
+    // Encode origin and redirectUri into state payload so callback receives the exact redirectUri used during authorization
+    const statePayload = JSON.stringify({ origin, redirectUri: expectedRedirect });
+    const encodedState = Buffer.from(statePayload).toString("base64url");
+
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: "offline",
       scope: [
@@ -654,7 +659,7 @@ async function startServer() {
         "https://www.googleapis.com/auth/userinfo.email"
       ],
       prompt: "consent",
-      state: origin // pass the origin in state parameter so callback can reconstruct redirectUri
+      state: encodedState
     });
 
     res.json({ 
@@ -674,20 +679,43 @@ async function startServer() {
       id: "102930293019302"
     };
 
-    // Retrieve the origin at the top level
-    let origin = state as string;
-    if (!origin || typeof origin !== "string") {
-      origin = getRequestOrigin(req);
+    let origin = getRequestOrigin(req);
+    let redirectUri = `${origin}/api/auth/callback/google`;
+
+    // Extract state to guarantee redirectUri matches the one passed during generateAuthUrl
+    if (state && typeof state === "string") {
+      try {
+        let decodedStr = state;
+        if (!state.startsWith("{")) {
+          decodedStr = Buffer.from(state, "base64url").toString("utf-8");
+          if (!decodedStr.startsWith("{")) {
+            decodedStr = Buffer.from(state, "base64").toString("utf-8");
+          }
+        }
+        if (decodedStr.startsWith("{")) {
+          const parsedState = JSON.parse(decodedStr);
+          if (parsedState.origin) {
+            origin = parsedState.origin.replace(/\/$/, "");
+          }
+          if (parsedState.redirectUri) {
+            redirectUri = parsedState.redirectUri;
+          }
+        } else if (state.startsWith("http")) {
+          origin = state.replace(/\/$/, "");
+          redirectUri = `${origin}/api/auth/callback/google`;
+        }
+      } catch (e) {
+        console.warn("[Google OAuth Callback] Could not parse state payload:", e);
+        if (state.startsWith("http")) {
+          origin = state.replace(/\/$/, "");
+          redirectUri = `${origin}/api/auth/callback/google`;
+        }
+      }
     }
-    origin = origin.replace(/\/$/, "");
 
     if (code && code !== "sandbox_demo" && process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       try {
-        // Dynamically match the callback path that was actually triggered to prevent code exchange mismatches
-        const currentPath = req.path;
-        const redirectUri = `${origin}${currentPath}`;
-
-        console.log("[Google OAuth Callback] Exchanging code using redirectUri:", redirectUri);
+        console.log("[Google OAuth Callback] Exchanging code using matching redirectUri:", redirectUri);
 
         const oauth2Client = new OAuth2Client(
           process.env.GOOGLE_CLIENT_ID,
@@ -710,12 +738,27 @@ async function startServer() {
         }
       } catch (err: any) {
         console.error("[Google OAuth Callback Error]:", err);
+        const errorMessage = err.message?.includes("invalid_grant")
+          ? "Google sign-in code expired or was already used. Please try clicking Google Sign-In again."
+          : (err.message || "Google authentication failed.");
+
         return res.send(`
           <html>
-            <body>
+            <body style="font-family: sans-serif; text-align: center; padding: 40px; background-color: #f8fafc; color: #1e293b;">
+              <div style="max-width: 400px; margin: 0 auto; background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                <h3 style="color: #ef4444; margin-top: 0;">Sign-In Session Expired</h3>
+                <p style="font-size: 14px; color: #64748b;">${errorMessage}</p>
+                <p style="font-size: 12px; color: #94a3b8;">This window will close automatically.</p>
+              </div>
               <script>
-                alert("Google authentication failed: ${err.message || "Unknown error"}");
-                window.close();
+                if (window.opener) {
+                  try {
+                    window.opener.postMessage({ type: 'GOOGLE_AUTH_ERROR', error: ${JSON.stringify(errorMessage)} }, '*');
+                  } catch (e) {}
+                }
+                setTimeout(() => {
+                  window.close();
+                }, 3000);
               </script>
             </body>
           </html>

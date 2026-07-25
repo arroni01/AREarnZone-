@@ -209,40 +209,40 @@ export const ReferralAnalytics: React.FC<ReferralAnalyticsProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-6 md:p-8 border border-slate-100 dark:border-slate-800 shadow-xl space-y-8">
+    <div className="bg-slate-900 rounded-[2.5rem] p-6 md:p-8 border-2 border-white/10 shadow-2xl space-y-8 text-white">
       {/* Header & Interactive Toggles */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 dark:border-slate-800/60 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-white/10 pb-6">
         <div className="space-y-1.5 text-left">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 rounded-full border border-emerald-500/20 text-[9px] font-black uppercase tracking-widest">
-            <ICONS.Dashboard size={10} />
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-emerald-950/90 text-emerald-400 rounded-full border border-emerald-500/40 text-xs font-black uppercase tracking-widest">
+            <ICONS.Dashboard size={12} />
             Analytics Core
           </div>
-          <h3 className="text-2xl font-black uppercase italic tracking-tighter text-slate-950 dark:text-white">
+          <h3 className="text-2xl font-black uppercase italic tracking-tighter text-white">
             Referral Analytics
           </h3>
-          <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">
+          <p className="text-xs font-bold text-slate-300 uppercase">
             Data-driven performance tracking & growth trends
           </p>
         </div>
 
         {/* Tab Buttons */}
-        <div className="flex bg-slate-100 dark:bg-slate-950 p-1.5 rounded-[1.5rem] border border-slate-200/40 dark:border-white/5 self-start sm:self-auto shrink-0">
+        <div className="flex bg-slate-950 p-1.5 rounded-[1.5rem] border border-white/10 self-start sm:self-auto shrink-0">
           <button
             onClick={() => setActiveTab('personal')}
-            className={`px-5 py-2.5 rounded-[1.1rem] text-[10px] font-black uppercase tracking-wider transition-all duration-300 cursor-pointer ${
+            className={`px-5 py-2.5 rounded-[1.1rem] text-xs font-black uppercase tracking-wider transition-all duration-300 cursor-pointer ${
               activeTab === 'personal'
-                ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 scale-105'
-                : 'text-slate-500 dark:text-slate-400 hover:text-emerald-500'
+                ? 'bg-emerald-500 text-slate-950 font-black shadow-lg shadow-emerald-500/30 scale-105'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
             }`}
           >
             My Performance
           </button>
           <button
             onClick={() => setActiveTab('leaderboard')}
-            className={`px-5 py-2.5 rounded-[1.1rem] text-[10px] font-black uppercase tracking-wider transition-all duration-300 cursor-pointer ${
+            className={`px-5 py-2.5 rounded-[1.1rem] text-xs font-black uppercase tracking-wider transition-all duration-300 cursor-pointer ${
               activeTab === 'leaderboard'
-                ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 scale-105'
-                : 'text-slate-500 dark:text-slate-400 hover:text-emerald-500'
+                ? 'bg-emerald-500 text-slate-950 font-black shadow-lg shadow-emerald-500/30 scale-105'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
             }`}
           >
             Ecosystem Leaders
@@ -256,45 +256,45 @@ export const ReferralAnalytics: React.FC<ReferralAnalyticsProps> = ({
           {/* Quick Metrics Ribbon */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             
-            <div className="bg-slate-50 dark:bg-slate-950/60 rounded-3xl p-5 border border-slate-200/50 dark:border-white/5 space-y-2 text-left">
-              <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
+            <div className="bg-slate-950 rounded-3xl p-5 border-2 border-white/10 space-y-2 text-left">
+              <span className="text-xs font-black text-emerald-400 uppercase tracking-widest block">
                 Verification Conv. Rate
               </span>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+                <span className="text-3xl font-black text-white tracking-tight">
                   {conversionRate}%
                 </span>
-                <span className="text-[10px] font-bold text-slate-400">of invites</span>
+                <span className="text-xs font-bold text-slate-300">of invites</span>
               </div>
-              <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+              <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-white/10">
                 <div 
-                  className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500"
+                  className="bg-emerald-400 h-full rounded-full transition-all duration-500"
                   style={{ width: `${Math.min(conversionRate || 10, 100)}%` }}
                 ></div>
               </div>
             </div>
 
-            <div className="bg-slate-50 dark:bg-slate-950/60 rounded-3xl p-5 border border-slate-200/50 dark:border-white/5 space-y-2 text-left">
-              <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
+            <div className="bg-slate-950 rounded-3xl p-5 border-2 border-white/10 space-y-2 text-left">
+              <span className="text-xs font-black text-emerald-400 uppercase tracking-widest block">
                 Avg. Commission / Partner
               </span>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-black text-emerald-500 tracking-tight">
+                <span className="text-3xl font-black text-emerald-400 tracking-tight">
                   {currencySymbol}{referralBonus}
                 </span>
-                <span className="text-[10px] font-bold text-slate-400">per verified</span>
+                <span className="text-xs font-bold text-slate-300">per verified</span>
               </div>
-              <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">
+              <p className="text-xs text-amber-300 font-bold uppercase">
                 High tier payout structure
               </p>
             </div>
 
-            <div className="bg-slate-50 dark:bg-slate-950/60 rounded-3xl p-5 border border-slate-200/50 dark:border-white/5 space-y-2 text-left">
-              <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
+            <div className="bg-slate-950 rounded-3xl p-5 border-2 border-white/10 space-y-2 text-left">
+              <span className="text-xs font-black text-emerald-400 uppercase tracking-widest block">
                 Ecosystem Standing
               </span>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-black text-blue-500 dark:text-blue-400 tracking-tight">
+                <span className="text-3xl font-black text-cyan-400 tracking-tight">
                   {user.referralCount > 20 ? 'Elite' : user.referralCount > 5 ? 'Rising' : 'Novice'}
                 </span>
               </div>

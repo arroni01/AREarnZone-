@@ -242,28 +242,28 @@ const Referral: React.FC<ReferralProps> = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row items-center gap-8 bg-[#10b981] rounded-[2.5rem] p-8 md:p-12 text-white relative overflow-hidden border-4 border-white shadow-2xl">
+      <div className="flex flex-col md:flex-row items-center gap-8 bg-slate-900 rounded-[2.5rem] p-8 md:p-12 text-white relative overflow-hidden border-2 border-emerald-500/40 shadow-2xl">
         <div className="flex-1 relative z-10 space-y-6">
-          <div className="inline-flex items-center gap-2 bg-white/20 px-4 py-1.5 rounded-full border border-white/20">
-            <div className="w-2 h-2 rounded-full bg-amber-300 animate-pulse"></div>
-            <span className="text-[10px] font-black uppercase tracking-widest">Active Partner Program</span>
+          <div className="inline-flex items-center gap-2 bg-emerald-950/90 px-4 py-1.5 rounded-full border border-emerald-500/50">
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></div>
+            <span className="text-xs font-black uppercase tracking-widest text-emerald-300">Active Partner Program</span>
           </div>
           
-          <h2 className="text-4xl md:text-5xl font-black leading-tight italic tracking-tighter uppercase">
-            Earn <span className="text-amber-300">
+          <h2 className="text-4xl md:text-5xl font-black leading-tight italic tracking-tighter uppercase text-white">
+            Earn <span className="text-amber-400">
               {selectedCountryCode === 'BD' ? `৳${referralBonus.toFixed(2)}` : (
                 `${convertCurrency(referralBonus, selectedCountryCode).symbol}${convertCurrency(referralBonus, selectedCountryCode).mainVal.toFixed(0)} (${convertCurrency(referralBonus, selectedCountryCode).symbol === '$' ? '' : '$'}${convertCurrency(referralBonus, selectedCountryCode).usdVal.toFixed(1)})`
               )}
             </span> per Upgrade
           </h2>
-          <p className="text-emerald-50 text-base font-medium max-w-md opacity-80">
-            রেফারেল কমিশন সরাসরি আপনার ব্যালেন্স এ যুক্ত হবে শুধুমাত্র যখন আপনার আমন্ত্রিত বন্ধু <strong>Verified Pro</strong> মেম্বারশিপ কিনবে।
+          <p className="text-slate-100 text-sm font-semibold max-w-md">
+            রেফারেল কমিশন সরাসরি আপনার ব্যালেন্স এ যুক্ত হবে শুধুমাত্র যখন আপনার আমন্ত্রিত বন্ধু <strong className="text-emerald-400">Verified Pro</strong> মেম্বারশিপ কিনবে।
           </p>
           
-          <div className="bg-white/10 border border-white/20 p-6 rounded-[2rem] backdrop-blur-md">
-            <p className="text-[10px] font-black uppercase mb-4 text-emerald-100 tracking-[0.2em]">Your Referral ID</p>
+          <div className="bg-slate-950 border-2 border-emerald-500/30 p-6 rounded-[2rem]">
+            <p className="text-xs font-black uppercase mb-4 text-emerald-400 tracking-[0.2em]">Your Referral ID</p>
             <div className="flex items-center gap-3">
-              <div className="flex-1 bg-white/90 backdrop-blur-sm p-4 rounded-xl text-slate-800 font-black text-xl tracking-widest text-center shadow-inner">
+              <div className="flex-1 bg-slate-900 border-2 border-amber-400/50 p-4 rounded-xl text-white font-black text-2xl tracking-widest text-center shadow-inner">
                 {user.referralCode}
               </div>
               <button 
@@ -271,7 +271,7 @@ const Referral: React.FC<ReferralProps> = ({
                   navigator.clipboard.writeText(user.referralCode);
                   alert("Code copied!");
                 }}
-                className="p-5 bg-amber-300 text-slate-900 rounded-xl font-black hover:scale-110 active:scale-95 transition-all shadow-xl shadow-amber-500/20"
+                className="p-5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl font-black hover:scale-105 active:scale-95 transition-all shadow-xl shadow-amber-500/30 cursor-pointer"
               >
                 <ICONS.Link size={24} />
               </button>
@@ -279,15 +279,15 @@ const Referral: React.FC<ReferralProps> = ({
           </div>
         </div>
         <div className="w-full md:w-1/3 flex justify-center relative z-10">
-          <div className="bg-white/10 p-12 rounded-full border-8 border-white/10 animate-bounce duration-[3000ms]">
-            <ICONS.Referral size={120} className="text-white" />
+          <div className="bg-emerald-950/80 p-12 rounded-full border-4 border-emerald-500/40 animate-bounce duration-[3000ms]">
+            <ICONS.Referral size={120} className="text-emerald-400" />
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard label="Total Invited" value={user.referralCount.toString()} icon={<ICONS.Users size={24} />} color="bg-white dark:bg-slate-800" />
-        <StatCard label="Verified Friends" value={verifiedFriendsCount.toString()} icon={<ICONS.Check size={24} />} color="bg-white dark:bg-slate-800" />
+        <StatCard label="Total Invited" value={user.referralCount.toString()} icon={<ICONS.Users size={24} />} color="bg-slate-900 border-2 border-white/10" />
+        <StatCard label="Verified Friends" value={verifiedFriendsCount.toString()} icon={<ICONS.Check size={24} />} color="bg-slate-900 border-2 border-white/10" />
         <StatCard 
           label="Total Bonus" 
           value={
@@ -295,12 +295,12 @@ const Referral: React.FC<ReferralProps> = ({
               bdtAmount={totalReferralBonus} 
               countryCode={selectedCountryCode} 
               className="flex flex-col items-center" 
-              textClassName="text-4xl font-black text-white leading-none" 
-              usdClassName="text-xs font-bold text-emerald-100 mt-1" 
+              textClassName="text-4xl font-black text-amber-300 leading-none" 
+              usdClassName="text-xs font-black text-emerald-300 mt-1" 
             />
           } 
           icon={<ICONS.Wallet size={24} />} 
-          color="bg-[#10b981]" 
+          color="bg-slate-900 border-2 border-emerald-500/40" 
           textWhite 
         />
       </div>
@@ -317,24 +317,24 @@ const Referral: React.FC<ReferralProps> = ({
 
       {/* REFERRAL TARGETS & FREE RANK UPGRADE PORTAL */}
       {activeUserTargets.length > 0 && (
-        <div id="referral-targets" className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-6 border border-slate-100 dark:border-slate-700 shadow-sm space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-amber-500/10 text-amber-500 rounded-2xl flex items-center justify-center animate-pulse border border-amber-500/20">
-              <span className="text-2xl">🎯</span>
+        <div id="referral-targets" className="bg-slate-900 rounded-[2.5rem] p-6 md:p-8 border-2 border-white/10 shadow-2xl space-y-6">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center border-2 border-amber-500/40 neon-glow-amber">
+              <span className="text-3xl">🎯</span>
             </div>
             <div className="flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[9px] font-black bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-2.5 py-1 rounded-full uppercase tracking-wider">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 px-3 py-1 rounded-full uppercase tracking-widest">
                   Rank Up Promotion
                 </span>
-                <span className="text-[9px] font-black bg-amber-500/10 text-amber-500 px-2.5 py-1 rounded-full uppercase tracking-wider animate-bounce">
+                <span className="text-[10px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/40 px-3 py-1 rounded-full uppercase tracking-widest animate-pulse">
                   Hot ⚡
                 </span>
               </div>
-              <h3 className="text-lg font-black dark:text-white uppercase tracking-tight mt-1 leading-tight">
+              <h3 className="text-xl font-black text-white uppercase tracking-tight mt-1 leading-tight italic">
                 {selectedCountryCode === 'BD' ? "আমার রেফারাল টার্গেট ও ফ্রি আপগ্রেড" : "Referral Targets & Free Upgrades"}
               </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold">
+              <p className="text-xs text-emerald-400 font-bold uppercase tracking-wider">
                 {selectedCountryCode === 'BD' 
                   ? "টার্গেট সম্পূর্ণ করে ফ্রিতে অ্যাকাউন্ট 'Verified Pro' ক্যাটাগরিতে আপগ্রেড করুন!" 
                   : "Complete any target to upgrade to 'Verified Pro' Category for FREE!"}
@@ -350,22 +350,22 @@ const Referral: React.FC<ReferralProps> = ({
               const isClaimed = targetHistories?.some(h => h.targetId === target.id && h.userId === user.id && h.periodId === periodId);
 
               return (
-                <div key={target.id} className="bg-slate-50 dark:bg-slate-900 rounded-3xl p-5 border border-slate-100 dark:border-slate-800/50 space-y-4">
+                <div key={target.id} className="bg-slate-950 rounded-3xl p-6 border-2 border-white/10 space-y-5 shadow-xl">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <span className="inline-block bg-[#10b981]/10 text-[#10b981] text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full mb-1.5">
-                        {target.periodType === 'daily' ? 'Daily' : target.periodType === 'weekly' ? 'Weekly' : 'Monthly'}
+                      <span className="inline-block bg-emerald-500/20 text-emerald-300 text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full mb-2 border border-emerald-500/40">
+                        {target.periodType === 'daily' ? 'Daily Goal' : target.periodType === 'weekly' ? 'Weekly Goal' : 'Monthly Goal'}
                       </span>
-                      <h4 className="font-bold text-slate-800 dark:text-slate-100 text-base leading-tight">
+                      <h4 className="font-black text-white text-lg leading-tight uppercase italic">
                         {target.title}
                       </h4>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                      <p className="text-xs text-slate-300 font-semibold mt-1">
                         {target.description}
                       </p>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="text-[9px] font-black uppercase text-slate-400 tracking-wider">REWARD</div>
-                      <div className="text-lg font-black text-emerald-500">৳{target.bonusReward}</div>
+                      <div className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">REWARD</div>
+                      <div className="text-xl font-black text-amber-300 italic">৳{target.bonusReward}</div>
                     </div>
                   </div>
 
@@ -660,13 +660,13 @@ const Referral: React.FC<ReferralProps> = ({
   );
 };
 
-const StatCard: React.FC<{ label: string, value: React.ReactNode, icon: React.ReactNode, color: string, textWhite?: boolean }> = ({ label, value, icon, color, textWhite }) => (
-  <div className={`${color} p-8 rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-700 text-center transition-all hover:-translate-y-1`}>
-    <div className={`w-14 h-14 ${textWhite ? 'bg-white/20 text-white' : 'bg-emerald-50 text-[#10b981]'} rounded-2xl flex items-center justify-center mx-auto mb-4`}>
+const StatCard: React.FC<{ label: string, value: React.ReactNode, icon: React.ReactNode, color: string, textWhite?: boolean }> = ({ label, value, icon, color }) => (
+  <div className={`${color} p-8 rounded-[2rem] shadow-xl text-center transition-all hover:-translate-y-1 flex flex-col items-center justify-center`}>
+    <div className="w-14 h-14 bg-slate-950 border border-white/10 text-emerald-400 rounded-2xl flex items-center justify-center mb-4 shadow-inner">
       {icon}
     </div>
-    <div className={`${textWhite ? 'text-white/70' : 'text-slate-400'} text-[10px] font-black uppercase tracking-widest mb-1`}>{label}</div>
-    <div className={`text-4xl font-black ${textWhite ? 'text-white' : 'dark:text-white'}`}>{value}</div>
+    <div className="text-xs font-black uppercase text-emerald-400 tracking-widest mb-1">{label}</div>
+    <div className="text-4xl font-black text-white">{value}</div>
   </div>
 );
 

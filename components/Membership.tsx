@@ -108,47 +108,44 @@ const Membership: React.FC<MembershipProps> = ({
         {plans.map(plan => (
           <div 
             key={plan.id} 
-            className={`rounded-[3rem] p-8 flex flex-col relative transition-all duration-500 backdrop-blur-3xl overflow-hidden ${
+            className={`rounded-[3rem] p-8 flex flex-col relative transition-all duration-500 overflow-hidden shadow-2xl ${
               plan.isPopular 
-                ? 'bg-emerald-500/20 text-white shadow-2xl shadow-emerald-500/20 scale-105 border-4 border-[#10b981]/40' 
-                : 'bg-white/5 text-white border border-white/5'
+                ? 'bg-slate-900 text-white border-4 border-emerald-500 shadow-emerald-500/20 scale-105' 
+                : 'bg-slate-900 text-white border-2 border-white/10 hover:border-emerald-500/40'
             }`}
           >
-            {/* Consistent texture */}
-            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-[0.05] pointer-events-none"></div>
-
             {plan.isPopular && (
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-amber-400 text-slate-900 font-black px-4 py-1.5 rounded-full text-[10px] uppercase tracking-[0.15em] shadow-lg z-10">Most Popular</div>
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-amber-400 text-slate-950 font-black px-4 py-1.5 rounded-full text-xs uppercase tracking-[0.15em] shadow-xl z-10 border border-slate-950">Most Popular</div>
             )}
             
-            <div className="relative z-10">
-              <h3 className="text-2xl font-black mb-1 italic tracking-tighter uppercase">{plan.name}</h3>
+            <div className="relative z-10 flex flex-col h-full">
+              <h3 className="text-2xl font-black mb-1 italic tracking-tighter uppercase text-white">{plan.name}</h3>
               <div className="mb-8 flex flex-col items-start">
-                  <LocalizedReward bdtAmount={plan.price} countryCode={selectedCountryCode} className="inline-flex flex-col items-start" textClassName={`text-5xl font-black leading-none ${plan.isPopular ? 'text-white' : 'text-[#10b981]'}`} usdClassName={`text-xs font-bold mt-1 uppercase ${plan.isPopular ? 'text-amber-200' : 'text-slate-400'}`} />
-                  <span className={`text-xs font-medium mt-1 ${plan.isPopular ? 'opacity-80' : 'text-slate-400'}`}>/ {plan.validityDays > 365 ? 'Lifetime' : `${plan.validityDays} Days`}</span>
+                  <LocalizedReward bdtAmount={plan.price} countryCode={selectedCountryCode} className="inline-flex flex-col items-start" textClassName="text-5xl font-black leading-none text-[#10b981]" usdClassName="text-xs font-black mt-1 uppercase text-emerald-300" />
+                  <span className="text-xs font-bold mt-1 text-slate-300">/ {plan.validityDays > 365 ? 'Lifetime' : `${plan.validityDays} Days`}</span>
               </div>
               
               <ul className="space-y-4 mb-10 flex-1">
                 {plan.features.map((feature, i) => (
-                  <li key={i} className="flex items-center gap-3 text-sm font-bold">
-                    <ICONS.Check size={18} className={`${plan.isPopular ? 'bg-white/20' : 'bg-[#10b981]/20 text-[#10b981]'} p-1 rounded-full`} /> 
+                  <li key={i} className="flex items-center gap-3 text-sm font-bold text-slate-200">
+                    <ICONS.Check size={18} className="bg-emerald-950 text-[#10b981] p-1 rounded-full border border-emerald-500/40 shrink-0" /> 
                     {feature}
                   </li>
                 ))}
-                <li className="flex items-center gap-3 text-sm font-bold">
-                    <ICONS.Check size={18} className={`${plan.isPopular ? 'bg-white/20' : 'bg-[#10b981]/20 text-[#10b981]'} p-1 rounded-full`} /> 
-                    <LocalizedReward bdtAmount={plan.referralBonus} countryCode={selectedCountryCode} className="inline-flex flex-row items-center gap-1 font-bold" textClassName="" usdClassName="text-[10px] font-bold text-slate-400" /> Refer Bonus
+                <li className="flex items-center gap-3 text-sm font-bold text-slate-200">
+                    <ICONS.Check size={18} className="bg-emerald-950 text-[#10b981] p-1 rounded-full border border-emerald-500/40 shrink-0" /> 
+                    <LocalizedReward bdtAmount={plan.referralBonus} countryCode={selectedCountryCode} className="inline-flex flex-row items-center gap-1 font-bold" textClassName="text-emerald-400 font-black" usdClassName="text-[10px] font-bold text-emerald-300" /> Refer Bonus
                 </li>
               </ul>
 
               <button 
                 onClick={() => handleOpenPayment(plan)}
                 disabled={user.status === 'Verified' || !!pendingRequest}
-                className={`w-full font-black py-5 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 ${
+                className={`w-full font-black py-5 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider text-xs ${
                   plan.isPopular 
-                    ? 'bg-white text-emerald-900 hover:scale-[1.02]' 
-                    : 'bg-[#10b981] text-white hover:scale-[1.02]'
-                } ${user.status === 'Verified' ? 'opacity-50' : ''}`}
+                    ? 'bg-[#10b981] hover:bg-emerald-400 text-slate-950 shadow-emerald-500/30 hover:scale-[1.02]' 
+                    : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/30 hover:scale-[1.02]'
+                } ${user.status === 'Verified' ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {user.status === 'Verified' ? (
                   <><ICONS.Check size={20} /> Already Active</>

@@ -1519,6 +1519,22 @@ const App: React.FC = () => {
   );
 };
 
+const AmbientBackground = React.memo(() => {
+  return (
+    <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none select-none [transform:translateZ(0)] [-webkit-backface-visibility:hidden] [backface-visibility:hidden]">
+      {/* Subtle grid pattern */}
+      <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] [background-size:24px_24px] opacity-60"></div>
+      {/* Emerald to Gold/Blue color-shifting orb */}
+      <div className="absolute top-[-10%] left-[15%] w-[450px] h-[450px] rounded-full blur-[120px] animate-float-slow [transform:translateZ(0)] [-webkit-backface-visibility:hidden] [backface-visibility:hidden] [will-change:transform,background-color]"></div>
+      {/* Deep Violet to Blue/Gold color-shifting orb */}
+      <div className="absolute top-[40%] right-[-5%] w-[500px] h-[500px] rounded-full blur-[140px] animate-float-reverse [transform:translateZ(0)] [-webkit-backface-visibility:hidden] [backface-visibility:hidden] [will-change:transform,background-color]"></div>
+      {/* Electric Cyan to Gold/Blue color-shifting orb */}
+      <div className="absolute bottom-[-10%] left-[30%] w-[420px] h-[420px] rounded-full blur-[130px] animate-pulse-glow [transform:translateZ(0)] [-webkit-backface-visibility:hidden] [backface-visibility:hidden] [will-change:transform,opacity,background-color]"></div>
+    </div>
+  );
+});
+AmbientBackground.displayName = 'AmbientBackground';
+
 const AppContent: React.FC<{
   currentUser: User | null;
   setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
@@ -1699,8 +1715,8 @@ const AppContent: React.FC<{
         </script>
       </Helmet>
       
-      {/* Visual Ambient Background Gradients */}
-      <div className="absolute inset-0 z-0 bg-cover bg-center opacity-40 filter blur-3xl pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 30% 20%, rgba(16, 185, 129, 0.12) 0%, transparent 50%), radial-gradient(circle at 70% 80%, rgba(59, 130, 246, 0.12) 0%, transparent 50%)' }}></div>
+      {/* Cyberpunk / Web3 Visual Ambient Floating Orbs & Grid Background */}
+      <AmbientBackground />
       
       {currentUser ? (
         /* RESPONSIVE FULL-SCREEN APPLICATION WORKSPACE (Logged In) */
@@ -1729,7 +1745,7 @@ const AppContent: React.FC<{
               toggleLanguage={toggleLanguage}
               onLogout={() => setShowLogoutConfirm(true)} 
               notify={notify} 
-              toggleSidebar={() => setIsSidebarOpen(true)}
+              toggleSidebar={() => setIsSidebarOpen(prev => !prev)}
               notifications={appNotifications}
               onClearNotifications={clearNotifications}
             />
@@ -1740,74 +1756,78 @@ const AppContent: React.FC<{
               {/* Central Routes Page Node */}
               <Routes>
                 <Route path="/" element={
-                  <Dashboard 
-                    user={currentUser} 
-                    tasks={tasks} 
-                    transactions={transactions} 
-                    submissions={taskSubmissions} 
-                    onLogout={() => setShowLogoutConfirm(true)} 
-                    t={t} 
-                    selectedCountryCode={selectedCountryCode} 
-                    onRefreshData={refreshAllData}
-                    targets={targets}
-                    targetHistories={targetHistories}
-                    users={users}
-                    setTargetHistories={setTargetHistories}
-                    setUsers={setUsers}
-                    setTransactions={setTransactions}
-                    onUpdateUser={handleUpdateUser}
-                  />
+                  <ErrorBoundary>
+                    <Dashboard 
+                      user={currentUser} 
+                      tasks={tasks} 
+                      transactions={transactions} 
+                      submissions={taskSubmissions} 
+                      onLogout={() => setShowLogoutConfirm(true)} 
+                      t={t} 
+                      selectedCountryCode={selectedCountryCode} 
+                      onRefreshData={refreshAllData}
+                      targets={targets}
+                      targetHistories={targetHistories}
+                      users={users}
+                      setTargetHistories={setTargetHistories}
+                      setUsers={setUsers}
+                      setTransactions={setTransactions}
+                      onUpdateUser={handleUpdateUser}
+                    />
+                  </ErrorBoundary>
                 } />
-                <Route path="/tasks" element={(currentUser.status === 'Verified' || currentUser.role === 'admin') ? <Tasks tasks={tasks} user={currentUser} submissions={taskSubmissions} setSubmissions={setTaskSubmissions} notify={notify} t={t} selectedCountryCode={selectedCountryCode} /> : <Navigate to="/membership" />} />
-                <Route path="/history" element={<History transactions={transactions} user={currentUser} t={t} selectedCountryCode={selectedCountryCode} />} />
-                <Route path="/referral" element={(currentUser.status === 'Verified' || currentUser.role === 'admin') ? <Referral user={currentUser} transactions={transactions} users={users} t={t} selectedCountryCode={selectedCountryCode} plans={membershipPlans} targets={targets} targetHistories={targetHistories} setTargetHistories={setTargetHistories} setUsers={setUsers} setTransactions={setTransactions} onUpdateUser={handleUpdateUser} /> : <Navigate to="/membership" />} />
-                <Route path="/withdraw" element={(currentUser.status === 'Verified' || currentUser.role === 'admin') ? <Withdraw user={currentUser} users={users} onUpdateUser={handleUpdateUser} notify={notify} options={withdrawOptions} paymentMethods={paymentMethods} withdraws={withdraws} setWithdraws={setWithdraws} t={t} selectedCountryCode={selectedCountryCode} globalConfig={globalConfig} /> : <Navigate to="/membership" />} />
-                <Route path="/membership" element={<Membership user={currentUser} onUpdateUser={handleUpdateUser} notify={notify} paymentMethods={paymentMethods} plans={membershipPlans} membershipRequests={membershipRequests} setMembershipRequests={setMembershipRequests} t={t} selectedCountryCode={selectedCountryCode} />} />
-                <Route path="/deposit" element={(currentUser.status === 'Verified' || currentUser.role === 'admin') ? <Deposit user={currentUser} onUpdateUser={handleUpdateUser} notify={notify} paymentMethods={paymentMethods} depositRequests={depositRequests} setDepositRequests={setDepositRequests} t={t} selectedCountryCode={selectedCountryCode} /> : <Navigate to="/membership" />} />
-                <Route path="/buy" element={(currentUser.status === 'Verified' || currentUser.role === 'admin') ? <Buy user={currentUser} onUpdateUser={handleUpdateUser} sellItems={sellItems} setSellItems={setSellItems} sellCategories={sellCategories} setTransactions={setTransactions} notify={notify} t={t} storeOrders={storeOrders} setStoreOrders={setStoreOrders} selectedCountryCode={selectedCountryCode} /> : <Navigate to="/membership" />} />
-                <Route path="/profile" element={<Profile user={currentUser} onUpdateUser={handleUpdateUser} notify={notify} timezone={timezone} selectedCountryCode={selectedCountryCode} onChangeCountry={handleCountryChange} />} />
-                <Route path="/telegram-verify" element={<TelegramVerify user={currentUser} onUpdateUser={handleUpdateUser} notify={notify} telegramRequests={telegramRequests} setTelegramRequests={setTelegramRequests} tasks={tasks} submissions={taskSubmissions} setSubmissions={setTaskSubmissions} t={t} />} />
-                <Route path="/faq" element={<FAQ language={language} selectedCountryCode={selectedCountryCode} t={t} />} />
+                <Route path="/tasks" element={(currentUser.status === 'Verified' || currentUser.role === 'admin') ? <ErrorBoundary><Tasks tasks={tasks} user={currentUser} submissions={taskSubmissions} setSubmissions={setTaskSubmissions} notify={notify} t={t} selectedCountryCode={selectedCountryCode} /></ErrorBoundary> : <Navigate to="/membership" />} />
+                <Route path="/history" element={<ErrorBoundary><History transactions={transactions} user={currentUser} t={t} selectedCountryCode={selectedCountryCode} /></ErrorBoundary>} />
+                <Route path="/referral" element={(currentUser.status === 'Verified' || currentUser.role === 'admin') ? <ErrorBoundary><Referral user={currentUser} transactions={transactions} users={users} t={t} selectedCountryCode={selectedCountryCode} plans={membershipPlans} targets={targets} targetHistories={targetHistories} setTargetHistories={setTargetHistories} setUsers={setUsers} setTransactions={setTransactions} onUpdateUser={handleUpdateUser} /></ErrorBoundary> : <Navigate to="/membership" />} />
+                <Route path="/withdraw" element={(currentUser.status === 'Verified' || currentUser.role === 'admin') ? <ErrorBoundary><Withdraw user={currentUser} users={users} onUpdateUser={handleUpdateUser} notify={notify} options={withdrawOptions} paymentMethods={paymentMethods} withdraws={withdraws} setWithdraws={setWithdraws} t={t} selectedCountryCode={selectedCountryCode} globalConfig={globalConfig} /></ErrorBoundary> : <Navigate to="/membership" />} />
+                <Route path="/membership" element={<ErrorBoundary><Membership user={currentUser} onUpdateUser={handleUpdateUser} notify={notify} paymentMethods={paymentMethods} plans={membershipPlans} membershipRequests={membershipRequests} setMembershipRequests={setMembershipRequests} t={t} selectedCountryCode={selectedCountryCode} /></ErrorBoundary>} />
+                <Route path="/deposit" element={(currentUser.status === 'Verified' || currentUser.role === 'admin') ? <ErrorBoundary><Deposit user={currentUser} onUpdateUser={handleUpdateUser} notify={notify} paymentMethods={paymentMethods} depositRequests={depositRequests} setDepositRequests={setDepositRequests} t={t} selectedCountryCode={selectedCountryCode} /></ErrorBoundary> : <Navigate to="/membership" />} />
+                <Route path="/buy" element={(currentUser.status === 'Verified' || currentUser.role === 'admin') ? <ErrorBoundary><Buy user={currentUser} onUpdateUser={handleUpdateUser} sellItems={sellItems} setSellItems={setSellItems} sellCategories={sellCategories} setTransactions={setTransactions} notify={notify} t={t} storeOrders={storeOrders} setStoreOrders={setStoreOrders} selectedCountryCode={selectedCountryCode} /></ErrorBoundary> : <Navigate to="/membership" />} />
+                <Route path="/profile" element={<ErrorBoundary><Profile user={currentUser} onUpdateUser={handleUpdateUser} notify={notify} timezone={timezone} selectedCountryCode={selectedCountryCode} onChangeCountry={handleCountryChange} /></ErrorBoundary>} />
+                <Route path="/telegram-verify" element={<ErrorBoundary><TelegramVerify user={currentUser} onUpdateUser={handleUpdateUser} notify={notify} telegramRequests={telegramRequests} setTelegramRequests={setTelegramRequests} tasks={tasks} submissions={taskSubmissions} setSubmissions={setTaskSubmissions} t={t} /></ErrorBoundary>} />
+                <Route path="/faq" element={<ErrorBoundary><FAQ language={language} selectedCountryCode={selectedCountryCode} t={t} /></ErrorBoundary>} />
                 <Route path="/admin/*" element={
                   (currentUser.role === 'admin' || currentUser.isMonitor) ? (
                     (currentUser.role === 'admin' && !isAdminVerified) ? (
-                      <AdminOtp onVerify={() => setIsAdminVerified(true)} notify={notify} />
+                      <ErrorBoundary><AdminOtp onVerify={() => setIsAdminVerified(true)} notify={notify} /></ErrorBoundary>
                     ) : (
-                      <AdminPanel 
-                          tasks={tasks} setTasks={setTasks} 
-                          taskSubmissions={taskSubmissions} setTaskSubmissions={setTaskSubmissions} 
-                          withdraws={withdraws} setWithdraws={setWithdraws} 
-                          membershipRequests={membershipRequests} setMembershipRequests={setMembershipRequests} 
-                          depositRequests={depositRequests} setDepositRequests={setDepositRequests} 
-                          paymentMethods={paymentMethods} setPaymentMethods={setPaymentMethods} 
-                          gatewayLogs={gatewayLogs} setGatewayLogs={setGatewayLogs} 
-                          plans={membershipPlans} setPlans={setMembershipPlans} 
-                          users={users} setUsers={setUsers} 
-                          withdrawOptions={withdrawOptions} setWithdrawOptions={setWithdrawOptions} 
-                          transactions={transactions} setTransactions={setTransactions} 
-                          appNotifications={appNotifications}
-                          setAppNotifications={setAppNotifications}
-                          socialLinks={socialLinks}
-                          setSocialLinks={setSocialLinks}
-                          globalConfig={globalConfig}
-                          setGlobalConfig={setGlobalConfig}
-                          sellItems={sellItems}
-                          setSellItems={setSellItems}
-                          sellCategories={sellCategories}
-                          setSellCategories={setSellCategories}
-                          notify={notify} 
-                          currentUser={currentUser}
-                          storeOrders={storeOrders}
-                          setStoreOrders={setStoreOrders}
-                          telegramRequests={telegramRequests}
-                          setTelegramRequests={setTelegramRequests}
-                          adViewLogs={adViewLogs}
-                          setAdViewLogs={setAdViewLogs}
-                          targets={targets}
-                          setTargets={setTargets}
-                          targetHistories={targetHistories}
-                          setTargetHistories={setTargetHistories}
-                      />
+                      <ErrorBoundary>
+                        <AdminPanel 
+                            tasks={tasks} setTasks={setTasks} 
+                            taskSubmissions={taskSubmissions} setTaskSubmissions={setTaskSubmissions} 
+                            withdraws={withdraws} setWithdraws={setWithdraws} 
+                            membershipRequests={membershipRequests} setMembershipRequests={setMembershipRequests} 
+                            depositRequests={depositRequests} setDepositRequests={setDepositRequests} 
+                            paymentMethods={paymentMethods} setPaymentMethods={setPaymentMethods} 
+                            gatewayLogs={gatewayLogs} setGatewayLogs={setGatewayLogs} 
+                            plans={membershipPlans} setPlans={setMembershipPlans} 
+                            users={users} setUsers={setUsers} 
+                            withdrawOptions={withdrawOptions} setWithdrawOptions={setWithdrawOptions} 
+                            transactions={transactions} setTransactions={setTransactions} 
+                            appNotifications={appNotifications}
+                            setAppNotifications={setAppNotifications}
+                            socialLinks={socialLinks}
+                            setSocialLinks={setSocialLinks}
+                            globalConfig={globalConfig}
+                            setGlobalConfig={setGlobalConfig}
+                            sellItems={sellItems}
+                            setSellItems={setSellItems}
+                            sellCategories={sellCategories}
+                            setSellCategories={setSellCategories}
+                            notify={notify} 
+                            currentUser={currentUser}
+                            storeOrders={storeOrders}
+                            setStoreOrders={setStoreOrders}
+                            telegramRequests={telegramRequests}
+                            setTelegramRequests={setTelegramRequests}
+                            adViewLogs={adViewLogs}
+                            setAdViewLogs={setAdViewLogs}
+                            targets={targets}
+                            setTargets={setTargets}
+                            targetHistories={targetHistories}
+                            setTargetHistories={setTargetHistories}
+                        />
+                      </ErrorBoundary>
                     )
                   ) : (
                     <Navigate to="/" />

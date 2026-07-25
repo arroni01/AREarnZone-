@@ -6,6 +6,7 @@ import { ICONS } from '../constants';
 import { useNavigate } from 'react-router-dom';
 import { compressImage } from '../utils/imageCompressor';
 import { LocalizedReward } from './localization';
+import { hapticFeedback } from '../utils/haptics';
 
 export const isTelegramTask = (task: Task): boolean => {
   if (!task) return false;
@@ -106,15 +107,18 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
     const isTelegram = isTelegramTask(task);
 
     if (isTelegram && !user.isTelegramVerified) {
+      hapticFeedback.warning();
       notify("টেলিগ্রাম টাস্ক করার আগে টেলিগ্রাম অ্যাকাউন্ট ভেরিফাই করা বাধ্যতামূলক।");
       navigate('/telegram-verify');
       return;
     }
     if (!isVerified) {
+      hapticFeedback.warning();
       notify("টাস্ক শুরু করতে মেম্বারশিপ আপগ্রেড করুন।");
       navigate('/membership');
       return;
     }
+    hapticFeedback.light();
     setSelectedTask(task);
     setCompletedSteps([]);
     setScreenshots([]);
@@ -126,18 +130,22 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
     if (files) {
       const filesArray = Array.from(files) as File[];
       if (screenshots.length + filesArray.length > 5) {
+        hapticFeedback.warning();
         notify("Maximum 5 screenshots allowed.");
         return;
       }
       
+      hapticFeedback.light();
       notify("স্ক্রিনশট প্রসেস করা হচ্ছে...");
       Promise.all(filesArray.map(file => compressImage(file)))
         .then(compressedUrls => {
           setScreenshots(prev => [...prev, ...compressedUrls]);
+          hapticFeedback.success();
           notify("স্ক্রিনশট প্রসেস করা হয়েছে এবং যুক্ত করা হয়েছে!");
         })
         .catch(err => {
           console.error("Image processing error:", err);
+          hapticFeedback.warning();
           notify("স্ক্রিনশট প্রসেস করতে ব্যর্থ হয়েছে।");
         });
       e.target.value = '';
@@ -147,14 +155,17 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
   const handleSubmit = () => {
     if (!selectedTask) return;
     if (completedSteps.length < selectedTask.instructions.length) {
+      hapticFeedback.warning();
       notify("সবগুলো নির্দেশাবলী সম্পন্ন করুন।");
       return;
     }
     if (screenshots.length === 0) {
+      hapticFeedback.warning();
       notify("কমপক্ষে ১টি স্ক্রিনশট আপলোড করুন।");
       return;
     }
 
+    hapticFeedback.medium();
     setIsSubmitting(true);
     
     // Security & Fake Task Detection: Generating a Hash based on Client Data
@@ -178,6 +189,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
         deviceFingerprint: deviceId
       };
       setSubmissions(prev => [newSubmission, ...(prev || [])]);
+      hapticFeedback.success();
       setShowSuccessModal({
         title: selectedTask.title,
         reward: selectedTask.reward,
@@ -213,15 +225,23 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1">
-          <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-none">MISSION <span className="text-[#10b981]">HUB</span></h2>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic opacity-60">Complete tasks to earn daily assets</p>
+          <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none">MISSION <span className="text-[#10b981]">HUB</span></h2>
+          <p className="text-xs font-black text-emerald-400 uppercase tracking-widest italic">Complete tasks to earn daily assets</p>
         </div>
-        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1.5 rounded-2xl shadow-sm border border-slate-100 dark:border-white/5 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-2xl shadow-xl border-2 border-white/10 overflow-x-auto no-scrollbar">
           {(user.isTelegramVerified 
             ? ['All', 'App Install', 'Link Open', 'Watch & Earn', 'Social', 'Telegram', '1 Device= 1 Task']
             : ['All', 'App Install', 'Link Open', 'Watch & Earn', 'Social', '1 Device= 1 Task']
           ).map(type => (
-            <button key={type} onClick={() => setTypeFilter(type)} className={`whitespace-nowrap px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${typeFilter === type ? 'bg-[#10b981] text-white shadow-lg' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+            <button 
+              key={type} 
+              onClick={() => setTypeFilter(type)} 
+              className={`whitespace-nowrap px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
+                typeFilter === type 
+                  ? 'neon-glow-emerald bg-emerald-950 text-emerald-300 scale-105' 
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
+              }`}
+            >
               {type}
             </button>
           ))}
@@ -234,71 +254,71 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
           return (
             <div 
               key={task.id} 
-              className={`bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-sm border transition-all duration-300 hover:-translate-y-1 flex flex-col h-full min-h-[340px] relative overflow-hidden ${
+              className={`bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl border-2 transition-all duration-300 hover:-translate-y-1 flex flex-col h-full min-h-[340px] relative overflow-hidden ${
                 isTelegramLocked 
-                  ? 'border-blue-500/30 bg-slate-50/50 dark:bg-slate-950/20' 
-                  : 'border-slate-100 dark:border-white/5'
+                  ? 'border-blue-500/50 bg-slate-900' 
+                  : 'border-white/10 hover:border-emerald-500/50'
               }`}
             >
               {isTelegramLocked && (
-                <div className="absolute top-4 right-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-3 py-1.5 rounded-full text-[8.5px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-md shadow-blue-500/10">
-                  <ICONS.Lock size={11} className="animate-pulse" /> TELEGRAM LOCKED
+                <div className="absolute top-4 right-4 bg-blue-600 text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-md border border-blue-400">
+                  <ICONS.Lock size={12} className="animate-pulse" /> TELEGRAM LOCKED
                 </div>
               )}
 
               <div className="flex justify-between items-start mb-8">
-                <div className={`p-3.5 rounded-2xl shadow-inner ${
+                <div className={`p-4 rounded-2xl shadow-inner border border-white/10 ${
                   isTelegramLocked 
-                    ? 'bg-blue-500/10 text-blue-500' 
+                    ? 'bg-blue-950 text-blue-400 border-blue-500/40' 
                     : task.type === 'Watch & Earn' 
-                      ? 'bg-rose-500/10 text-rose-500' 
-                      : 'bg-[#10b981]/10 text-[#10b981]'
+                      ? 'bg-rose-950 text-rose-400 border-rose-500/40' 
+                      : 'bg-emerald-950 text-[#10b981] border-emerald-500/40'
                 }`}>
                   {isTelegramLocked ? (
                     <div className="relative">
-                      <ICONS.Telegram size={24} />
-                      <div className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 border border-white dark:border-slate-900">
+                      <ICONS.Telegram size={26} />
+                      <div className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 border border-slate-900">
                         <ICONS.Lock size={10} />
                       </div>
                     </div>
                   ) : task.type === 'Telegram' ? (
-                    <ICONS.Telegram size={24} />
+                    <ICONS.Telegram size={26} />
                   ) : task.type === 'Watch & Earn' ? (
-                    <ICONS.Youtube size={24} />
+                    <ICONS.Youtube size={26} />
                   ) : (
-                    <ICONS.Zap size={24} />
+                    <ICONS.Zap size={26} />
                   )}
                 </div>
                 <div className="text-right flex flex-col items-end justify-center">
-                  <LocalizedReward bdtAmount={task.reward} countryCode={selectedCountryCode} className="flex flex-col items-end" textClassName={`text-2xl font-black italic tracking-tighter leading-none ${isTelegramLocked ? 'text-blue-500' : 'text-[#10b981]'}`} usdClassName="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-wider" />
-                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1 italic">Reward</p>
+                  <LocalizedReward bdtAmount={task.reward} countryCode={selectedCountryCode} className="flex flex-col items-end" textClassName={`text-2xl font-black italic tracking-tighter leading-none ${isTelegramLocked ? 'text-blue-400' : 'text-[#10b981]'}`} usdClassName="text-xs font-black text-emerald-300 mt-1 uppercase tracking-wider" />
+                  <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] mt-1 italic">Reward</p>
                 </div>
               </div>
 
-              <h3 className="text-lg font-black text-slate-900 dark:text-white mb-3 uppercase italic tracking-tight">
+              <h3 className="text-xl font-black text-white mb-3 uppercase italic tracking-tight">
                 {task.title}
-                {isTelegramLocked && <ICONS.Lock size={14} className="text-blue-500 inline ml-1.5" />}
+                {isTelegramLocked && <ICONS.Lock size={16} className="text-blue-400 inline ml-1.5" />}
               </h3>
               
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed flex-1 line-clamp-3 mb-8">
+              <p className="text-xs text-slate-300 font-semibold leading-relaxed flex-1 line-clamp-3 mb-8">
                 {task.description}
               </p>
 
               {isTelegramLocked && (
-                <div className="mb-4 p-3.5 bg-blue-500/10 border border-blue-500/25 rounded-2xl text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide leading-relaxed text-left flex items-start gap-1.5">
-                  <span className="flex-shrink-0">🔒</span>
+                <div className="mb-4 p-3.5 bg-blue-950/80 border border-blue-500/40 rounded-2xl text-xs font-bold text-blue-300 uppercase tracking-wide leading-relaxed text-left flex items-start gap-2">
+                  <span className="flex-shrink-0 text-base">🔒</span>
                   <span>টেলিগ্রাম ভেরিফিকেশন করা নেই! টাস্কটি সম্পন্ন করতে প্রথমে আপনার টেলিগ্রাম অ্যাকাউন্ট ভেরিফাই করুন।</span>
                 </div>
               )}
 
               <button 
                 onClick={() => handleLaunchTask(task)} 
-                className={`w-full font-black py-4 rounded-xl shadow-xl uppercase text-[10px] tracking-[0.15em] active:scale-95 transition-all ${
+                className={`w-full font-black py-4.5 rounded-2xl shadow-2xl uppercase text-xs tracking-[0.15em] active:scale-95 transition-all cursor-pointer ${
                   isTelegramLocked 
-                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-blue-500/10' 
+                    ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/30' 
                     : !isVerified 
-                      ? 'bg-slate-950 text-white dark:bg-slate-800' 
-                      : 'bg-slate-900 dark:bg-[#10b981] text-white'
+                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950' 
+                      : 'bg-[#10b981] hover:bg-emerald-400 text-slate-950 shadow-emerald-500/30'
                 }`}
               >
                 {isTelegramLocked 
@@ -385,7 +405,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
               <div className="space-y-4">
                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] italic">Instructions</h4>
                 {selectedTask.instructions.map((step, i) => (
-                  <div key={i} onClick={() => setCompletedSteps(p => p.includes(i) ? p.filter(x => x !== i) : [...p, i])} className={`p-5 rounded-[1.8rem] border-2 transition-all cursor-pointer flex items-center gap-5 ${completedSteps.includes(i) ? 'bg-[#10b981]/5 border-[#10b981]' : 'bg-slate-50 dark:bg-white/5 border-transparent'}`}>
+                  <div key={i} onClick={() => { hapticFeedback.light(); setCompletedSteps(p => p.includes(i) ? p.filter(x => x !== i) : [...p, i]); }} className={`p-5 rounded-[1.8rem] border-2 transition-all cursor-pointer flex items-center gap-5 ${completedSteps.includes(i) ? 'bg-[#10b981]/5 border-[#10b981]' : 'bg-slate-50 dark:bg-white/5 border-transparent'}`}>
                     <div className={`w-7 h-7 rounded-xl flex items-center justify-center font-black text-xs ${completedSteps.includes(i) ? 'bg-[#10b981] text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-400'}`}>{i+1}</div>
                     <span className={`text-[11px] font-black uppercase tracking-tight ${completedSteps.includes(i) ? 'text-[#10b981]' : 'text-slate-500'}`}>{step}</span>
                   </div>

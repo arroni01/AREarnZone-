@@ -104,17 +104,15 @@ const Deposit: React.FC<DepositProps> = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-4 items-start">
         {/* LEFT COLUMN: Deposit Form */}
-        <div className="lg:col-span-7 bg-white/5 border border-white/5 rounded-[3rem] p-8 space-y-8 relative overflow-hidden backdrop-blur-3xl">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-[0.05] pointer-events-none"></div>
-          
+        <div className="lg:col-span-7 bg-slate-900 border-2 border-white/10 rounded-[3rem] p-8 space-y-8 relative overflow-hidden shadow-2xl">
           <form onSubmit={handleSubmitRequest} className="space-y-8 relative z-10">
             {/* Step 1: Deposit Amount */}
             <div className="space-y-4">
-              <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">
+              <label className="text-xs font-black uppercase text-emerald-400 tracking-[0.2em] ml-2">
                 ১. ডিপোজিট পরিমাণ (Deposit Amount)
               </label>
               <div className="relative group">
-                <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-[#10b981] font-black italic text-xl transition-colors">
+                <div className="absolute left-6 top-1/2 -translate-y-1/2 text-emerald-400 font-black italic text-2xl transition-colors">
                   {selectedCountryCode === 'BD' ? '৳' : convertCurrency(1, selectedCountryCode).symbol}
                 </div>
                 <input 
@@ -124,7 +122,7 @@ const Deposit: React.FC<DepositProps> = ({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="কত টাকা ডিপোজিট করতে চান লিখুন..." 
-                  className="w-full bg-black/40 border-2 border-transparent focus:border-[#10b981]/30 rounded-2xl py-5 pl-12 pr-6 text-white font-black text-base outline-none transition-all shadow-inner placeholder:text-slate-700"
+                  className="w-full bg-slate-950 border-2 border-white/20 focus:border-[#10b981] rounded-2xl py-5 pl-14 pr-6 text-white font-black text-lg outline-none transition-all shadow-inner placeholder:text-slate-500"
                 />
               </div>
 
@@ -135,7 +133,7 @@ const Deposit: React.FC<DepositProps> = ({
                     key={val}
                     type="button"
                     onClick={() => setAmount(val.toString())}
-                    className="px-4 py-2 bg-white/5 border border-white/5 rounded-xl font-bold text-xs hover:border-[#10b981]/50 hover:bg-[#10b981]/10 text-slate-300 transition-all"
+                    className="px-4 py-2.5 bg-slate-800 border-2 border-white/10 rounded-xl font-black text-xs hover:border-emerald-500 hover:bg-emerald-500/20 text-white transition-all cursor-pointer"
                   >
                     {selectedCountryCode === 'BD' ? `+৳${val}` : `+${convertCurrency(val, selectedCountryCode).symbol}${Math.round(convertCurrency(val, selectedCountryCode).mainVal)}`}
                   </button>
@@ -145,7 +143,7 @@ const Deposit: React.FC<DepositProps> = ({
 
             {/* Step 2: Select Gateway */}
             <div className="space-y-4">
-              <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">
+              <label className="text-xs font-black uppercase text-emerald-400 tracking-[0.2em] ml-2">
                 ২. পেমেন্ট মেথড সিলেক্ট করুন
               </label>
               <div className="grid grid-cols-2 gap-3">
@@ -157,23 +155,23 @@ const Deposit: React.FC<DepositProps> = ({
                       type="button"
                       disabled={isLimitExceeded}
                       onClick={() => setSelectedMethod(m)}
-                      className={`p-5 rounded-2xl border-2 text-left transition-all relative group backdrop-blur-md ${
+                      className={`p-5 rounded-2xl border-2 text-left transition-all relative group cursor-pointer ${
                         isLimitExceeded 
-                          ? 'border-red-500/10 bg-red-500/5 opacity-50 cursor-not-allowed' 
+                          ? 'border-red-500/20 bg-red-950/20 opacity-50 cursor-not-allowed' 
                           : selectedMethod?.id === m.id 
-                            ? 'border-[#10b981] bg-emerald-500/10 shadow-lg' 
-                            : 'border-white/5 bg-white/5 hover:border-white/10'
+                            ? 'neon-glow-emerald bg-emerald-950 text-white' 
+                            : 'border-white/10 bg-slate-800 hover:border-emerald-500/40 text-white'
                       }`}
                     >
                       <p className="font-black text-white text-base leading-none italic uppercase tracking-tight">{m.name}</p>
-                      <p className="text-[9px] uppercase font-black mt-1.5 tracking-tighter flex items-center gap-1.5">
-                        <span className="text-slate-500">{m.type}</span>
-                        <span className="w-1 h-1 rounded-full bg-slate-500"></span>
-                        <span className={isLimitExceeded ? "text-red-400 font-bold" : "text-[#10b981] font-bold"}>
-                          {isLimitExceeded ? "Temporarily Unavailable" : "Gateway Available"}
+                      <p className="text-[10px] uppercase font-black mt-2 tracking-tighter flex items-center gap-1.5">
+                        <span className="text-slate-300">{m.type}</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                        <span className={isLimitExceeded ? "text-red-400 font-black" : "text-emerald-400 font-black"}>
+                          {isLimitExceeded ? "Unavailable" : "Gateway Ready"}
                         </span>
                       </p>
-                      {selectedMethod?.id === m.id && !isLimitExceeded && <div className="absolute top-2 right-2 text-[#10b981]"><ICONS.Check size={16} /></div>}
+                      {selectedMethod?.id === m.id && !isLimitExceeded && <div className="absolute top-2 right-2 text-emerald-400"><ICONS.Check size={20} /></div>}
                     </button>
                   );
                 })}
@@ -183,10 +181,10 @@ const Deposit: React.FC<DepositProps> = ({
 
             {/* Selected Gateway Payment Info */}
             {selectedMethod && amount && (
-              <div className="bg-emerald-500/5 backdrop-blur-xl p-7 rounded-[2rem] border-2 border-[#10b981]/20 space-y-3 animate-in slide-in-from-top-4 shadow-2xl">
+              <div className="bg-slate-950 p-7 rounded-[2rem] border-2 border-emerald-500/50 space-y-3 animate-in slide-in-from-top-4 shadow-2xl">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 mb-2">
-                  <span className="text-[10px] font-black text-[#10b981] uppercase tracking-[0.2em]">এই নম্বরে পেমেন্ট (Send Money / Cash-in) করুন:</span>
-                  <LocalizedReward bdtAmount={Number(amount) || 0} countryCode={selectedCountryCode} className="inline-flex flex-row items-center gap-1 font-black text-white text-xs uppercase" textClassName="" usdClassName="text-[10px] text-[#10b981]/80 font-bold" />
+                  <span className="text-xs font-black text-emerald-400 uppercase tracking-[0.2em]">এই নম্বরে পেমেন্ট (Send Money / Cash-in) করুন:</span>
+                  <LocalizedReward bdtAmount={Number(amount) || 0} countryCode={selectedCountryCode} className="inline-flex flex-row items-center gap-1 font-black text-white text-sm uppercase" textClassName="" usdClassName="text-xs text-emerald-300 font-bold" />
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-3xl font-black text-white tracking-widest italic">{selectedMethod.number}</span>
@@ -196,9 +194,9 @@ const Deposit: React.FC<DepositProps> = ({
                       navigator.clipboard.writeText(selectedMethod.number);
                       notify("নম্বর কপি হয়েছে!");
                     }}
-                    className="p-3 bg-[#10b981] text-white rounded-xl shadow-lg active:scale-90 transition-all border border-white/20"
+                    className="p-3 bg-[#10b981] hover:bg-emerald-400 text-slate-950 font-black rounded-xl shadow-lg active:scale-90 transition-all border border-emerald-300 cursor-pointer"
                   >
-                    <ICONS.Link size={18} />
+                    <ICONS.Link size={20} />
                   </button>
                 </div>
               </div>
@@ -207,11 +205,11 @@ const Deposit: React.FC<DepositProps> = ({
             {/* Step 3: TRX ID & Screenshot */}
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">
+                <label className="text-xs font-black uppercase text-emerald-400 tracking-[0.2em] ml-2">
                   ৩. ট্রানজেকশন আইডি (TRX ID)
                 </label>
                 <div className="relative group">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-[#10b981] transition-colors">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 transition-colors">
                     <ICONS.Zap size={20} />
                   </div>
                   <input 
@@ -220,19 +218,19 @@ const Deposit: React.FC<DepositProps> = ({
                     value={transactionId}
                     onChange={(e) => setTransactionId(e.target.value)}
                     placeholder="পেমেন্ট করার পর প্রাপ্ত TRX ID দিন..." 
-                    className="w-full bg-black/40 border-2 border-transparent focus:border-[#10b981]/30 rounded-2xl py-5 pl-12 pr-6 text-white font-black text-sm outline-none transition-all shadow-inner placeholder:text-slate-700"
+                    className="w-full bg-slate-950 border-2 border-white/20 focus:border-[#10b981] rounded-2xl py-5 pl-12 pr-6 text-white font-black text-sm outline-none transition-all shadow-inner placeholder:text-slate-500"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">
+                <label className="text-xs font-black uppercase text-slate-400 tracking-[0.2em] ml-2">
                   ৪. পেমেন্ট স্ক্রিনশট (ঐচ্ছিক)
                 </label>
                 <div 
                   onClick={() => fileInputRef.current?.click()}
-                  className={`flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed rounded-[2rem] cursor-pointer transition-all backdrop-blur-md ${
-                    screenshot ? 'border-[#10b981] bg-emerald-500/10' : 'border-white/5 bg-white/5 hover:border-white/10'
+                  className={`flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed rounded-[2rem] cursor-pointer transition-all ${
+                    screenshot ? 'border-emerald-500 bg-emerald-950/40' : 'border-white/20 bg-slate-950 hover:border-emerald-500/40'
                   }`}
                 >
                   <input type="file" className="hidden" ref={fileInputRef} accept="image/*" onChange={handleFileChange} />
@@ -243,8 +241,8 @@ const Deposit: React.FC<DepositProps> = ({
                     </div>
                   ) : (
                     <>
-                      <ICONS.Image size={32} className="text-slate-600" />
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Attach Proof Screenshot</span>
+                      <ICONS.Image size={32} className="text-emerald-400" />
+                      <span className="text-xs font-black text-slate-300 uppercase tracking-widest">Attach Proof Screenshot</span>
                     </>
                   )}
                 </div>
@@ -253,15 +251,15 @@ const Deposit: React.FC<DepositProps> = ({
 
             <button 
               disabled={isSubmitting || !selectedMethod || !transactionId || !amount}
-              className={`w-full font-black py-6 rounded-[2rem] shadow-2xl transition-all text-lg uppercase tracking-widest ${
+              className={`w-full font-black py-6 rounded-[2rem] shadow-2xl transition-all text-lg uppercase tracking-widest cursor-pointer ${
                 isSubmitting || !selectedMethod || !transactionId || !amount
-                ? 'bg-white/10 text-slate-600 cursor-not-allowed shadow-none'
-                : 'bg-[#10b981] text-white shadow-emerald-500/30 hover:scale-[1.02] active:scale-95 border border-white/10'
+                ? 'bg-slate-800 text-slate-500 cursor-not-allowed shadow-none border border-white/5'
+                : 'bg-[#10b981] hover:bg-emerald-400 text-slate-950 shadow-emerald-500/30 hover:scale-[1.02] active:scale-95 border-2 border-emerald-300'
               }`}
             >
               {isSubmitting ? (
                 <div className="flex items-center justify-center gap-3">
-                  <div className="w-5 h-5 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <div className="w-5 h-5 border-4 border-slate-950 border-t-emerald-500 rounded-full animate-spin"></div>
                   রিকোয়েস্ট পাঠানো হচ্ছে...
                 </div>
               ) : 'ডিপোজিটের আবেদন পাঠান'}
@@ -270,13 +268,11 @@ const Deposit: React.FC<DepositProps> = ({
         </div>
 
         {/* RIGHT COLUMN: User Pending Deposit History */}
-        <div className="lg:col-span-5 bg-white/5 border border-white/5 rounded-[3rem] p-8 space-y-6 relative overflow-hidden backdrop-blur-3xl">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-[0.05] pointer-events-none"></div>
-          
+        <div className="lg:col-span-5 bg-slate-900 border-2 border-white/10 rounded-[3rem] p-8 space-y-6 relative overflow-hidden shadow-2xl">
           <h3 className="text-xl font-black italic uppercase text-white leading-none tracking-tighter relative z-10">
             Recent Deposits
           </h3>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest relative z-10">
+          <p className="text-xs font-black text-emerald-400 uppercase tracking-widest relative z-10">
             ডিপোজিট রিকোয়েস্ট হিস্ট্রি
           </p>
 

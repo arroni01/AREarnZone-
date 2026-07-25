@@ -438,37 +438,35 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
     return (
       <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500 pb-24 px-4">
         {/* TOP STATUS CARD */}
-        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-100 dark:border-white/5 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-[0.03] pointer-events-none"></div>
-          
+        <div className="bg-slate-900 rounded-[2.5rem] p-8 border-2 border-emerald-500/40 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="relative z-10 flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
-            <div className="w-20 h-20 bg-blue-500 text-white rounded-[1.8rem] flex items-center justify-center shadow-2xl shadow-blue-500/30 shrink-0">
+            <div className="w-20 h-20 bg-blue-600 text-white rounded-[1.8rem] flex items-center justify-center shadow-2xl shadow-blue-500/30 shrink-0 border-2 border-blue-400">
               <ICONS.Telegram size={44} />
             </div>
             <div>
               <div className="flex items-center justify-center md:justify-start gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-none">
-                  Telegram <span className="text-blue-500">Verified</span>
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter leading-none">
+                  Telegram <span className="text-blue-400">Verified</span>
                 </h2>
               </div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">আপনার টেলিগ্রাম অ্যাকাউন্টটি সম্পূর্ণ ভেরিফাইড এবং লক করা আছে।</p>
+              <p className="text-xs font-black text-emerald-400 uppercase tracking-widest mt-1">আপনার টেলিগ্রাম অ্যাকাউন্টটি সম্পূর্ণ ভেরিফাইড এবং লক করা আছে।</p>
             </div>
           </div>
 
-          <div className="relative z-10 flex flex-wrap justify-center gap-3 bg-slate-50 dark:bg-white/5 p-4 rounded-3xl border border-slate-100 dark:border-white/5 font-mono text-[11px] min-w-[280px]">
+          <div className="relative z-10 flex flex-wrap justify-center gap-3 bg-slate-950 p-5 rounded-3xl border-2 border-white/10 font-mono text-xs min-w-[280px]">
             <div className="w-full flex justify-between gap-4">
-              <span className="text-slate-400">USERNAME:</span>
-              <span className="text-blue-500 font-bold">@{user.telegramUsername}</span>
+              <span className="text-slate-400 font-bold">USERNAME:</span>
+              <span className="text-blue-400 font-black">@{user.telegramUsername}</span>
             </div>
             <div className="w-full flex justify-between gap-4">
-              <span className="text-slate-400">TELEGRAM ID:</span>
-              <span className="text-slate-750 dark:text-white font-bold">{user.telegramId}</span>
+              <span className="text-slate-400 font-bold">TELEGRAM ID:</span>
+              <span className="text-white font-black">{user.telegramId}</span>
             </div>
             {user.telegramPhone && (
               <div className="w-full flex justify-between gap-4">
-                <span className="text-slate-400">PHONE:</span>
-                <span className="text-slate-750 dark:text-white font-bold">+{user.telegramPhone}</span>
+                <span className="text-slate-400 font-bold">PHONE:</span>
+                <span className="text-emerald-300 font-black">+{user.telegramPhone}</span>
               </div>
             )}
           </div>
@@ -476,10 +474,10 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
 
         {/* TELEGRAM MISSIONS HEADER */}
         <div className="space-y-1">
-          <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-none">
-            TELEGRAM <span className="text-blue-500">TASKS</span>
+          <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none">
+            TELEGRAM <span className="text-blue-400">TASKS</span>
           </h2>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic opacity-60">
+          <p className="text-xs font-black text-emerald-400 uppercase tracking-widest italic">
             টেলিগ্রাম অ্যাকাউন্ট দিয়ে মিশনগুলো সম্পন্ন করে অতিরিক্ত অর্থ উপার্জন করুন
           </p>
         </div>

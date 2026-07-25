@@ -1,10 +1,37 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'motion/react';
 import { User, Task, Transaction, TaskSubmission, ReferralTarget, TargetHistory } from '../types';
 import { ICONS } from '../constants';
 import { Crown, Trophy, Medal, Sparkles, ArrowUpRight, RefreshCw } from 'lucide-react';
 import { LocalizedReward, convertCurrency } from './localization';
+import { hapticFeedback } from '../utils/haptics';
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+const cardItemVariants = {
+  hidden: { opacity: 0, y: 24, scale: 0.98 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: 'spring',
+      stiffness: 280,
+      damping: 22,
+    },
+  },
+};
 
 const isTelegramTask = (task: Task): boolean => {
   if (!task) return false;
@@ -112,6 +139,31 @@ const Dashboard: React.FC<DashboardProps> = ({
   const isVerified = user.status === 'Verified' || isAdmin;
 
   const animatedBalance = useCountUp(user.balance, 1200);
+  const animatedTodayIncome = useCountUp(user.todayIncome || 0, 1200);
+
+  const safeSubmissions = submissions || [];
+  const availableTasksCount = tasks.filter(t => 
+    t.isActive && 
+    (!isTelegramTask(t) || user.isTelegramVerified) &&
+    !safeSubmissions.find(s => s.taskId === t.id && s.userId === user.id && (s.status === 'pending' || s.status === 'approved'))
+  ).length;
+
+  const referralIncome = useMemo(() => {
+    return transactions
+      .filter(t => t.userId === user.id && t.type === 'Referral' && t.status === 'completed')
+      .reduce((sum, t) => sum + t.amount, 0);
+  }, [transactions, user.id]);
+
+  const animatedReferralIncome = useCountUp(referralIncome, 1200);
+
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  const handleCopyReferralCode = () => {
+    hapticFeedback.success();
+    navigator.clipboard.writeText(user.referralCode);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
 
   const [leaderboardTab, setLeaderboardTab] = useState<'weekly' | 'allTime'>('weekly');
 
@@ -259,7 +311,13 @@ const Dashboard: React.FC<DashboardProps> = ({
     return () => clearInterval(timer);
   }, [triggerRefresh]);
 
+  const handleNav = useCallback((path: string) => {
+    hapticFeedback.light();
+    navigate(path);
+  }, [navigate]);
+
   const handleManualRefresh = () => {
+    hapticFeedback.medium();
     triggerRefresh();
   };
 
@@ -340,6 +398,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const handleClaimTarget = (target: ReferralTarget) => {
     const currentCount = getReferralsCountInPeriod(target.periodType);
     if (currentCount < target.referralGoal) {
+      hapticFeedback.warning();
       alert(selectedCountryCode === 'BD' ? "টার্গেট এখনো সম্পূর্ণ হয়নি!" : "Target is not achieved yet!");
       return;
     }
@@ -347,9 +406,12 @@ const Dashboard: React.FC<DashboardProps> = ({
     const periodId = getPeriodId(target.periodType);
     const alreadyClaimed = targetHistories?.some(h => h.targetId === target.id && h.userId === user.id && h.periodId === periodId);
     if (alreadyClaimed) {
+      hapticFeedback.warning();
       alert(selectedCountryCode === 'BD' ? "এই মেয়াদের বোনাস ইতিমধ্যেই দাবি করা হয়েছে!" : "Bonus for this period has already been claimed!");
       return;
     }
+
+    hapticFeedback.success();
 
     const historyId = 'tgh_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now().toString(36);
     const txId = 'tx_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now().toString(36);
@@ -445,350 +507,532 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const safeSubmissions = submissions || [];
-  const availableTasksCount = tasks.filter(t => 
-    t.isActive && 
-    (!isTelegramTask(t) || user.isTelegramVerified) &&
-    !safeSubmissions.find(s => s.taskId === t.id && s.userId === user.id && (s.status === 'pending' || s.status === 'approved'))
-  ).length;
-  const referralIncome = transactions
-    .filter(t => t.userId === user.id && t.type === 'Referral' && t.status === 'completed')
-    .reduce((sum, t) => sum + t.amount, 0);
-
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-6xl mx-auto w-full pb-24 px-2 sm:px-4">
-      
-      {/* Top Greeting Header */}
-      <div className="px-2 space-y-1.5">
-        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Earning Hub Portal</p>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-xl sm:text-2xl font-bold dark:text-white text-slate-900 leading-none">{t('welcome')}, {user.name.split(' ')[0]}</h2>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20 shadow-sm">
-              <div className={`w-1.5 h-1.5 rounded-full ${isVerified ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></div>
-              <span className="text-[9px] font-bold text-slate-500 uppercase">{isVerified ? 'Verified Pro' : 'Free Member'}</span>
-            </div>
-            <button
-              id="sync-balance-btn"
-              type="button"
-              onClick={handleManualRefresh}
-              disabled={isRefreshing}
-              className="bg-slate-100/80 dark:bg-slate-900/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-white/10 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50 shadow-sm"
-            >
-              <RefreshCw size={11} className={`${isRefreshing ? 'animate-spin text-emerald-500' : ''}`} />
-              <span>{isRefreshing ? 'Syncing...' : 'Sync Balance'}</span>
-            </button>
-          </div>
-        </div>
+    <div className="relative min-h-screen w-full overflow-hidden">
+      {/* Ambient Live Animated Background Mesh */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-emerald-500/10 rounded-full blur-[120px] animate-float-slow" />
+        <div className="absolute top-1/3 -right-32 w-96 h-96 bg-teal-500/10 rounded-full blur-[120px] animate-float-reverse" />
+        <div className="absolute -bottom-32 left-1/3 w-[30rem] h-[30rem] bg-indigo-600/10 rounded-full blur-[140px] animate-pulse-glow" />
+        <div className="absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:32px_32px] opacity-[0.02]" />
       </div>
 
-      {/* Live Status Bar */}
-      <div className="bg-emerald-600 rounded-2xl sm:rounded-3xl py-3.5 px-4 sm:px-6 flex flex-col items-center justify-center shadow-lg shadow-emerald-500/20 border border-white/10 relative overflow-hidden">
-        <div className="flex items-center gap-2 relative z-10">
-           <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
-           <p className="text-xs sm:text-sm font-bold text-white uppercase tracking-wide">Live Online: {liveUsers.toLocaleString()}</p>
-        </div>
-        <div className="flex items-center gap-2 mt-1 relative z-10 opacity-90">
-           <ICONS.Check size={12} className="text-white" />
-           <p className="text-[10px] sm:text-[11px] font-medium text-white uppercase tracking-wide">৳{lastPayoutAmount} Paid to {lastPayoutUser}</p>
-        </div>
-      </div>
-
-      {/* Account Status Banner */}
-      {!isVerified && (
-        <div className="bg-orange-500 p-6 sm:p-8 rounded-3xl sm:rounded-[2.5rem] text-white space-y-4 sm:space-y-5 shadow-2xl relative overflow-hidden group">
-           <div className="absolute inset-0 bg-gradient-to-br from-orange-400 to-orange-600 opacity-50"></div>
-           <div className="flex items-center gap-4 relative z-10">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/20 shrink-0">
-                 <ICONS.Shield size={22} className="sm:w-6 sm:h-6" />
-              </div>
-              <h3 className="text-base sm:text-lg font-bold uppercase tracking-tight">Access Restricted</h3>
-           </div>
-           <p className="text-xs sm:text-sm font-medium opacity-90 relative z-10 leading-relaxed">
-             {t('upgradeNow')}
-           </p>
-           <button 
-             onClick={() => navigate('/membership')}
-             className="w-full bg-white text-orange-600 font-black py-3.5 sm:py-4 rounded-xl sm:rounded-2xl text-[10px] uppercase tracking-[0.2em] shadow-lg active:scale-95 transition-all relative z-10"
-           >
-             {t('upgradeNow')}
-           </button>
-        </div>
-      )}
-
-      {/* Main Grid Cards */}
-      <div className={`space-y-4 transition-all duration-700 ${!isVerified ? 'opacity-30 blur-[4px] pointer-events-none' : ''}`}>
+      {/* Main Dashboard Layout */}
+      <motion.div 
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="relative z-10 space-y-6 max-w-6xl mx-auto w-full pb-24 px-2 sm:px-4"
+      >
         
-        {/* Top Tier Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Total Balance Card */}
-          <div onClick={() => navigate('/withdraw')} className="bg-[#10b981] p-5 sm:p-7 md:p-8 rounded-3xl sm:rounded-[2.5rem] shadow-xl shadow-emerald-500/10 relative overflow-hidden group active:scale-95 transition-all cursor-pointer border-2 border-white/10 flex flex-col justify-between min-h-[9.5rem] sm:h-44">
-            <div className="relative z-10 flex justify-between items-start">
-               <div className="p-2.5 sm:p-3 bg-white/20 rounded-xl sm:rounded-2xl backdrop-blur-md border border-white/20">
-                  <ICONS.Wallet size={22} className="text-white sm:w-6 sm:h-6" />
-               </div>
-               <div className="bg-white/10 px-3 py-1 rounded-xl border border-white/10 flex items-center gap-2">
-                  <ICONS.Trend size={12} className="text-white" />
-                  <span className="text-[10px] font-bold text-white uppercase">+2.5%</span>
-               </div>
-            </div>
-            <div className="relative z-10 mt-3">
-              <p className="text-[10px] sm:text-[11px] font-bold text-emerald-50 uppercase tracking-widest opacity-80 mb-1">{t('balance')}</p>
-              <LocalizedReward bdtAmount={animatedBalance} countryCode={selectedCountryCode} className="flex flex-col items-start" textClassName="text-2xl sm:text-4xl font-bold text-white tracking-tight leading-none" usdClassName="text-[10px] sm:text-xs font-bold text-emerald-100/70 mt-1 uppercase tracking-wider" />
+        {/* Top Greeting Header */}
+        <motion.div variants={cardItemVariants} className="px-2 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.25em]">EARNING ZONE PLATFORM</p>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-2xl sm:text-3xl font-black dark:text-white text-slate-900 tracking-tight italic">
+              {t('welcome')}, <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-200 bg-clip-text text-transparent">{user.name.split(' ')[0]}</span>
+            </h2>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-emerald-500/10 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-emerald-500/20 shadow-sm">
+                <div className={`w-2 h-2 rounded-full ${isVerified ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`}></div>
+                <span className="text-[10px] font-black text-slate-300 uppercase tracking-wider">{isVerified ? 'Verified Pro' : 'Free Member'}</span>
+              </div>
+              <button
+                id="sync-balance-btn"
+                type="button"
+                onClick={handleManualRefresh}
+                disabled={isRefreshing}
+                className="bg-white/5 hover:bg-white/10 dark:bg-slate-900/60 hover:dark:bg-slate-800/80 text-slate-200 border border-white/15 px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1.5 active:scale-95 disabled:opacity-50 shadow-lg backdrop-blur-md"
+              >
+                <RefreshCw size={12} className={`${isRefreshing ? 'animate-spin text-emerald-400' : 'text-emerald-400'}`} />
+                <span>{isRefreshing ? 'Syncing...' : 'Sync Balance'}</span>
+              </button>
             </div>
           </div>
+        </motion.div>
 
-          {/* Referral Income Card */}
-          <div onClick={() => navigate('/referral')} className="bg-orange-500 p-5 sm:p-7 md:p-8 rounded-3xl sm:rounded-[2.5rem] shadow-xl shadow-orange-500/10 relative overflow-hidden group active:scale-95 transition-all cursor-pointer border-2 border-white/10 flex flex-col justify-between min-h-[9.5rem] sm:h-44">
-            <div className="relative z-10 flex justify-between items-start">
-               <div className="p-2.5 sm:p-3 bg-white/20 rounded-xl sm:rounded-2xl backdrop-blur-md border border-white/20">
-                  <ICONS.Referral size={22} className="text-white sm:w-6 sm:h-6" />
-               </div>
-               <div className="bg-white/10 px-3 py-1 rounded-xl border border-white/10 flex items-center gap-2">
-                  <ICONS.Trend size={12} className="text-white" />
-                  <span className="text-[10px] font-bold text-white uppercase">+5%</span>
-               </div>
-            </div>
-            <div className="relative z-10 mt-3">
-              <p className="text-[10px] sm:text-[11px] font-bold text-orange-50 uppercase tracking-widest opacity-80 mb-1">{t('refIncome')}</p>
-              <LocalizedReward bdtAmount={referralIncome} countryCode={selectedCountryCode} className="flex flex-col items-start" textClassName="text-2xl sm:text-4xl font-bold text-white tracking-tight leading-none" usdClassName="text-[10px] sm:text-xs font-bold text-orange-100/70 mt-1 uppercase tracking-wider" />
-            </div>
+        {/* Live Status Bar */}
+        <motion.div variants={cardItemVariants} className="backdrop-blur-xl bg-gradient-to-r from-emerald-600/80 via-teal-600/80 to-emerald-700/80 rounded-2xl sm:rounded-3xl py-3.5 px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 shadow-xl shadow-emerald-950/40 border border-emerald-400/30 relative overflow-hidden group">
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            <div className="w-1/2 h-full bg-gradient-to-r from-transparent via-white/15 to-transparent -skew-x-12 animate-shimmer"></div>
           </div>
-        </div>
+          <div className="flex items-center gap-2.5 relative z-10">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+            </span>
+            <p className="text-xs sm:text-sm font-black text-white uppercase tracking-wider">Live Online: {liveUsers.toLocaleString()} Members</p>
+          </div>
+          <div className="flex items-center gap-2 relative z-10 opacity-95 bg-black/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/10">
+            <ICONS.Check size={12} className="text-emerald-300" />
+            <p className="text-[10px] sm:text-[11px] font-extrabold text-white uppercase tracking-wider">৳{lastPayoutAmount} Paid out to {lastPayoutUser}</p>
+          </div>
+        </motion.div>
 
-        {/* Action Quick Grid (4 items on desktop) */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div onClick={() => navigate('/tasks')} className="bg-[#14b8a6] p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] shadow-xl relative overflow-hidden group active:scale-95 transition-all cursor-pointer border-2 border-white/10 min-h-[8.5rem] sm:h-40 flex flex-col justify-between">
-                <div className="p-2 sm:p-2.5 bg-white/20 rounded-xl w-fit">
-                    <ICONS.Trend size={18} className="text-white sm:w-5 sm:h-5" />
-                </div>
-                <div className="relative z-10">
-                    <p className="text-[9px] sm:text-[10px] font-bold text-teal-50 uppercase tracking-widest opacity-80">{t('todayEarn')}</p>
-                    <LocalizedReward bdtAmount={user.todayIncome} countryCode={selectedCountryCode} className="flex flex-col items-start" textClassName="text-xl sm:text-2xl font-bold text-white tracking-tight" usdClassName="text-[9px] sm:text-[10px] font-bold text-teal-100/70 mt-0.5 uppercase tracking-wider" />
-                </div>
+        {/* Account Status Banner */}
+        {!isVerified && (
+          <motion.div variants={cardItemVariants} className="backdrop-blur-xl bg-gradient-to-br from-orange-500/90 via-amber-600/90 to-red-600/90 p-6 sm:p-8 rounded-3xl sm:rounded-[2.5rem] text-white space-y-4 sm:space-y-5 shadow-2xl border border-orange-400/40 relative overflow-hidden group">
+            <div className="flex items-center gap-4 relative z-10">
+              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/30 shrink-0 shadow-lg">
+                <ICONS.Shield size={24} className="text-white" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-200">ACTION REQUIRED</span>
+                <h3 className="text-lg sm:text-xl font-black uppercase tracking-tight">Access Restricted</h3>
+              </div>
             </div>
+            <p className="text-xs sm:text-sm font-semibold opacity-95 relative z-10 leading-relaxed">
+              {t('upgradeNow')}
+            </p>
+            <button 
+              onClick={() => handleNav('/membership')}
+              className="w-full bg-white text-orange-600 font-black py-4 rounded-2xl text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-orange-50 active:scale-[0.98] transition-all relative z-10"
+            >
+              {t('upgradeNow')}
+            </button>
+          </motion.div>
+        )}
+
+        {/* Main Grid Cards */}
+        <div className={`space-y-5 transition-all duration-700 ${!isVerified ? 'opacity-30 blur-[4px] pointer-events-none' : ''}`}>
+          
+          {/* Top Tier Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+            {/* Total Balance Card */}
+            <motion.div 
+              variants={cardItemVariants}
+              whileHover={{ y: -4, scale: 1.01 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => handleNav('/withdraw')} 
+              className="bg-slate-900 border-2 border-emerald-500/40 hover:border-emerald-400 p-6 sm:p-8 rounded-[2.5rem] shadow-2xl shadow-emerald-950/50 relative overflow-hidden group transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[10.5rem] sm:h-48"
+            >
+              {/* Shimmer Light Beam Pass */}
+              <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-[2.5rem]">
+                <div className="w-1/2 h-full bg-gradient-to-r from-transparent via-emerald-400/10 to-transparent -skew-x-12 animate-shimmer"></div>
+              </div>
+              {/* Background ambient glow orb */}
+              <div className="absolute -top-12 -right-12 w-36 h-36 bg-emerald-500/20 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500 pointer-events-none"></div>
+
+              <div className="relative z-10 flex justify-between items-start">
+                <div className="p-3 bg-emerald-950/90 rounded-2xl border border-emerald-500/50 shadow-md group-hover:scale-110 transition-transform duration-300">
+                  <ICONS.Wallet size={24} className="text-emerald-400" />
+                </div>
+                <div className="bg-emerald-950/90 px-3.5 py-1.5 rounded-full border border-emerald-500/50 flex items-center gap-1.5 shadow-sm">
+                  <ICONS.Trend size={13} className="text-emerald-400" />
+                  <span className="text-[10px] font-black text-emerald-300 uppercase tracking-wider">+2.5% LIVE</span>
+                </div>
+              </div>
+              <div className="relative z-10 mt-3">
+                <p className="text-[11px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-1">{t('balance')}</p>
+                <LocalizedReward 
+                  bdtAmount={animatedBalance} 
+                  countryCode={selectedCountryCode} 
+                  className="flex flex-col items-start" 
+                  textClassName="text-3xl sm:text-4xl font-black text-white tracking-tight leading-none drop-shadow-md" 
+                  usdClassName="text-[11px] sm:text-xs font-black text-emerald-300 mt-1 uppercase tracking-wider" 
+                />
+              </div>
+            </motion.div>
+
+            {/* Referral Income Card */}
+            <motion.div 
+              variants={cardItemVariants}
+              whileHover={{ y: -4, scale: 1.01 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => handleNav('/referral')} 
+              className="bg-slate-900 border-2 border-amber-500/40 hover:border-amber-400 p-6 sm:p-8 rounded-[2.5rem] shadow-2xl shadow-amber-950/50 relative overflow-hidden group transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[10.5rem] sm:h-48"
+            >
+              {/* Shimmer Light Beam Pass */}
+              <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-[2.5rem]">
+                <div className="w-1/2 h-full bg-gradient-to-r from-transparent via-amber-400/10 to-transparent -skew-x-12 animate-shimmer"></div>
+              </div>
+              {/* Background ambient glow orb */}
+              <div className="absolute -top-12 -right-12 w-36 h-36 bg-amber-500/20 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500 pointer-events-none"></div>
+
+              <div className="relative z-10 flex justify-between items-start">
+                <div className="p-3 bg-amber-950/90 rounded-2xl border border-amber-500/50 shadow-md group-hover:scale-110 transition-transform duration-300">
+                  <ICONS.Referral size={24} className="text-amber-400" />
+                </div>
+                <div className="bg-amber-950/90 px-3.5 py-1.5 rounded-full border border-amber-500/50 flex items-center gap-1.5 shadow-sm">
+                  <ICONS.Trend size={13} className="text-amber-400" />
+                  <span className="text-[10px] font-black text-amber-300 uppercase tracking-wider">+5% EARNINGS</span>
+                </div>
+              </div>
+              <div className="relative z-10 mt-3">
+                <p className="text-[11px] font-black text-amber-400 uppercase tracking-[0.2em] mb-1">{t('refIncome')}</p>
+                <LocalizedReward 
+                  bdtAmount={animatedReferralIncome} 
+                  countryCode={selectedCountryCode} 
+                  className="flex flex-col items-start" 
+                  textClassName="text-3xl sm:text-4xl font-black text-white tracking-tight leading-none drop-shadow-md" 
+                  usdClassName="text-[11px] sm:text-xs font-black text-amber-300 mt-1 uppercase tracking-wider" 
+                />
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Action Quick Grid (4 items on desktop) */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            {/* Today Earn */}
+            <motion.div 
+              variants={cardItemVariants}
+              whileHover={{ y: -3, scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => handleNav('/tasks')} 
+              className="bg-slate-900 border-2 border-teal-500/40 hover:border-teal-400 p-5 sm:p-6 rounded-[2rem] shadow-xl relative overflow-hidden group transition-all duration-300 cursor-pointer min-h-[9rem] sm:h-44 flex flex-col justify-between"
+            >
+              <div className="p-2.5 bg-teal-950/90 rounded-xl w-fit border border-teal-500/50 group-hover:scale-110 transition-transform duration-300">
+                <ICONS.Trend size={20} className="text-teal-400" />
+              </div>
+              <div className="relative z-10">
+                <p className="text-[10px] font-black text-teal-400 uppercase tracking-widest">{t('todayEarn')}</p>
+                <LocalizedReward 
+                  bdtAmount={animatedTodayIncome} 
+                  countryCode={selectedCountryCode} 
+                  className="flex flex-col items-start" 
+                  textClassName="text-xl sm:text-2xl font-black text-white tracking-tight" 
+                  usdClassName="text-[10px] font-black text-teal-300 mt-0.5 uppercase tracking-wider" 
+                />
+              </div>
+            </motion.div>
             
-            <div onClick={() => navigate('/tasks')} className="bg-slate-900 p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] shadow-xl relative overflow-hidden group active:scale-95 transition-all cursor-pointer border-2 border-white/5 min-h-[8.5rem] sm:h-40 flex flex-col justify-between">
-                <div className="p-2 sm:p-2.5 bg-white/10 rounded-xl w-fit text-slate-400">
-                    <ICONS.Tasks size={18} className="sm:w-5 sm:h-5" />
-                </div>
-                <div className="relative z-10">
-                    <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest opacity-80">{t('tasksReady')}</p>
-                    <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">{availableTasksCount}</h3>
-                </div>
-            </div>
+            {/* Tasks Ready */}
+            <motion.div 
+              variants={cardItemVariants}
+              whileHover={{ y: -3, scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => handleNav('/tasks')} 
+              className="bg-slate-900 border-2 border-cyan-500/40 hover:border-cyan-400 p-5 sm:p-6 rounded-[2rem] shadow-xl relative overflow-hidden group transition-all duration-300 cursor-pointer min-h-[9rem] sm:h-44 flex flex-col justify-between"
+            >
+              <div className="p-2.5 bg-cyan-950/90 rounded-xl w-fit border border-cyan-500/50 group-hover:scale-110 transition-transform duration-300">
+                <ICONS.Tasks size={20} className="text-cyan-400" />
+              </div>
+              <div className="relative z-10">
+                <p className="text-[10px] font-black text-cyan-400 uppercase tracking-widest">{t('tasksReady')}</p>
+                <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-0.5">{availableTasksCount}</h3>
+              </div>
+            </motion.div>
 
-            <div onClick={() => navigate('/buy')} className="bg-indigo-600 p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] shadow-xl relative overflow-hidden group active:scale-95 transition-all cursor-pointer border-2 border-white/10 min-h-[8.5rem] sm:h-40 flex flex-col justify-between">
-                <div className="p-2 sm:p-2.5 bg-white/20 rounded-xl w-fit">
-                    <ICONS.Buy size={18} className="text-white sm:w-5 sm:h-5" />
-                </div>
-                <div className="relative z-10">
-                    <p className="text-[9px] sm:text-[10px] font-bold text-indigo-50 uppercase tracking-widest opacity-80">Buy (Shop)</p>
-                    <h3 className="text-base sm:text-lg font-bold text-white tracking-tight mt-0.5">শপ ও অ্যাকাউন্ট</h3>
-                </div>
-            </div>
+            {/* Buy (Shop) */}
+            <motion.div 
+              variants={cardItemVariants}
+              whileHover={{ y: -3, scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => handleNav('/buy')} 
+              className="bg-slate-900 border-2 border-indigo-500/40 hover:border-indigo-400 p-5 sm:p-6 rounded-[2rem] shadow-xl relative overflow-hidden group transition-all duration-300 cursor-pointer min-h-[9rem] sm:h-44 flex flex-col justify-between"
+            >
+              <div className="p-2.5 bg-indigo-950/90 rounded-xl w-fit border border-indigo-500/50 group-hover:scale-110 transition-transform duration-300">
+                <ICONS.Buy size={20} className="text-indigo-400" />
+              </div>
+              <div className="relative z-10">
+                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">BUY (SHOP)</p>
+                <h3 className="text-base sm:text-lg font-black text-white tracking-tight mt-0.5">শপ ও অ্যাকাউন্ট</h3>
+              </div>
+            </motion.div>
 
-            <div onClick={() => navigate('/telegram-verify')} className="bg-[#0088cc] p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] shadow-xl relative overflow-hidden group active:scale-95 transition-all cursor-pointer border-2 border-white/10 min-h-[8.5rem] sm:h-40 flex flex-col justify-between">
-                <div className="p-2 sm:p-2.5 bg-white/20 rounded-xl w-fit">
-                    <ICONS.Telegram size={18} className="text-white sm:w-5 sm:h-5" />
-                </div>
-                <div className="relative z-10">
-                    <p className="text-[9px] sm:text-[10px] font-bold text-blue-50 uppercase tracking-widest opacity-80 truncate">
-                      {user.isTelegramVerified ? "Telegram Task" : "Telegram Verify"}
-                    </p>
-                    <h3 className="text-base sm:text-lg font-bold text-white tracking-tight mt-0.5 truncate">
-                      {user.isTelegramVerified ? "টেলিগ্রাম টাস্ক" : "টেলিগ্রাম ভেরিফাই"}
-                    </h3>
-                </div>
-            </div>
+            {/* Telegram Verify / Task */}
+            <motion.div 
+              variants={cardItemVariants}
+              whileHover={{ y: -3, scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => handleNav('/telegram-verify')} 
+              className="bg-slate-900 border-2 border-sky-500/40 hover:border-sky-400 p-5 sm:p-6 rounded-[2rem] shadow-xl relative overflow-hidden group transition-all duration-300 cursor-pointer min-h-[9rem] sm:h-44 flex flex-col justify-between"
+            >
+              <div className="p-2.5 bg-sky-950/90 rounded-xl w-fit border border-sky-500/50 group-hover:scale-110 transition-transform duration-300">
+                <ICONS.Telegram size={20} className="text-sky-400" />
+              </div>
+              <div className="relative z-10">
+                <p className="text-[10px] font-black text-sky-400 uppercase tracking-widest truncate">
+                  {user.isTelegramVerified ? "Telegram Task" : "Telegram Verify"}
+                </p>
+                <h3 className="text-base sm:text-lg font-black text-white tracking-tight mt-0.5 truncate">
+                  {user.isTelegramVerified ? "টেলিগ্রাম টাস্ক" : "টেলিগ্রাম ভেরিফাই"}
+                </h3>
+              </div>
+            </motion.div>
+          </div>
         </div>
-      </div>
 
-      {/* Invite & Earn Box */}
-      <div className={`bg-slate-900 rounded-[2.5rem] p-10 space-y-6 shadow-2xl relative overflow-hidden border border-white/5 transition-all duration-500 ${!isVerified ? 'opacity-40 blur-[4px] pointer-events-none' : ''}`}>
-         <div className="flex items-center gap-4 relative z-10">
-            <div className="w-12 h-12 bg-amber-400 rounded-2xl flex items-center justify-center text-slate-950 shadow-xl shadow-amber-400/20">
-               <ICONS.Gift size={24} />
+        {/* Active Referral Target Goals Card (If targets available) */}
+        {activeUserTargets.length > 0 && (
+          <motion.div 
+            variants={cardItemVariants}
+            className="backdrop-blur-xl bg-gradient-to-br from-emerald-950/60 via-slate-900/90 to-teal-950/60 rounded-[2.5rem] p-6 sm:p-8 space-y-5 shadow-2xl border border-emerald-500/30 relative overflow-hidden"
+          >
+            <div className="flex items-center gap-3 relative z-10">
+              <div className="p-3 bg-emerald-500/20 rounded-2xl border border-emerald-400/30 text-emerald-400">
+                <Trophy size={22} />
+              </div>
+              <div>
+                <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">BONUS REWARD TARGETS</span>
+                <h4 className="text-lg font-black text-white uppercase tracking-tight">রেফারেল টার্গেট ও রিওয়ার্ড</h4>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
+              {activeUserTargets.map(target => {
+                const currentCount = getReferralsCountInPeriod(target.periodType);
+                const periodId = getPeriodId(target.periodType);
+                const isClaimed = targetHistories?.some(h => h.targetId === target.id && h.userId === user.id && h.periodId === periodId);
+                const isAchieved = currentCount >= target.referralGoal;
+                const progressPct = Math.min(100, Math.round((currentCount / target.referralGoal) * 100));
+
+                return (
+                  <div key={target.id} className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3.5 backdrop-blur-md">
+                    <div className="flex items-center justify-between gap-2">
+                      <h5 className="font-extrabold text-white text-sm">{target.title}</h5>
+                      <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        {target.periodType}
+                      </span>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-[11px] font-bold text-slate-300">
+                        <span>Progress: {currentCount}/{target.referralGoal}</span>
+                        <span>{progressPct}%</span>
+                      </div>
+                      <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden p-0.5 border border-white/5">
+                        <div 
+                          className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500"
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Reward:</span>
+                        <LocalizedReward bdtAmount={target.bonusReward} countryCode={selectedCountryCode} textClassName="text-sm font-black text-amber-400" />
+                      </div>
+
+                      <button
+                        onClick={() => handleClaimTarget(target)}
+                        disabled={isClaimed || !isAchieved}
+                        className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${
+                          isClaimed
+                            ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-white/5'
+                            : isAchieved
+                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25 active:scale-95'
+                            : 'bg-white/10 text-slate-400 cursor-not-allowed border border-white/5'
+                        }`}
+                      >
+                        {isClaimed ? 'Claimed' : isAchieved ? 'Claim Bonus' : 'In Progress'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Invite & Earn Box */}
+        <motion.div 
+          variants={cardItemVariants}
+          className={`bg-slate-900 rounded-[2.5rem] p-6 sm:p-10 space-y-6 shadow-2xl relative overflow-hidden border-2 border-amber-500/40 transition-all duration-500 ${!isVerified ? 'opacity-40 blur-[4px] pointer-events-none' : ''}`}
+        >
+          <div className="flex items-center gap-4 relative z-10">
+            <div className="w-12 h-12 bg-amber-400 rounded-2xl flex items-center justify-center text-slate-950 shadow-xl shadow-amber-500/20 shrink-0 font-black">
+              <ICONS.Gift size={24} />
             </div>
             <div>
-               <p className="text-[9px] font-bold text-amber-400 uppercase tracking-widest leading-none">Partner Program</p>
-               <h4 className="text-xl font-bold text-white uppercase mt-1 tracking-tight">{t('inviteEarn')}</h4>
+              <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest leading-none">Partner Program</p>
+              <h4 className="text-xl sm:text-2xl font-black text-white uppercase mt-1 tracking-tight">{t('inviteEarn')}</h4>
             </div>
-         </div>
-         <p className="text-xs text-slate-400 font-medium leading-relaxed relative z-10">
-            আপনার রেফারেল কোড ব্যবহার করে কেউ জয়েন করে মেম্বারশিপ আপগ্রেড করলে আপনি সাথে সাথে বোনাস পাবেন।
-         </p>
-         <div className="flex items-center gap-3 relative z-10">
-            <div className="flex-1 bg-black/50 backdrop-blur-xl border border-white/10 p-5 rounded-2xl text-center">
-               <span className="text-white font-black tracking-widest text-lg uppercase">{user.referralCode}</span>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-100 font-semibold leading-relaxed relative z-10">
+            আপনার রেফারেল কোড ব্যবহার করে কেউ জয়েন করে মেম্বারশিপ আপগ্রেড করলে আপনি সাথে সাথে রেফারেল বোনাস পাবেন।
+          </p>
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="flex-1 bg-slate-950 border-2 border-amber-500/30 p-4 sm:p-5 rounded-2xl text-center shadow-inner">
+              <span className="text-white font-black tracking-widest text-lg sm:text-xl uppercase">{user.referralCode}</span>
             </div>
             <button 
-              onClick={() => { navigator.clipboard.writeText(user.referralCode); alert("Code Copied!"); }} 
-              className="bg-amber-400 p-5 rounded-2xl shadow-xl active:scale-90 transition-all text-slate-950"
+              onClick={handleCopyReferralCode} 
+              className="bg-amber-400 hover:bg-amber-300 p-4 sm:p-5 rounded-2xl shadow-xl shadow-amber-500/20 active:scale-90 transition-all duration-300 text-slate-950 flex items-center justify-center gap-2 font-black"
             >
-               <ICONS.Link size={24} />
-            </button>
-         </div>
-      </div>
-
-      {/* UNIQUE & PROFESSIONAL LEADERBOARD */}
-      <div className={`bg-white dark:bg-slate-900 rounded-[2.5rem] p-6 lg:p-8 space-y-6 shadow-xl border border-slate-100 dark:border-white/5 transition-all duration-500 ${!isVerified ? 'opacity-30 blur-[4px] pointer-events-none' : ''}`}>
-        
-        {/* Leaderboard Header */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-1">
-              <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
-              <p className="text-[10px] font-black text-[#10b981] uppercase tracking-widest leading-none">EarnZone Top Rankings</p>
-            </div>
-            <h3 className="text-xl font-black uppercase tracking-tight italic dark:text-white">লিডারবোর্ড</h3>
-          </div>
-
-          {/* Timeframe Pill Switch */}
-          <div className="bg-slate-100 dark:bg-white/5 p-1 rounded-full flex items-center border border-slate-200/50 dark:border-white/5">
-            <button
-              onClick={() => setLeaderboardTab('weekly')}
-              className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all duration-300 ${
-                leaderboardTab === 'weekly'
-                  ? 'bg-[#10b981] text-white shadow-md'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'
-              }`}
-            >
-              Weekly
-            </button>
-            <button
-              onClick={() => setLeaderboardTab('allTime')}
-              className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all duration-300 ${
-                leaderboardTab === 'allTime'
-                  ? 'bg-[#10b981] text-white shadow-md'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'
-              }`}
-            >
-              All-Time
+              <ICONS.Link size={22} />
+              <span className="hidden sm:inline text-xs uppercase tracking-wider">{copiedCode ? "COPIED!" : "COPY"}</span>
             </button>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Podium Layout (Ranks 1, 2, 3) */}
-        <div className="grid grid-cols-3 gap-3 pt-6 items-end relative">
+        {/* UNIQUE & PROFESSIONAL LEADERBOARD */}
+        <motion.div 
+          variants={cardItemVariants}
+          className={`bg-slate-900 rounded-[2.5rem] p-6 lg:p-8 space-y-6 shadow-2xl border-2 border-white/10 transition-all duration-500 ${!isVerified ? 'opacity-30 blur-[4px] pointer-events-none' : ''}`}
+        >
           
-          {/* Rank 2 (Silver) */}
-          <div className="flex flex-col items-center bg-slate-50/50 dark:bg-white/5 rounded-3xl p-4 border border-slate-100 dark:border-white/5 relative hover:-translate-y-1 transition-transform duration-300">
-            <div className="absolute -top-3 flex items-center justify-center bg-slate-300 dark:bg-slate-700 text-white rounded-full w-6 h-6 border-2 border-white dark:border-slate-900 shadow-md">
-              <span className="text-[9px] font-black">2</span>
-            </div>
-            <div className="relative mt-2 mb-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-slate-400 to-slate-200 flex items-center justify-center text-white font-black text-sm shadow-md">
-                {activeLeaderboard[1]?.initials}
+          {/* Leaderboard Header */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+                <p className="text-[10px] font-black text-[#10b981] uppercase tracking-widest leading-none">EarnZone Top Rankings</p>
               </div>
-              <div className="absolute -bottom-1 -right-1 bg-emerald-500 p-0.5 rounded-full border border-white dark:border-slate-800">
-                <ICONS.Check size={8} className="text-white" />
-              </div>
+              <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight italic text-white">লিডারবোর্ড</h3>
             </div>
-            <p className="text-[11px] font-black text-slate-800 dark:text-white leading-tight truncate w-full text-center">
-              {activeLeaderboard[1]?.name.split(' ')[0]}
-            </p>
-            <div className="mt-2 bg-slate-300/15 dark:bg-slate-500/10 px-2 py-1 rounded-lg">
-              {activeLeaderboard[1] && renderLeaderboardAmount(activeLeaderboard[1].amount, "text-[#10b981]")}
+
+            {/* Timeframe Pill Switch */}
+            <div className="bg-white/5 p-1 rounded-full flex items-center border border-white/10 backdrop-blur-md">
+              <button
+                onClick={() => { hapticFeedback.light(); setLeaderboardTab('weekly'); }}
+                className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
+                  leaderboardTab === 'weekly'
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Weekly
+              </button>
+              <button
+                onClick={() => { hapticFeedback.light(); setLeaderboardTab('allTime'); }}
+                className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
+                  leaderboardTab === 'allTime'
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                All-Time
+              </button>
             </div>
           </div>
 
-          {/* Rank 1 (Gold VIP) */}
-          <div className="flex flex-col items-center bg-gradient-to-b from-amber-500/10 via-slate-50/40 to-slate-50/50 dark:from-amber-500/10 dark:via-white/5 dark:to-white/5 rounded-[2rem] p-4 border-2 border-amber-400/30 dark:border-amber-400/20 relative shadow-lg shadow-amber-500/5 hover:-translate-y-1.5 transition-transform duration-300 transform scale-105 z-10">
-            {/* Crown floating above */}
-            <div className="absolute -top-6 animate-bounce">
-              <Crown className="w-6 h-6 text-amber-400 fill-amber-400" />
-            </div>
-            <div className="absolute -top-3 flex items-center justify-center bg-amber-400 text-slate-950 rounded-full w-6 h-6 border-2 border-white dark:border-slate-900 shadow-md">
-              <span className="text-[9px] font-black">1</span>
-            </div>
-            <div className="relative mt-2 mb-3">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center text-slate-950 font-black text-base shadow-md">
-                {activeLeaderboard[0]?.initials}
-              </div>
-              <div className="absolute -bottom-1 -right-1 bg-emerald-500 p-0.5 rounded-full border border-white dark:border-slate-800">
-                <ICONS.Check size={8} className="text-white" />
-              </div>
-            </div>
-            <p className="text-xs font-black text-slate-950 dark:text-white leading-tight truncate w-full text-center">
-              {activeLeaderboard[0]?.name.split(' ')[0]}
-            </p>
-            <div className="mt-2 bg-amber-400/20 dark:bg-amber-400/10 px-2.5 py-1 rounded-lg border border-amber-400/25">
-              {activeLeaderboard[0] && renderLeaderboardAmount(activeLeaderboard[0].amount, "text-amber-600 dark:text-amber-400")}
-            </div>
-          </div>
-
-          {/* Rank 3 (Bronze) */}
-          <div className="flex flex-col items-center bg-slate-50/50 dark:bg-white/5 rounded-3xl p-4 border border-slate-100 dark:border-white/5 relative hover:-translate-y-1 transition-transform duration-300">
-            <div className="absolute -top-3 flex items-center justify-center bg-amber-700/80 text-white rounded-full w-6 h-6 border-2 border-white dark:border-slate-900 shadow-md">
-              <span className="text-[9px] font-black">3</span>
-            </div>
-            <div className="relative mt-2 mb-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-700 to-amber-600 flex items-center justify-center text-white font-black text-sm shadow-md">
-                {activeLeaderboard[2]?.initials}
-              </div>
-              <div className="absolute -bottom-1 -right-1 bg-emerald-500 p-0.5 rounded-full border border-white dark:border-slate-800">
-                <ICONS.Check size={8} className="text-white" />
-              </div>
-            </div>
-            <p className="text-[11px] font-black text-slate-800 dark:text-white leading-tight truncate w-full text-center">
-              {activeLeaderboard[2]?.name.split(' ')[0]}
-            </p>
-            <div className="mt-2 bg-slate-300/15 dark:bg-slate-500/10 px-2 py-1 rounded-lg">
-              {activeLeaderboard[2] && renderLeaderboardAmount(activeLeaderboard[2].amount, "text-[#10b981]")}
-            </div>
-          </div>
-
-        </div>
-
-        {/* Runners-Up List (Ranks 4-7) */}
-        <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-white/5">
-          {runnersUp.map((r, i) => (
-            <div 
-              key={r.name}
-              className="flex items-center justify-between p-3.5 bg-slate-50/50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-2xl transition-all duration-300 border border-slate-100/50 dark:border-transparent"
+          {/* Podium Layout (Ranks 1, 2, 3) */}
+          <div className="grid grid-cols-3 gap-3 pt-6 items-end relative">
+            
+            {/* Rank 2 (Silver) */}
+            <motion.div 
+              whileHover={{ y: -4, scale: 1.02 }}
+              className="flex flex-col items-center bg-white/5 backdrop-blur-md rounded-3xl p-4 border border-white/10 relative transition-transform duration-300"
             >
-              <div className="flex items-center gap-3">
-                {/* Position Marker */}
-                <span className="font-mono text-xs font-black text-slate-400 dark:text-slate-500 w-5">
-                  #{i + 4}
-                </span>
-
-                {/* Avatar with colorful gradients */}
-                <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${r.avatarBg} flex items-center justify-center text-white font-black text-[10px] shadow-sm`}>
-                  {r.initials}
+              <div className="absolute -top-3 flex items-center justify-center bg-slate-700 text-white rounded-full w-6 h-6 border-2 border-slate-900 shadow-md">
+                <span className="text-[9px] font-black">2</span>
+              </div>
+              <div className="relative mt-2 mb-3">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-slate-400 to-slate-200 flex items-center justify-center text-slate-950 font-black text-sm shadow-md">
+                  {activeLeaderboard[1]?.initials}
                 </div>
-
-                {/* Name */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-slate-800 dark:text-white">{r.name}</span>
-                  {r.verified && (
-                    <div className="bg-emerald-500 p-0.5 rounded-full">
-                      <ICONS.Check size={7} className="text-white" />
-                    </div>
-                  )}
+                <div className="absolute -bottom-1 -right-1 bg-emerald-500 p-0.5 rounded-full border border-slate-900">
+                  <ICONS.Check size={8} className="text-white" />
                 </div>
               </div>
-
-              {/* Earnings Badge */}
-              <div className="flex items-center gap-1 text-right">
-                {renderRunnerUpAmount(r.amount)}
-                <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <p className="text-[11px] font-black text-white leading-tight truncate w-full text-center">
+                {activeLeaderboard[1]?.name.split(' ')[0]}
+              </p>
+              <div className="mt-2 bg-white/5 px-2 py-1 rounded-lg border border-white/10">
+                {activeLeaderboard[1] && renderLeaderboardAmount(activeLeaderboard[1].amount, "text-[#10b981]")}
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
+            </motion.div>
 
-      <div className="pt-8 flex justify-center">
-         <button 
-           onClick={onLogout}
-           className="flex items-center gap-3 px-8 py-3 text-xs font-bold text-slate-500 hover:text-red-500 uppercase tracking-widest transition-all group opacity-60 hover:opacity-100"
-         >
-           <ICONS.Logout size={16} />
-           Logout Account
-         </button>
-      </div>
+            {/* Rank 1 (Gold VIP) */}
+            <motion.div 
+              whileHover={{ y: -6, scale: 1.06 }}
+              className="flex flex-col items-center bg-gradient-to-b from-amber-500/20 via-slate-900/90 to-slate-900/90 rounded-[2rem] p-4 border-2 border-amber-400/40 relative shadow-xl shadow-amber-500/10 transition-transform duration-300 transform scale-105 z-10 backdrop-blur-md"
+            >
+              {/* Crown floating above */}
+              <div className="absolute -top-6 animate-bounce">
+                <Crown className="w-6 h-6 text-amber-400 fill-amber-400" />
+              </div>
+              <div className="absolute -top-3 flex items-center justify-center bg-amber-400 text-slate-950 rounded-full w-6 h-6 border-2 border-slate-900 shadow-md">
+                <span className="text-[9px] font-black">1</span>
+              </div>
+              <div className="relative mt-2 mb-3">
+                <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-300 flex items-center justify-center text-slate-950 font-black text-base shadow-md">
+                  {activeLeaderboard[0]?.initials}
+                </div>
+                <div className="absolute -bottom-1 -right-1 bg-emerald-500 p-0.5 rounded-full border border-slate-900">
+                  <ICONS.Check size={8} className="text-white" />
+                </div>
+              </div>
+              <p className="text-xs font-black text-white leading-tight truncate w-full text-center">
+                {activeLeaderboard[0]?.name.split(' ')[0]}
+              </p>
+              <div className="mt-2 bg-amber-400/15 px-2.5 py-1 rounded-lg border border-amber-400/30">
+                {activeLeaderboard[0] && renderLeaderboardAmount(activeLeaderboard[0].amount, "text-amber-400")}
+              </div>
+            </motion.div>
+
+            {/* Rank 3 (Bronze) */}
+            <motion.div 
+              whileHover={{ y: -4, scale: 1.02 }}
+              className="flex flex-col items-center bg-white/5 backdrop-blur-md rounded-3xl p-4 border border-white/10 relative transition-transform duration-300"
+            >
+              <div className="absolute -top-3 flex items-center justify-center bg-amber-800 text-white rounded-full w-6 h-6 border-2 border-slate-900 shadow-md">
+                <span className="text-[9px] font-black">3</span>
+              </div>
+              <div className="relative mt-2 mb-3">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-700 to-amber-600 flex items-center justify-center text-white font-black text-sm shadow-md">
+                  {activeLeaderboard[2]?.initials}
+                </div>
+                <div className="absolute -bottom-1 -right-1 bg-emerald-500 p-0.5 rounded-full border border-slate-900">
+                  <ICONS.Check size={8} className="text-white" />
+                </div>
+              </div>
+              <p className="text-[11px] font-black text-white leading-tight truncate w-full text-center">
+                {activeLeaderboard[2]?.name.split(' ')[0]}
+              </p>
+              <div className="mt-2 bg-white/5 px-2 py-1 rounded-lg border border-white/10">
+                {activeLeaderboard[2] && renderLeaderboardAmount(activeLeaderboard[2].amount, "text-[#10b981]")}
+              </div>
+            </motion.div>
+
+          </div>
+
+          {/* Runners-Up List (Ranks 4-7) */}
+          <div className="space-y-2 pt-2 border-t border-white/10">
+            {runnersUp.map((r, i) => (
+              <motion.div 
+                key={r.name}
+                whileHover={{ x: 4, backgroundColor: "rgba(255, 255, 255, 0.08)" }}
+                className="flex items-center justify-between p-3.5 bg-white/5 rounded-2xl transition-all duration-300 border border-white/5"
+              >
+                <div className="flex items-center gap-3">
+                  {/* Position Marker */}
+                  <span className="font-mono text-xs font-black text-slate-500 w-5">
+                    #{i + 4}
+                  </span>
+
+                  {/* Avatar with colorful gradients */}
+                  <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${r.avatarBg} flex items-center justify-center text-white font-black text-[10px] shadow-sm`}>
+                    {r.initials}
+                  </div>
+
+                  {/* Name */}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-white">{r.name}</span>
+                    {r.verified && (
+                      <div className="bg-emerald-500 p-0.5 rounded-full">
+                        <ICONS.Check size={7} className="text-white" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Earnings Badge */}
+                <div className="flex items-center gap-1 text-right">
+                  {renderRunnerUpAmount(r.amount)}
+                  <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+
+        <motion.div variants={cardItemVariants} className="pt-8 flex justify-center">
+          <button 
+            onClick={() => { hapticFeedback.heavy(); onLogout(); }}
+            className="flex items-center gap-3 px-8 py-3 text-xs font-bold text-slate-400 hover:text-red-400 uppercase tracking-widest transition-all group opacity-70 hover:opacity-100"
+          >
+            <ICONS.Logout size={16} />
+            Logout Account
+          </button>
+        </motion.div>
+      </motion.div>
     </div>
   );
 };
