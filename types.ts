@@ -95,15 +95,86 @@ export interface RankUpgradeRecord {
   date: string;
 }
 
+export interface CPANetwork {
+  id: string;
+  name: string; // e.g. CPAlead, CPAGrip, AdGate, OfferToro, AdGem, Lootably, AdscendMedia
+  logoUrl?: string;
+  status: 'Active' | 'Inactive';
+  postbackUrl: string;
+  apiKey?: string;
+  secretKey?: string;
+  offerApiUrl?: string;
+  currency: string; // e.g. USD, BDT
+  autoApprove: boolean; // true = ON, false = OFF
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CPAConversion {
+  id: string;
+  userId: string;
+  userUid?: string;
+  userName?: string;
+  userEmail?: string;
+  taskId?: string;
+  taskTitle?: string;
+  offerId: string;
+  networkId: string;
+  cpaNetworkId?: string;
+  networkName: string;
+  cpaNetworkName?: string;
+  reward: number;
+  revenue: number; // Payout from CPA Network
+  country?: string;
+  status: 'pending' | 'approved' | 'rejected'; // pending = 🟡 Yellow, approved = 🟢 Green, rejected = 🔴 Red
+  cpaConfirmed: boolean;
+  walletStatus: 'Credited' | 'Pending' | 'Rejected';
+  autoApproved: boolean;
+  conversionTime: string;
+  processedAt?: string;
+  processedById?: string;
+  processedByName?: string;
+  rejectionReason?: string;
+  clickId?: string;
+  ip?: string;
+}
+
+export interface CPATransaction {
+  id: string;
+  conversionId: string;
+  userId: string;
+  userUid?: string;
+  userName?: string;
+  networkId: string;
+  networkName: string;
+  offerTitle: string;
+  offerId: string;
+  reward: number;
+  revenue: number;
+  status: 'Approved' | 'Rejected' | 'Pending';
+  date: string;
+}
+
 export interface Task {
   id: string;
   title: string;
   reward: number;
-  type: 'App Install' | 'Link Open' | 'Watch & Earn' | 'Social' | 'Telegram' | '1 Device= 1 Task';
+  type: 'App Install' | 'Link Open' | 'Watch & Earn' | 'Social' | 'Telegram' | '1 Device= 1 Task' | 'Install App' | 'Install Game' | 'Survey' | 'Email Signup' | 'Website Visit' | string;
   description: string;
   instructions: string[];
   youtubeLink?: string;
   isActive: boolean;
+  // CPA Task optional integration properties
+  taskSource?: 'Manual Task' | 'CPA Task';
+  cpaNetworkId?: string;
+  cpaNetworkName?: string;
+  offerLink?: string;
+  offerId?: string;
+  country?: string;
+  category?: string;
+  buttonText?: string;
+  taskImage?: string;
 }
 
 export interface TaskSubmission {
@@ -326,9 +397,13 @@ export interface AdViewLog {
 export interface ReferralTarget {
   id: string;
   title: string;
+  description?: string;
   targetRole: 'user' | 'monitor' | 'all';
   assignedToIds?: string[]; // Specific user/monitor IDs
-  periodType: 'daily' | 'weekly' | 'monthly'; // দৈনিক, সাপ্তাহিক, মাসিক
+  periodType: 'daily' | 'weekly' | 'monthly' | 'custom' | 'oneday'; // দৈনিক, সাপ্তাহিক, মাসিক, কাস্টম, ১ দিন
+  startDate?: string; // Optional custom start date (YYYY-MM-DD)
+  endDate?: string;   // Optional custom end date (YYYY-MM-DD)
+  durationDays?: number; // Optional duration in days e.g. 1
   referralGoal: number;
   bonusReward: number;
   createdAt: string;
@@ -342,8 +417,8 @@ export interface TargetHistory {
   userId: string;
   userName: string;
   userEmail: string;
-  periodType: 'daily' | 'weekly' | 'monthly';
-  periodId: string; // "2026-07-13", "2026-07" etc.
+  periodType: 'daily' | 'weekly' | 'monthly' | 'custom' | 'oneday';
+  periodId: string; // "2026-07-26", "2026-07", "custom_2026-07-26_2026-07-27" etc.
   referralGoal: number;
   referralsAchieved: number;
   bonusReward: number;

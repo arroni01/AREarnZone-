@@ -334,14 +334,24 @@ const Dashboard: React.FC<DashboardProps> = ({
     return () => clearInterval(interval);
   }, [namePool]);
 
-  const getReferralsCountInPeriod = (period: 'daily' | 'weekly' | 'monthly') => {
+  const getReferralsCountInPeriod = (targetOrPeriod: ReferralTarget | 'daily' | 'weekly' | 'monthly' | 'custom' | 'oneday') => {
     if (!users) return 0;
     const referredUsers = users.filter(u => u.referredBy && u.referredBy.toUpperCase() === user.referralCode.toUpperCase());
     const now = new Date();
     let startTime = new Date();
+    let endTime: Date | null = null;
 
-    if (period === 'daily') {
+    const period = typeof targetOrPeriod === 'string' ? targetOrPeriod : targetOrPeriod.periodType;
+    const target = typeof targetOrPeriod === 'object' ? targetOrPeriod : null;
+
+    if (period === 'daily' || period === 'oneday') {
       startTime.setHours(0, 0, 0, 0);
+      if (target?.startDate) {
+        startTime = new Date(target.startDate + 'T00:00:00');
+      }
+      if (target?.endDate) {
+        endTime = new Date(target.endDate + 'T23:59:59');
+      }
     } else if (period === 'weekly') {
       const day = now.getDay();
       const diff = now.getDate() - day + (day === 0 ? -6 : 1);
@@ -351,29 +361,48 @@ const Dashboard: React.FC<DashboardProps> = ({
     } else if (period === 'monthly') {
       startTime = new Date(now.getFullYear(), now.getMonth(), 1);
       startTime.setHours(0, 0, 0, 0);
+    } else if (period === 'custom') {
+      if (target?.startDate) {
+        startTime = new Date(target.startDate + 'T00:00:00');
+      } else if (target?.createdAt) {
+        startTime = new Date(target.createdAt);
+      } else {
+        startTime.setHours(0, 0, 0, 0);
+      }
+      if (target?.endDate) {
+        endTime = new Date(target.endDate + 'T23:59:59');
+      }
     }
 
     const matches = referredUsers.filter(u => {
       if (!u.createdAt) return false;
       const date = new Date(u.createdAt);
-      return date >= startTime;
+      if (date < startTime) return false;
+      if (endTime && date > endTime) return false;
+      return true;
     });
 
     return matches.length;
   };
 
-  const getPeriodId = (period: 'daily' | 'weekly' | 'monthly'): string => {
+  const getPeriodId = (targetOrPeriod: ReferralTarget | 'daily' | 'weekly' | 'monthly' | 'custom' | 'oneday'): string => {
     const d = new Date();
-    if (period === 'daily') {
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const period = typeof targetOrPeriod === 'string' ? targetOrPeriod : targetOrPeriod.periodType;
+    const target = typeof targetOrPeriod === 'object' ? targetOrPeriod : null;
+    const targetPrefix = target ? `${target.id}_` : '';
+
+    if (period === 'daily' || period === 'oneday') {
+      return `${targetPrefix}${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     } else if (period === 'weekly') {
       const day = d.getDay();
       const diff = d.getDate() - day + (day === 0 ? -6 : 1);
       const tempDate = new Date(d);
       const startOfWeek = new Date(tempDate.setDate(diff));
-      return `${startOfWeek.getFullYear()}-W${String(Math.ceil(startOfWeek.getDate() / 7))}`;
+      return `${targetPrefix}${startOfWeek.getFullYear()}-W${String(Math.ceil(startOfWeek.getDate() / 7))}`;
+    } else if (period === 'monthly') {
+      return `${targetPrefix}${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     } else {
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      return `${targetPrefix}custom_${target?.startDate || 'start'}_${target?.endDate || 'end'}`;
     }
   };
 
@@ -396,14 +425,14 @@ const Dashboard: React.FC<DashboardProps> = ({
   }, [targets, user]);
 
   const handleClaimTarget = (target: ReferralTarget) => {
-    const currentCount = getReferralsCountInPeriod(target.periodType);
+    const currentCount = getReferralsCountInPeriod(target);
     if (currentCount < target.referralGoal) {
       hapticFeedback.warning();
       alert(selectedCountryCode === 'BD' ? "টার্গেট এখনো সম্পূর্ণ হয়নি!" : "Target is not achieved yet!");
       return;
     }
 
-    const periodId = getPeriodId(target.periodType);
+    const periodId = getPeriodId(target);
     const alreadyClaimed = targetHistories?.some(h => h.targetId === target.id && h.userId === user.id && h.periodId === periodId);
     if (alreadyClaimed) {
       hapticFeedback.warning();

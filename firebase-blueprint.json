@@ -197,6 +197,39 @@
         "gatewayId": { "type": "string" },
         "gatewayName": { "type": "string" }
       }
+    },
+    "CPANetwork": {
+      "title": "CPA Network",
+      "description": "CPA Affiliate Network configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "status": { "type": "string" },
+        "postbackUrl": { "type": "string" },
+        "autoApprove": { "type": "boolean" }
+      }
+    },
+    "CPAConversion": {
+      "title": "CPA Conversion",
+      "description": "CPA offer completion conversion record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "networkId": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "CPATransaction": {
+      "title": "CPA Transaction",
+      "description": "CPA financial reward transaction record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "conversionId": { "type": "string" },
+        "userId": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -283,6 +316,18 @@
     "gatewayLogs": {
       "schema": "GatewayLog",
       "description": "Gateway daily transaction logs"
+    },
+    "cpaNetworks": {
+      "schema": "CPANetwork",
+      "description": "CPA affiliate network list"
+    },
+    "cpaConversions": {
+      "schema": "CPAConversion",
+      "description": "CPA lead conversion records"
+    },
+    "cpaTransactions": {
+      "schema": "CPATransaction",
+      "description": "CPA reward payouts ledger"
     }
   }
 }

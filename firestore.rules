@@ -138,5 +138,23 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isValidId(logId);
     }
+
+    // CPA Networks
+    match /cpaNetworks/{networkId} {
+      allow read: if true;
+      allow write: if isValidId(networkId);
+    }
+
+    // CPA Conversions
+    match /cpaConversions/{conversionId} {
+      allow read: if true;
+      allow write: if isValidId(conversionId);
+    }
+
+    // CPA Transactions
+    match /cpaTransactions/{transactionId} {
+      allow read: if true;
+      allow write: if isValidId(transactionId);
+    }
   }
 }

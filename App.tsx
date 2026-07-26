@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { User, Task, WithdrawRequest, Transaction, PaymentMethod, MembershipRequest, DepositRequest, MembershipPlan, TaskSubmission, WithdrawOption, AppNotification, SocialLink, Language, GlobalConfig, SellCategory, SellItem, StoreOrder, TelegramVerificationRequest, AdViewLog, GatewayLog } from './types';
+import { User, Task, WithdrawRequest, Transaction, PaymentMethod, MembershipRequest, DepositRequest, MembershipPlan, TaskSubmission, WithdrawOption, AppNotification, SocialLink, Language, GlobalConfig, SellCategory, SellItem, StoreOrder, TelegramVerificationRequest, AdViewLog, GatewayLog, CPANetwork, CPAConversion, CPATransaction } from './types';
 import { ICONS } from './constants';
 import { COUNTRIES, translate } from './components/localization';
 import { 
@@ -380,6 +380,42 @@ const App: React.FC = () => {
 
   const [storeOrders, setStoreOrders] = useState<StoreOrder[]>(getStored('arez_store_orders', []));
   const [telegramRequests, setTelegramRequests] = useState<TelegramVerificationRequest[]>(getStored('arez_telegram_reqs', []));
+
+  // CPA Management States
+  const [cpaNetworks, setCpaNetworks] = useState<CPANetwork[]>(getStored('arez_cpa_networks', [
+    { id: 'cpalead', name: 'CPAlead', logoUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&auto=format&fit=crop&q=80', status: 'Active', postbackUrl: '/api/cpa/postback?network=cpalead&subid={subid}&offer_id={offer_id}&payout={payout}', currency: 'USD', autoApprove: true, description: 'CPAlead Global Postback Network' },
+    { id: 'cpagrip', name: 'CPAGrip', logoUrl: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=100&auto=format&fit=crop&q=80', status: 'Active', postbackUrl: '/api/cpa/postback?network=cpagrip&subid={subid}&offer_id={offer_id}&payout={payout}', currency: 'USD', autoApprove: true, description: 'CPAGrip Global Content Locker' }
+  ]));
+  const [cpaConversions, setCpaConversions] = useState<CPAConversion[]>(getStored('arez_cpa_conversions', []));
+  const [cpaTransactions, setCpaTransactions] = useState<CPATransaction[]>(getStored('arez_cpa_transactions', []));
+
+  // Fetch CPA data from server API
+  useEffect(() => {
+    async function loadCPAData() {
+      try {
+        const [netRes, convRes, txRes] = await Promise.all([
+          fetch('/api/cpa/networks'),
+          fetch('/api/cpa/conversions'),
+          fetch('/api/cpa/transactions')
+        ]);
+        if (netRes.ok) {
+          const netData = await netRes.json();
+          if (netData.success && Array.isArray(netData.networks)) setCpaNetworks(netData.networks);
+        }
+        if (convRes.ok) {
+          const convData = await convRes.json();
+          if (convData.success && Array.isArray(convData.conversions)) setCpaConversions(convData.conversions);
+        }
+        if (txRes.ok) {
+          const txData = await txRes.json();
+          if (txData.success && Array.isArray(txData.transactions)) setCpaTransactions(txData.transactions);
+        }
+      } catch (err) {
+        console.error('[CPA Load Error]:', err);
+      }
+    }
+    loadCPAData();
+  }, []);
 
   // Translation Helper
   const t = (key: any): string => {
@@ -1495,6 +1531,12 @@ const App: React.FC = () => {
             setTargets={setTargets}
             targetHistories={targetHistories}
             setTargetHistories={setTargetHistories}
+            cpaNetworks={cpaNetworks}
+            setCpaNetworks={setCpaNetworks}
+            cpaConversions={cpaConversions}
+            setCpaConversions={setCpaConversions}
+            cpaTransactions={cpaTransactions}
+            setCpaTransactions={setCpaTransactions}
             t={t}
             toggleDarkMode={toggleDarkMode}
             toggleLanguage={toggleLanguage}
@@ -1599,6 +1641,12 @@ const AppContent: React.FC<{
   setTargets: React.Dispatch<React.SetStateAction<ReferralTarget[]>>;
   targetHistories: TargetHistory[];
   setTargetHistories: React.Dispatch<React.SetStateAction<TargetHistory[]>>;
+  cpaNetworks: CPANetwork[];
+  setCpaNetworks: React.Dispatch<React.SetStateAction<CPANetwork[]>>;
+  cpaConversions: CPAConversion[];
+  setCpaConversions: React.Dispatch<React.SetStateAction<CPAConversion[]>>;
+  cpaTransactions: CPATransaction[];
+  setCpaTransactions: React.Dispatch<React.SetStateAction<CPATransaction[]>>;
   t: (key: any) => string;
   toggleDarkMode: () => void;
   toggleLanguage: () => void;
@@ -1625,7 +1673,9 @@ const AppContent: React.FC<{
   adViewLogs, setAdViewLogs, withdrawOptions, setWithdrawOptions, paymentMethods, setPaymentMethods,
   membershipPlans, setMembershipPlans, gatewayLogs, setGatewayLogs, socialLinks, setSocialLinks, appNotifications, setAppNotifications,
   sellCategories, setSellCategories, sellItems, setSellItems, storeOrders, setStoreOrders,
-  telegramRequests, setTelegramRequests, targets, setTargets, targetHistories, setTargetHistories, t, toggleDarkMode, toggleLanguage, notify,
+  telegramRequests, setTelegramRequests, targets, setTargets, targetHistories, setTargetHistories,
+  cpaNetworks, setCpaNetworks, cpaConversions, setCpaConversions, cpaTransactions, setCpaTransactions,
+  t, toggleDarkMode, toggleLanguage, notify,
   handleLogin, handleUpdateUser, clearNotifications, isMaintenanceLocked, dbQuotaExceeded,
   refreshAllData, sessionExpiredNotice, setSessionExpiredNotice, performAutoLogout,
   showWelcomeSplash, handleWelcomeComplete
@@ -1824,6 +1874,12 @@ const AppContent: React.FC<{
                             setTargets={setTargets}
                             targetHistories={targetHistories}
                             setTargetHistories={setTargetHistories}
+                            cpaNetworks={cpaNetworks}
+                            setCpaNetworks={setCpaNetworks}
+                            cpaConversions={cpaConversions}
+                            setCpaConversions={setCpaConversions}
+                            cpaTransactions={cpaTransactions}
+                            setCpaTransactions={setCpaTransactions}
                         />
                       </ErrorBoundary>
                     )

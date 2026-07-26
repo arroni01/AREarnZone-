@@ -23,9 +23,13 @@ import {
   StoreOrder,
   TelegramVerificationRequest,
   AdViewLog,
+  CPANetwork,
+  CPAConversion,
+  CPATransaction,
 } from "../types";
 import { ICONS } from "../constants";
 import MonitorDashboard from "./MonitorDashboard";
+import CPAControlCenter from "./CPAControlCenter";
 import { getErrors, clearErrors, trackError } from "../utils/errorTracker";
 import type { SystemErrorLog } from "../utils/errorTracker";
 import { getActiveStatus } from "./statusUtils";
@@ -90,6 +94,12 @@ interface AdminPanelProps {
   setTargetHistories?: React.Dispatch<React.SetStateAction<TargetHistory[]>>;
   gatewayLogs?: GatewayLog[];
   setGatewayLogs?: React.Dispatch<React.SetStateAction<GatewayLog[]>>;
+  cpaNetworks?: CPANetwork[];
+  setCpaNetworks?: React.Dispatch<React.SetStateAction<CPANetwork[]>>;
+  cpaConversions?: CPAConversion[];
+  setCpaConversions?: React.Dispatch<React.SetStateAction<CPAConversion[]>>;
+  cpaTransactions?: CPATransaction[];
+  setCpaTransactions?: React.Dispatch<React.SetStateAction<CPATransaction[]>>;
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -137,6 +147,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   setTargetHistories,
   gatewayLogs = [],
   setGatewayLogs,
+  cpaNetworks = [],
+  setCpaNetworks,
+  cpaConversions = [],
+  setCpaConversions,
+  cpaTransactions = [],
+  setCpaTransactions,
 }) => {
   const [activeTab, setActiveTab] = useState<
     | "approvals"
@@ -156,10 +172,25 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     | "audit_logs"
     | "targets"
     | "welcome"
-  >("settings");
+    | "cpa_control"
+  >("cpa_control");
   const [approvalSubTab, setApprovalSubTab] = useState<
-    "membership" | "tasks" | "deposit"
+    "membership" | "tasks" | "deposit" | "cpa"
   >("membership");
+
+  // Referral Target Manager Filter & Form States
+  const [targetFormPeriodType, setTargetFormPeriodType] = useState<'daily' | 'oneday' | 'weekly' | 'monthly' | 'custom'>('daily');
+  const [targetFormStartDate, setTargetFormStartDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [targetFormEndDate, setTargetFormEndDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+
+  // Existing Targets Filter State
+  const [targetFilterPeriod, setTargetFilterPeriod] = useState<'all' | 'daily' | 'weekly' | 'monthly' | 'custom'>('all');
+
+  // Target History Filter & Analytics State
+  const [targetHistoryFilterPeriod, setTargetHistoryFilterPeriod] = useState<'all' | 'daily' | 'weekly' | 'monthly' | 'custom'>('all');
+  const [targetHistoryStartDate, setTargetHistoryStartDate] = useState<string>('');
+  const [targetHistoryEndDate, setTargetHistoryEndDate] = useState<string>('');
+  const [targetHistorySearch, setTargetHistorySearch] = useState<string>('');
 
   // Welcome Screen Settings State
   const [welcomeForm, setWelcomeForm] = useState<WelcomeSettings>({
@@ -3010,6 +3041,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         )}
         {!isMonitor && (
           <AdminTab
+            active={activeTab === "cpa_control"}
+            onClick={() => setActiveTab("cpa_control")}
+            label="CPA CONTROL CENTER"
+            icon={<Globe size={14} className="text-emerald-500" />}
+            badge={cpaConversions.filter(c => c.status === "pending").length || undefined}
+          />
+        )}
+        {!isMonitor && (
+          <AdminTab
             active={activeTab === "system"}
             onClick={() => setActiveTab("system")}
             label="SYSTEM SETUP"
@@ -3147,6 +3187,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           />
         )}
       </div>
+
+      {/* CPA CONTROL CENTER TAB CONTENT */}
+      {activeTab === "cpa_control" && (
+        <CPAControlCenter
+          cpaNetworks={cpaNetworks}
+          setCpaNetworks={setCpaNetworks}
+          cpaConversions={cpaConversions}
+          setCpaConversions={setCpaConversions}
+          cpaTransactions={cpaTransactions}
+          setCpaTransactions={setCpaTransactions}
+          tasks={tasks}
+          setTasks={setTasks}
+          users={users}
+          notify={notify}
+          currentUser={currentUser}
+        />
+      )}
 
       {/* WELCOME SCREEN MANAGEMENT TAB CONTENT */}
       {activeTab === "welcome" && (
@@ -5770,9 +5827,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
               <div className="space-y-8">
                 {/* Form to create a new target */}
                 <div className="bg-slate-50 dark:bg-slate-950 p-6 md:p-8 rounded-3xl border border-slate-100 dark:border-white/5 space-y-6">
-                  <h4 className="text-sm font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                    Create New Target (নতুন রেফারাল টার্গেট যোগ করুন)
-                  </h4>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 dark:border-white/10 pb-4 gap-2">
+                    <div>
+                      <h4 className="text-sm font-black uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                        <Calendar size={18} className="text-[#10b981]" /> Create New Referral Target (নতুন রেফারাল টার্গেট যোগ করুন)
+                      </h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                        দৈনিক (১ দিন), সাপ্তাহিক, মাসিক বা নির্দিষ্ট কাস্টম তারিখের জন্য আকর্ষণীয় রেফারাল টার্গেট তৈরি করুন
+                      </p>
+                    </div>
+                  </div>
+
                   <form onSubmit={(e) => {
                     e.preventDefault();
                     const form = e.currentTarget;
@@ -5780,7 +5845,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     
                     const title = formData.get("title") as string;
                     const description = formData.get("description") as string;
-                    const periodType = formData.get("periodType") as 'daily' | 'weekly' | 'monthly';
+                    const periodType = targetFormPeriodType;
                     const targetRole = formData.get("targetRole") as 'all' | 'user' | 'monitor';
                     const referralGoal = parseInt(formData.get("referralGoal") as string);
                     const bonusReward = parseFloat(formData.get("bonusReward") as string);
@@ -5800,6 +5865,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       title,
                       description,
                       periodType,
+                      startDate: (periodType === 'custom' || periodType === 'oneday' || periodType === 'daily') ? targetFormStartDate : undefined,
+                      endDate: (periodType === 'custom' || periodType === 'oneday' || periodType === 'daily') ? targetFormEndDate : undefined,
+                      durationDays: periodType === 'oneday' ? 1 : undefined,
                       targetRole,
                       referralGoal,
                       bonusReward,
@@ -5825,13 +5893,43 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Period Type (সময়সীমা) *</label>
-                      <select name="periodType" className="w-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 rounded-xl p-3.5 text-sm focus:outline-none focus:border-[#10b981] font-bold dark:text-white">
-                        <option value="daily">Daily (দৈনিক)</option>
-                        <option value="weekly">Weekly (সাপ্তাহিক)</option>
-                        <option value="monthly">Monthly (মাসিক)</option>
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Period Type / Timeframe (সময়সীমা) *</label>
+                      <select 
+                        value={targetFormPeriodType} 
+                        onChange={(e) => setTargetFormPeriodType(e.target.value as any)}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 rounded-xl p-3.5 text-sm focus:outline-none focus:border-[#10b981] font-bold dark:text-white"
+                      >
+                        <option value="daily">Daily Target (দৈনিক - প্রতি দিন)</option>
+                        <option value="oneday">1 Day System (বিশেষ ১ দিনের চ্যালেঞ্জ)</option>
+                        <option value="weekly">Weekly Target (সাপ্তাহিক - ৭ দিন)</option>
+                        <option value="monthly">Monthly Target (মাসিক - ৩০ দিন)</option>
+                        <option value="custom">Custom Date Range (কাস্টম নির্দিষ্ট সময়সীমা)</option>
                       </select>
                     </div>
+
+                    {/* Date Pickers for Custom / Daily / 1 Day */}
+                    {(targetFormPeriodType === 'custom' || targetFormPeriodType === 'oneday' || targetFormPeriodType === 'daily') && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Start Date (শুরুর তারিখ)</label>
+                          <input 
+                            type="date" 
+                            value={targetFormStartDate} 
+                            onChange={(e) => setTargetFormStartDate(e.target.value)} 
+                            className="w-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 rounded-xl p-3 text-xs focus:outline-none focus:border-[#10b981] font-bold dark:text-white" 
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">End Date (শেষের তারিখ)</label>
+                          <input 
+                            type="date" 
+                            value={targetFormEndDate} 
+                            onChange={(e) => setTargetFormEndDate(e.target.value)} 
+                            className="w-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 rounded-xl p-3 text-xs focus:outline-none focus:border-[#10b981] font-bold dark:text-white" 
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Target Audience Role (টার্গেট গ্রুপ) *</label>
@@ -5858,7 +5956,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
 
                     <div className="md:col-span-2 pt-2">
-                      <button type="submit" className="w-full md:w-auto bg-[#10b981] hover:bg-emerald-600 text-white font-black px-8 py-3.5 rounded-xl text-sm flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] transition-all">
+                      <button type="submit" className="w-full md:w-auto bg-[#10b981] hover:bg-emerald-600 text-white font-black px-8 py-3.5 rounded-xl text-sm flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer shadow-lg shadow-emerald-500/20">
                         <Plus size={16} /> Add Referral Target
                       </button>
                     </div>
@@ -5866,17 +5964,56 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
 
                 {/* List of active targets */}
-                <div className="space-y-4">
-                  <h4 className="text-sm font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                    Existing Referral Targets ({targets.length})
-                  </h4>
+                <div className="space-y-5">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-white/5 shadow-sm">
+                    <h4 className="text-sm font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                      Existing Referral Targets ({targets.filter(t => targetFilterPeriod === 'all' ? true : targetFilterPeriod === 'daily' ? (t.periodType === 'daily' || t.periodType === 'oneday') : t.periodType === targetFilterPeriod).length})
+                    </h4>
+
+                    {/* Filter Tabs */}
+                    <div className="flex flex-wrap gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+                      <button 
+                        onClick={() => setTargetFilterPeriod('all')}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${targetFilterPeriod === 'all' ? 'bg-[#10b981] text-white shadow' : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}
+                      >
+                        All (সকল)
+                      </button>
+                      <button 
+                        onClick={() => setTargetFilterPeriod('daily')}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${targetFilterPeriod === 'daily' ? 'bg-[#10b981] text-white shadow' : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}
+                      >
+                        Daily / 1 Day (দৈনিক / ১ দিন)
+                      </button>
+                      <button 
+                        onClick={() => setTargetFilterPeriod('weekly')}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${targetFilterPeriod === 'weekly' ? 'bg-[#10b981] text-white shadow' : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}
+                      >
+                        Weekly (সাপ্তাহিক)
+                      </button>
+                      <button 
+                        onClick={() => setTargetFilterPeriod('monthly')}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${targetFilterPeriod === 'monthly' ? 'bg-[#10b981] text-white shadow' : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}
+                      >
+                        Monthly (মাসিক)
+                      </button>
+                      <button 
+                        onClick={() => setTargetFilterPeriod('custom')}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${targetFilterPeriod === 'custom' ? 'bg-[#10b981] text-white shadow' : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}
+                      >
+                        Custom Range (কাস্টম)
+                      </button>
+                    </div>
+                  </div>
+
                   {targets.length === 0 ? (
                     <div className="text-center py-12 text-slate-400 font-bold bg-slate-50 dark:bg-slate-950 rounded-3xl">
                       No referral targets created yet.
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {targets.map(tgt => (
+                      {targets
+                        .filter(t => targetFilterPeriod === 'all' ? true : targetFilterPeriod === 'daily' ? (t.periodType === 'daily' || t.periodType === 'oneday') : t.periodType === targetFilterPeriod)
+                        .map(tgt => (
                         <div key={tgt.id} className="bg-white dark:bg-slate-950 p-6 rounded-3xl border border-slate-100 dark:border-white/5 space-y-4 relative overflow-hidden shadow-sm">
                           {!tgt.isActive && (
                             <div className="absolute top-3 right-3 bg-rose-500/10 text-rose-500 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full">
@@ -5884,13 +6021,26 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             </div>
                           )}
                           <div>
-                            <div className="flex items-center gap-2 mb-1.5">
-                              <span className="bg-amber-100 dark:bg-amber-950/40 text-amber-500 text-[9px] font-black uppercase px-2 py-0.5 rounded">
-                                {tgt.periodType}
+                            <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                              <span className="bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 text-[9px] font-black uppercase px-2.5 py-0.5 rounded-md border border-amber-500/20">
+                                {tgt.periodType === 'daily' 
+                                  ? 'DAILY TARGET (দৈনিক)' 
+                                  : tgt.periodType === 'oneday' 
+                                  ? '1 DAY CHALLENGE (১ দিন)' 
+                                  : tgt.periodType === 'weekly' 
+                                  ? 'WEEKLY (সাপ্তাহিক)' 
+                                  : tgt.periodType === 'monthly' 
+                                  ? 'MONTHLY (মাসিক)' 
+                                  : 'CUSTOM RANGE (কাস্টম)'}
                               </span>
-                              <span className="bg-indigo-100 dark:bg-indigo-950/40 text-indigo-500 text-[9px] font-black uppercase px-2 py-0.5 rounded">
+                              <span className="bg-indigo-100 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 text-[9px] font-black uppercase px-2 py-0.5 rounded">
                                 Role: {tgt.targetRole}
                               </span>
+                              {tgt.startDate && tgt.endDate && (
+                                <span className="bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-[9px] font-mono font-bold px-2 py-0.5 rounded">
+                                  📅 {tgt.startDate} to {tgt.endDate}
+                                </span>
+                              )}
                             </div>
                             <h5 className="font-bold text-slate-800 dark:text-slate-100 text-base">
                               {tgt.title}
@@ -5938,7 +6088,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                   notify("টার্গেট সফলভাবে মুছে ফেলা হয়েছে!");
                                 }
                               }}
-                              className="p-2.5 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white rounded-xl transition-all"
+                              className="p-2.5 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white rounded-xl transition-all cursor-pointer"
                             >
                               <Trash2 size={16} />
                             </button>
@@ -5953,60 +6103,216 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {approvalSubTab === ("tasks" as any) && (
               <div className="space-y-6 animate-in fade-in">
-                <h4 className="text-sm font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                  User Referral Target Completions ({targetHistories.length})
-                </h4>
-                {targetHistories.length === 0 ? (
-                  <div className="text-center py-12 text-slate-400 font-bold bg-slate-50 dark:bg-slate-950 rounded-3xl">
-                    No target completions recorded yet.
-                  </div>
-                ) : (
-                  <div className="bg-white dark:bg-slate-950 rounded-3xl border border-slate-100 dark:border-white/5 overflow-hidden shadow-sm">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-white/5 text-[9px] font-black uppercase tracking-wider text-slate-400">
-                          <tr>
-                            <th className="p-4">User Details</th>
-                            <th className="p-4">Target Information</th>
-                            <th className="p-4">Period</th>
-                            <th className="p-4">Achievement</th>
-                            <th className="p-4">Bonus Earned</th>
-                            <th className="p-4">Claimed Date</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-white/5 font-bold">
-                          {targetHistories.map(history => (
-                            <tr key={history.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 text-slate-700 dark:text-slate-300">
-                              <td className="p-4 space-y-1">
-                                <div className="font-bold dark:text-white">{history.userName}</div>
-                                <div className="text-[10px] font-mono text-slate-400">{history.userEmail}</div>
-                                <div className="text-[9px] font-mono text-indigo-400">ID: {history.userId}</div>
-                              </td>
-                              <td className="p-4">
-                                <div className="font-bold dark:text-white">{history.targetTitle}</div>
-                                <div className="text-[9px] font-mono text-slate-400 uppercase">Type: {history.periodType}</div>
-                              </td>
-                              <td className="p-4 font-mono">
-                                <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-1 rounded">
-                                  {history.periodId}
-                                </span>
-                              </td>
-                              <td className="p-4 font-mono text-emerald-500">
-                                {history.referralsAchieved} / {history.referralGoal}
-                              </td>
-                              <td className="p-4 font-black text-emerald-500">
-                                ৳{history.bonusReward}
-                              </td>
-                              <td className="p-4 text-slate-400 font-mono">
-                                {new Date(history.completedAt).toLocaleString()}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                {/* Header & Filter Controls */}
+                <div className="bg-slate-50 dark:bg-slate-950 p-6 rounded-3xl border border-slate-100 dark:border-white/5 space-y-5">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-white/10 pb-4">
+                    <div>
+                      <h4 className="text-sm font-black uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                        <Activity size={18} className="text-[#10b981]" /> User Target Completions & Timeframe Reports
+                      </h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                        দৈনিক (১ দিন), সাপ্তাহিক, মাসিক এবং কাস্টম নির্দিষ্ট তারিখের টার্গেট পূরণের হিসাব
+                      </p>
+                    </div>
+
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input 
+                        type="text" 
+                        value={targetHistorySearch} 
+                        onChange={(e) => setTargetHistorySearch(e.target.value)} 
+                        placeholder="Search user, email, target..." 
+                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs font-bold dark:text-white outline-none focus:border-[#10b981] w-full md:w-64"
+                      />
                     </div>
                   </div>
-                )}
+
+                  {/* Filter Toolbar */}
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex flex-wrap gap-1.5 bg-slate-200/60 dark:bg-slate-900 p-1.5 rounded-2xl">
+                      <button 
+                        onClick={() => setTargetHistoryFilterPeriod('all')}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase transition-all ${targetHistoryFilterPeriod === 'all' ? 'bg-[#10b981] text-white shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
+                      >
+                        All Time (সর্বমোট)
+                      </button>
+                      <button 
+                        onClick={() => setTargetHistoryFilterPeriod('daily')}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase transition-all ${targetHistoryFilterPeriod === 'daily' ? 'bg-[#10b981] text-white shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
+                      >
+                        Daily / Today (আজকে / ১ দিন)
+                      </button>
+                      <button 
+                        onClick={() => setTargetHistoryFilterPeriod('weekly')}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase transition-all ${targetHistoryFilterPeriod === 'weekly' ? 'bg-[#10b981] text-white shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
+                      >
+                        Weekly (সাপ্তাহিক)
+                      </button>
+                      <button 
+                        onClick={() => setTargetHistoryFilterPeriod('monthly')}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase transition-all ${targetHistoryFilterPeriod === 'monthly' ? 'bg-[#10b981] text-white shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
+                      >
+                        Monthly (মাসিক)
+                      </button>
+                      <button 
+                        onClick={() => setTargetHistoryFilterPeriod('custom')}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase transition-all ${targetHistoryFilterPeriod === 'custom' ? 'bg-[#10b981] text-white shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
+                      >
+                        Custom Date (কাস্টম তারিখ)
+                      </button>
+                    </div>
+
+                    {/* Date Pickers for Target History */}
+                    {(targetHistoryFilterPeriod === 'custom' || targetHistoryFilterPeriod === 'daily') && (
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="date" 
+                          value={targetHistoryStartDate} 
+                          onChange={(e) => setTargetHistoryStartDate(e.target.value)} 
+                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-1.5 text-xs font-bold dark:text-white outline-none focus:border-[#10b981]"
+                          title="From Date"
+                        />
+                        <span className="text-slate-400 text-xs font-bold">to</span>
+                        <input 
+                          type="date" 
+                          value={targetHistoryEndDate} 
+                          onChange={(e) => setTargetHistoryEndDate(e.target.value)} 
+                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-1.5 text-xs font-bold dark:text-white outline-none focus:border-[#10b981]"
+                          title="To Date"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Summary Metrics Cards */}
+                {(() => {
+                  const filtered = targetHistories.filter(history => {
+                    if (targetHistorySearch.trim()) {
+                      const q = targetHistorySearch.toLowerCase().trim();
+                      const match = (history.userName && history.userName.toLowerCase().includes(q)) ||
+                                    (history.userEmail && history.userEmail.toLowerCase().includes(q)) ||
+                                    (history.userId && history.userId.toLowerCase().includes(q)) ||
+                                    (history.targetTitle && history.targetTitle.toLowerCase().includes(q));
+                      if (!match) return false;
+                    }
+
+                    if (targetHistoryFilterPeriod === 'all') return true;
+
+                    const completedDate = new Date(history.completedAt);
+                    const now = new Date();
+
+                    if (targetHistoryFilterPeriod === 'daily' || targetHistoryFilterPeriod === 'oneday') {
+                      if (targetHistoryStartDate) {
+                        const start = new Date(targetHistoryStartDate + 'T00:00:00');
+                        const end = targetHistoryEndDate ? new Date(targetHistoryEndDate + 'T23:59:59') : new Date(targetHistoryStartDate + 'T23:59:59');
+                        if (completedDate < start || completedDate > end) return false;
+                      } else {
+                        const todayStr = now.toISOString().split('T')[0];
+                        const compStr = completedDate.toISOString().split('T')[0];
+                        if (compStr !== todayStr) return false;
+                      }
+                    } else if (targetHistoryFilterPeriod === 'weekly') {
+                      const day = now.getDay();
+                      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+                      const startOfWeek = new Date(now.setDate(diff));
+                      startOfWeek.setHours(0,0,0,0);
+                      if (completedDate < startOfWeek) return false;
+                    } else if (targetHistoryFilterPeriod === 'monthly') {
+                      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                      startOfMonth.setHours(0,0,0,0);
+                      if (completedDate < startOfMonth) return false;
+                    } else if (targetHistoryFilterPeriod === 'custom') {
+                      if (targetHistoryStartDate) {
+                        const start = new Date(targetHistoryStartDate + 'T00:00:00');
+                        if (completedDate < start) return false;
+                      }
+                      if (targetHistoryEndDate) {
+                        const end = new Date(targetHistoryEndDate + 'T23:59:59');
+                        if (completedDate > end) return false;
+                      }
+                    }
+
+                    return true;
+                  });
+
+                  const totalCompletions = filtered.length;
+                  const totalReferrals = filtered.reduce((acc, h) => acc + (h.referralsAchieved || 0), 0);
+                  const totalBonusPaid = filtered.reduce((acc, h) => acc + (h.bonusReward || 0), 0);
+
+                  return (
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-white dark:bg-slate-950 p-5 rounded-3xl border border-slate-100 dark:border-white/5 space-y-1 shadow-sm">
+                          <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Total Targets Completed</div>
+                          <div className="text-2xl font-black text-slate-900 dark:text-white">{totalCompletions} Targets</div>
+                        </div>
+                        <div className="bg-white dark:bg-slate-950 p-5 rounded-3xl border border-slate-100 dark:border-white/5 space-y-1 shadow-sm">
+                          <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Total Referrals Achieved</div>
+                          <div className="text-2xl font-black text-indigo-500">{totalReferrals} Users</div>
+                        </div>
+                        <div className="bg-white dark:bg-slate-950 p-5 rounded-3xl border border-slate-100 dark:border-white/5 space-y-1 shadow-sm">
+                          <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Total Bonus Paid Out</div>
+                          <div className="text-2xl font-black text-[#10b981]">৳{totalBonusPaid.toFixed(2)}</div>
+                        </div>
+                      </div>
+
+                      {filtered.length === 0 ? (
+                        <div className="text-center py-12 text-slate-400 font-bold bg-slate-50 dark:bg-slate-950 rounded-3xl">
+                          No target completions found for the selected timeframe filter.
+                        </div>
+                      ) : (
+                        <div className="bg-white dark:bg-slate-950 rounded-3xl border border-slate-100 dark:border-white/5 overflow-hidden shadow-sm">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-white/5 text-[9px] font-black uppercase tracking-wider text-slate-400">
+                                <tr>
+                                  <th className="p-4">User Details</th>
+                                  <th className="p-4">Target Information</th>
+                                  <th className="p-4">Period</th>
+                                  <th className="p-4">Achievement</th>
+                                  <th className="p-4">Bonus Earned</th>
+                                  <th className="p-4">Claimed Date</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 dark:divide-white/5 font-bold">
+                                {filtered.map(history => (
+                                  <tr key={history.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 text-slate-700 dark:text-slate-300">
+                                    <td className="p-4 space-y-1">
+                                      <div className="font-bold dark:text-white">{history.userName}</div>
+                                      <div className="text-[10px] font-mono text-slate-400">{history.userEmail}</div>
+                                      <div className="text-[9px] font-mono text-indigo-400">ID: {history.userId}</div>
+                                    </td>
+                                    <td className="p-4 space-y-1">
+                                      <div className="font-bold dark:text-white">{history.targetTitle}</div>
+                                      <span className="inline-block bg-amber-500/10 text-amber-500 text-[8px] font-black uppercase px-2 py-0.5 rounded">
+                                        Type: {history.periodType}
+                                      </span>
+                                    </td>
+                                    <td className="p-4 font-mono">
+                                      <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-1 rounded">
+                                        {history.periodId}
+                                      </span>
+                                    </td>
+                                    <td className="p-4 font-mono text-emerald-500">
+                                      {history.referralsAchieved} / {history.referralGoal}
+                                    </td>
+                                    <td className="p-4 font-black text-emerald-500">
+                                      ৳{history.bonusReward}
+                                    </td>
+                                    <td className="p-4 text-slate-400 font-mono">
+                                      {new Date(history.completedAt).toLocaleString()}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -12912,6 +13218,87 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
               Configure Mission
             </h3>
             <form className="space-y-6" onSubmit={handleSaveTask}>
+              {/* Task Source Selector */}
+              <div className="grid grid-cols-2 gap-4 bg-slate-100 dark:bg-slate-800/80 p-2 rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() => setEditingTask({ ...editingTask, taskSource: "Manual Task" })}
+                  className={`py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all ${
+                    (editingTask.taskSource || "Manual Task") === "Manual Task"
+                      ? "bg-[#10b981] text-slate-950 shadow-md"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  📋 Manual Task
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingTask({ ...editingTask, taskSource: "CPA Task" })}
+                  className={`py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all ${
+                    editingTask.taskSource === "CPA Task"
+                      ? "bg-[#10b981] text-slate-950 shadow-md"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  🌐 CPA Task
+                </button>
+              </div>
+
+              {/* CPA Task Specific Fields */}
+              {editingTask.taskSource === "CPA Task" && (
+                <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-emerald-400 uppercase tracking-widest ml-1">
+                      Select CPA Network
+                    </label>
+                    <select
+                      value={editingTask.cpaNetworkId || ""}
+                      onChange={(e) => {
+                        const net = cpaNetworks.find(n => n.id === e.target.value);
+                        setEditingTask({
+                          ...editingTask,
+                          cpaNetworkId: e.target.value,
+                          cpaNetworkName: net ? net.name : ""
+                        });
+                      }}
+                      className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-xl font-bold text-xs outline-none border border-emerald-500/30 dark:text-white"
+                    >
+                      <option value="">-- Select CPA Network --</option>
+                      {cpaNetworks.map((net) => (
+                        <option key={net.id} value={net.id}>
+                          {net.name} ({net.status})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black text-emerald-400 uppercase tracking-widest ml-1">
+                        CPA Offer ID
+                      </label>
+                      <input
+                        value={editingTask.offerId || ""}
+                        onChange={(e) => setEditingTask({ ...editingTask, offerId: e.target.value })}
+                        placeholder="e.g. 1024"
+                        className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-xl font-mono text-xs outline-none border border-emerald-500/30 dark:text-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black text-emerald-400 uppercase tracking-widest ml-1">
+                        Offer Link
+                      </label>
+                      <input
+                        value={editingTask.offerLink || ""}
+                        onChange={(e) => setEditingTask({ ...editingTask, offerLink: e.target.value })}
+                        placeholder="https://cpa-offer-link.com/..."
+                        className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-xl font-mono text-xs outline-none border border-emerald-500/30 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">
                   Mission Title
