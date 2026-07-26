@@ -49,10 +49,12 @@ function getTelegramConfig() {
     }
   } catch (e) {}
 
-  // Prioritize environment variables to prevent secure credential leaks
-  const envToken = process.env.TELEGRAM_BOT_TOKEN || process.env.VITE_TELEGRAM_BOT_TOKEN;
-  if (envToken) {
-    config.token = envToken;
+  // Use environment variables ONLY if config.token in file is empty/missing
+  if (!config.token || !config.token.trim()) {
+    const envToken = process.env.TELEGRAM_BOT_TOKEN || process.env.VITE_TELEGRAM_BOT_TOKEN;
+    if (envToken && envToken.trim()) {
+      config.token = envToken.trim();
+    }
   }
   return config;
 }
@@ -1476,11 +1478,23 @@ async function startServer() {
   // Telegram Configuration Endpoints
   app.get("/api/telegram/config", (req, res) => {
     const config = getTelegramConfig();
+    const token = config.token || "";
+    const maskedToken = token.length > 8 
+      ? `${token.slice(0, 4)}...${token.slice(-4)}`
+      : token ? "Invalid/Short Token" : "None";
+
+    // Auto-recovery attempt: if token exists but polling is stopped and no explicit 401 error, restart long polling
+    if (token && !pollingActive && (!lastPollingError || !lastPollingError.includes("401"))) {
+      startLongPolling().catch(() => {});
+    }
+
     res.json({
       isConfigured: !!config.token,
       botUsername: config.username,
       channelLink: config.channel,
-      isBotOnline: pollingActive
+      isBotOnline: pollingActive,
+      maskedToken,
+      lastPollingError
     });
   });
 
@@ -1502,7 +1516,7 @@ async function startServer() {
       cleanToken = cleanToken.replace(/[:.\s]+$/, "").trim();
       cleanToken = cleanToken.replace(/^[:.\s]+/, "").trim();
 
-      const cleanUsername = (username || "@AREarnZone_bot").trim();
+      let cleanUsername = (username || "").trim();
       const cleanChannel = (channel || "https://t.me/arearnzone").trim();
 
       // Check if it looks truncated (contains ellipsis or is too short)
@@ -1523,6 +1537,14 @@ async function startServer() {
               canForce: true
             });
           }
+
+          // Automatically set real bot username if available from getMe
+          if (testData.result && testData.result.username) {
+            const fetchedUsername = "@" + testData.result.username;
+            if (!cleanUsername || cleanUsername === "@AREarnZone_bot") {
+              cleanUsername = fetchedUsername;
+            }
+          }
         } catch (fetchErr: any) {
           console.error("[Telegram Bot Save Config Validate Fetch Error]:", fetchErr);
           return res.status(400).json({
@@ -1532,12 +1554,20 @@ async function startServer() {
         }
       }
 
+      if (!cleanUsername) {
+        cleanUsername = "@AREarnZone_bot";
+      }
+
       const config = getTelegramConfig();
       config.token = cleanToken;
       config.username = cleanUsername;
       config.channel = cleanChannel;
 
       fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), "utf-8");
+
+      // Update in-memory env vars to stay in sync
+      process.env.TELEGRAM_BOT_TOKEN = cleanToken;
+      process.env.VITE_TELEGRAM_BOT_TOKEN = cleanToken;
 
       console.log("[Telegram Bot] Local configuration updated successfully.");
 
@@ -1548,7 +1578,7 @@ async function startServer() {
 
       return res.json({
         success: true,
-        message: "অভিনন্দন! আপনার টেলিগ্রাম বট সফলভাবে ওয়েবসাইটে সক্রিয় এবং কানেক্ট করা হয়েছে।",
+        message: `অভিনন্দন! আপনার টেলিগ্রাম বট (${cleanUsername}) সফলভাবে ওয়েবসাইটে সক্রিয় এবং কানেক্ট করা হয়েছে।`,
         config: {
           token: cleanToken,
           username: cleanUsername,

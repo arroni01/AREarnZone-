@@ -1299,6 +1299,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [tgBotStatusMsg, setTgBotStatusMsg] = useState<string | null>(null);
   const [tgBotStatusOk, setTgBotStatusOk] = useState<boolean | null>(null);
   const [canForceTgSave, setCanForceTgSave] = useState(false);
+  const [tgBotIsOnline, setTgBotIsOnline] = useState<boolean | null>(null);
+  const [tgBotMaskedToken, setTgBotMaskedToken] = useState<string | null>(null);
+  const [tgBotLastErr, setTgBotLastErr] = useState<string | null>(null);
 
   const [telegramFilter, setTelegramFilter] = useState<
     "all" | "pending" | "approved" | "rejected"
@@ -1629,6 +1632,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         const data = await res.json();
         setTgBotUsername(data.botUsername || "@AREarnZone_bot");
         setTgChannelLink(data.channelLink || "https://t.me/arearnzone");
+        setTgBotIsOnline(!!data.isBotOnline);
+        if (data.maskedToken && data.maskedToken !== "None") {
+          setTgBotMaskedToken(data.maskedToken);
+        }
+        setTgBotLastErr(data.lastPollingError || null);
 
         // Ephemeral recovery: If the server restarted and has no active token, but this admin has a cached copy, auto-restore it!
         if (!data.isConfigured) {
@@ -1734,6 +1742,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       if (res.ok) {
         setTgBotStatusOk(true);
         setTgBotStatusMsg(data.message);
+        setTgBotIsOnline(true);
+        setTgBotLastErr(null);
+        
+        const finalUsername = data.config?.username || tgBotUsername;
+        if (data.config?.username) {
+          setTgBotUsername(data.config.username);
+        }
+        if (data.config?.token) {
+          const t = data.config.token;
+          setTgBotMaskedToken(t.length > 8 ? `${t.slice(0, 4)}...${t.slice(-4)}` : t);
+        }
+
         notify(
           force
             ? "টেলিগ্রাম বট জোরপূর্বক সেভ হয়েছে! ⚠️"
@@ -1745,7 +1765,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           "arez_admin_tg_config",
           JSON.stringify({
             token: tgBotToken,
-            username: tgBotUsername,
+            username: finalUsername,
             channel: tgChannelLink,
           }),
         );
@@ -1754,11 +1774,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         setGlobalConfig((prev) => ({
           ...prev,
           telegramBotToken: tgBotToken,
-          telegramBotUsername: tgBotUsername,
+          telegramBotUsername: finalUsername,
           telegramChannelLink: tgChannelLink,
         }));
 
-        setTgBotToken(""); // Clear token field for security
         setCanForceTgSave(false);
       } else {
         setTgBotStatusOk(false);
@@ -4478,6 +4497,30 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       তাত্ক্ষণিকভাবে আপনার বটের সাথে সাইটের রিয়েল-টাইম সংযোগ
                       স্থাপন করবে।
                     </p>
+                  </div>
+
+                  {/* Live Telegram Bot Health Status Badge */}
+                  <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                    tgBotIsOnline 
+                      ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400" 
+                      : "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400"
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      <span className={`w-3 h-3 rounded-full shrink-0 ${tgBotIsOnline ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
+                      <div>
+                        <div className="text-[11px] font-black uppercase tracking-wider">
+                          {tgBotIsOnline ? "বট স্ট্যাটাস: সক্রিয় ও কানেক্টেড (LIVE & ACTIVE)" : "বট স্ট্যাটাস: ডিসকানেক্টেড / অফলাইন (DISCONNECTED)"}
+                        </div>
+                        <div className="text-[10px] opacity-80 font-mono mt-0.5">
+                          ইউজারনেম: <span className="font-bold">{tgBotUsername}</span> {tgBotMaskedToken && `| টোকেন: ${tgBotMaskedToken}`}
+                        </div>
+                      </div>
+                    </div>
+                    {tgBotLastErr && (
+                      <div className="text-[9px] bg-rose-500/20 px-2.5 py-1 rounded-lg border border-rose-500/30 font-medium">
+                        ত্রুটি: {tgBotLastErr}
+                      </div>
+                    )}
                   </div>
 
                   {/* Ephemeral Restart Notice and Guide */}
