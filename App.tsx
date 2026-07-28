@@ -42,6 +42,7 @@ import { FAQ } from './components/FAQ';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { getAIRecoveryConfig, runAIHealthScanAndRecovery } from './utils/aiRecoveryEngine';
 import { WelcomeSplashScreen } from './components/WelcomeSplashScreen';
+import { AppLoadingScreen } from './components/AppLoadingScreen';
 
 // Global Translations Dictionary (Expanded)
 const TRANSLATIONS = {
@@ -1471,22 +1472,7 @@ const App: React.FC = () => {
     !(currentUser?.isMonitor && globalConfig.allowMonitorsDuringMaintenance);
 
   // Optimized Fast Loading Overlay
-  if (!isAppReady) return (
-    <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center space-y-8 animate-in fade-in duration-1000">
-      <div className="bg-[#10b981] p-5 rounded-[2.5rem] shadow-[0_0_80px_rgba(16,185,129,0.3)] border-4 border-white/10 animate-pulse">
-         <ICONS.Logo size={56} className="text-white" />
-      </div>
-      <div className="space-y-4 text-center">
-        <div className="w-64 bg-white/5 h-2 rounded-full overflow-hidden border border-white/10 p-0.5">
-           <div className="bg-[#10b981] h-full rounded-full transition-all duration-300 shadow-[0_0_15px_#10b981]" style={{ width: `${loadProgress}%` }}></div>
-        </div>
-        <div className="flex flex-col gap-1">
-          <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">CDN Cloud Edge Protocol: {loadProgress}%</p>
-          <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.4em] italic">Precision Assets Delivery Active</p>
-        </div>
-      </div>
-    </div>
-  );
+  if (!isAppReady) return <AppLoadingScreen loadProgress={loadProgress} />;
 
   return (
     <HelmetProvider>

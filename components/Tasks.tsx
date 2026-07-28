@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Globe } from 'lucide-react';
 import { Task, User, TaskSubmission } from '../types';
@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { compressImage } from '../utils/imageCompressor';
 import { LocalizedReward, COUNTRIES } from './localization';
 import { hapticFeedback } from '../utils/haptics';
+import { preloadTaskAssetsAndUserPhotos } from '../utils/assetCache';
 
 export const isTelegramTask = (task: Task): boolean => {
   if (!task) return false;
@@ -62,6 +63,13 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
   const [typeFilter, setTypeFilter] = useState<string>('All');
   const [showSuccessModal, setShowSuccessModal] = useState<{ title: string; reward: number; securityHash: string } | null>(null);
   
+  // Preload all task thumbnails and user photo for instant rendering
+  useEffect(() => {
+    const taskThumbs = tasks.map(t => t.thumbnail || (t as any).imageUrl || (t as any).icon).filter(Boolean);
+    const userPhotos = [user?.photoURL, user?.avatar].filter(Boolean);
+    preloadTaskAssetsAndUserPhotos(taskThumbs, userPhotos);
+  }, [tasks, user?.photoURL, user?.avatar]);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isVerified = user.status === 'Verified' || user.role === 'admin';

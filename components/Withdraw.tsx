@@ -351,12 +351,18 @@ const Withdraw: React.FC<WithdrawProps> = ({
       {/* ANIMATED WITHDRAW SUCCESS MODAL */}
       <AnimatePresence>
         {showSuccessModal && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-2xl">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-2xl"
+          >
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              initial={{ scale: 0.8, opacity: 0, y: 15 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 15 }}
-              transition={{ type: "spring", duration: 0.5, bounce: 0.3 }}
+              exit={{ scale: 0.85, opacity: 0, y: 10 }}
+              transition={{ type: "spring", duration: 0.45, bounce: 0.25 }}
               className="bg-slate-900 border border-emerald-500/20 w-full max-w-md rounded-[3rem] shadow-[0_0_80px_rgba(16,185,129,0.25)] p-8 text-center relative overflow-hidden text-white"
             >
               {/* Decorative background visual */}
@@ -451,7 +457,7 @@ const Withdraw: React.FC<WithdrawProps> = ({
                 </button>
               </motion.div>
             </motion.div>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
