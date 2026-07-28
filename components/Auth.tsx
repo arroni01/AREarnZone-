@@ -6,6 +6,7 @@ import { ICONS } from '../constants';
 import { auth } from '../firebase';
 import { GoogleAuthProvider, signInWithPopup, signInWithCredential } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
+import { safeApiFetch, getApiUrl as resolveApiUrl } from '../utils/apiClient';
 
 interface AuthProps {
   onLogin: (user: User, referralUsed?: string) => void;
@@ -609,9 +610,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
   };
 
   const getApiUrl = (endpoint: string): string => {
-    const origin = getOriginSafe().replace(/\/$/, "");
-    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    return origin && origin !== 'null' ? `${origin}${cleanEndpoint}` : cleanEndpoint;
+    return resolveApiUrl(endpoint);
   };
 
   const isCurrentlyInApp = (): boolean => {
@@ -881,17 +880,16 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     }
 
     try {
-      const res = await fetch(getApiUrl('/api/auth/send-otp'), {
+      const res = await safeApiFetch('/api/auth/send-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, name }),
       });
-      const data = await res.json();
       
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to send verification email. Please try again.');
+        throw new Error(res.error || res.data?.error || 'Failed to send verification email. Please try again.');
       }
 
+      const data = res.data;
       setView('verify');
       setIsLoading(false);
       
@@ -902,7 +900,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       setCooldownSeconds(30 * 60);
       
       setOtp(['', '', '', '', '', '']);
-      notify(data.message || "ভেরিফিকেশন কোড পাঠানো হয়েছে।");
+      notify(data?.message || "ভেরিফিকেশন কোড পাঠানো হয়েছে।");
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Verification email dynamically failed. Try again.');
@@ -921,16 +919,16 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     setFallbackNotice('');
 
     try {
-      const res = await fetch(getApiUrl('/api/auth/send-otp'), {
+      const res = await safeApiFetch('/api/auth/send-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, name }),
       });
-      const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to send verification email.');
+        throw new Error(res.error || res.data?.error || 'Failed to send verification email.');
       }
+
+      const data = res.data;
 
       // Start 30-min Cooldown on Success
       const targetEmail = email.toLowerCase().trim();
@@ -1230,15 +1228,13 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     }
 
     try {
-      const res = await fetch(getApiUrl('/api/auth/verify-otp'), {
+      const res = await safeApiFetch('/api/auth/verify-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code: finalOtp }),
       });
-      const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Incorrect verification code. Please check and try again.');
+        throw new Error(res.error || res.data?.error || 'Incorrect verification code. Please check and try again.');
       }
 
       // Unique UID generation for new manual signup
@@ -1676,15 +1672,13 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
 
                       setIsLoading(true);
                       try {
-                        const res = await fetch(getApiUrl('/api/auth/send-otp'), {
+                        const res = await safeApiFetch('/api/auth/send-otp', {
                           method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ email: targetEmail, name: 'Password Recovery' }),
                         });
-                        const data = await res.json();
 
                         if (!res.ok) {
-                          throw new Error(data.error || 'Failed to send OTP code.');
+                          throw new Error(res.error || res.data?.error || 'Failed to send OTP code.');
                         }
 
                         setForgotStep(2);
@@ -1755,15 +1749,13 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
                           const finalOtp = forgotOtp.join('');
 
                           try {
-                            const res = await fetch(getApiUrl('/api/auth/verify-otp'), {
+                            const res = await safeApiFetch('/api/auth/verify-otp', {
                               method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ email: forgotEmail.toLowerCase().trim(), code: finalOtp }),
                             });
-                            const data = await res.json();
 
                             if (!res.ok) {
-                              throw new Error(data.error || 'Incorrect or expired OTP');
+                              throw new Error(res.error || res.data?.error || 'Incorrect or expired OTP');
                             }
 
                             setForgotStep(3);

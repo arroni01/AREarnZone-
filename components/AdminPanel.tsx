@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { saveDocument } from "../firebase";
 import { compressImage } from "../utils/imageCompressor";
+import { safeApiFetch } from "../utils/apiClient";
 import { Eye, EyeOff, Plus, Edit, Trash2, Play, Image as ImageIcon, Globe, ArrowUpDown, PlusCircle, CheckCircle2, XCircle, RefreshCw, Download, Activity, TrendingUp, TrendingDown, DollarSign, Calendar, Terminal, AlertTriangle, Search, Folder, ArrowLeft, CheckSquare, Square, ShieldCheck, Shield } from "lucide-react";
 import {
   Task,
@@ -1587,9 +1588,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const fetchEmailCounters = async () => {
     try {
-      const res = await fetch("/api/admin/email-counters");
-      if (res.ok) {
-        const data = await res.json();
+      const res = await safeApiFetch("/api/admin/email-counters");
+      if (res.ok && res.data) {
+        const data = res.data;
         setEmailCounters(data);
 
         // Ephemeral recovery for Multi-SMTP rotation pool
@@ -1603,7 +1604,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
               const isMissing = cachedSmtps.some(
                 (cached) =>
                   !serverSmtps.some(
-                    (serv) =>
+                    (serv: any) =>
                       serv.user.toLowerCase() === cached.user.toLowerCase(),
                   ),
               );
@@ -1613,17 +1614,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   "[SMTP Cache] Connection/configs lost. Restoring SMTP list in background...",
                 );
                 // Save the whole list using bulk save API
-                await fetch("/api/admin/save-smtp-list", {
+                await safeApiFetch("/api/admin/save-smtp-list", {
                   method: "POST",
-                  headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ smtpList: cachedSmtps }),
                 });
                 console.log("[SMTP Cache] SMTP configurations successfully restored!");
                 // Trigger a refresh after background restoration
-                const refreshedRes = await fetch("/api/admin/email-counters");
-                if (refreshedRes.ok) {
-                  const refreshedData = await refreshedRes.json();
-                  setEmailCounters(refreshedData);
+                const refreshedRes = await safeApiFetch("/api/admin/email-counters");
+                if (refreshedRes.ok && refreshedRes.data) {
+                  setEmailCounters(refreshedRes.data);
                 }
               }
             }
@@ -1633,27 +1632,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         }
       }
     } catch (e: any) {
-      if (e?.message === "Failed to fetch") {
-        console.warn(
-          "Failed to fetch email counters (temporary network/server disconnect).",
-        );
-      } else {
-        console.error("Failed to fetch email counters:", e);
-      }
+      console.warn("Failed to fetch email counters:", e?.message || e);
     }
   };
 
   const handleResetCounters = async () => {
     try {
-      const res = await fetch("/api/admin/email-counters/reset", {
+      const res = await safeApiFetch("/api/admin/email-counters/reset", {
         method: "POST",
       });
-      const data = await res.json();
       if (res.ok) {
         notify("Email limits manually reset!");
         fetchEmailCounters();
       } else {
-        notify(data.error || "Failed to reset counters.");
+        notify(res.error || res.data?.error || "Failed to reset counters.");
       }
     } catch (e) {
       console.error(e);
@@ -1663,9 +1655,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const fetchTelegramConfig = async () => {
     try {
-      const res = await fetch("/api/telegram/config");
-      if (res.ok) {
-        const data = await res.json();
+      const res = await safeApiFetch("/api/telegram/config");
+      if (res.ok && res.data) {
+        const data = res.data;
         setTgBotUsername(data.botUsername || "@AREarnZone_bot");
         setTgChannelLink(data.channelLink || "https://t.me/arearnzone");
         setTgBotIsOnline(!!data.isBotOnline);
@@ -1685,9 +1677,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             console.log(
               "[Telegram Bot Cache] Ephemeral connection lost. Restoring bot from globalConfig in background...",
             );
-            await fetch("/api/telegram/save-config", {
+            await safeApiFetch("/api/telegram/save-config", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 token: firestoreToken,
                 username: firestoreUsername,
@@ -1710,9 +1701,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 console.log(
                   "[Telegram Bot Cache] Ephemeral connection lost. Restoring bot in background...",
                 );
-                await fetch("/api/telegram/save-config", {
+                await safeApiFetch("/api/telegram/save-config", {
                   method: "POST",
-                  headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     token: parsed.token,
                     username: parsed.username || parsed.botUsername,
@@ -1734,13 +1724,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         }
       }
     } catch (e: any) {
-      if (e?.message === "Failed to fetch") {
-        console.warn(
-          "Failed to fetch Telegram config (temporary network/server disconnect).",
-        );
-      } else {
-        console.error("Failed to fetch Telegram config:", e);
-      }
+      console.warn("Failed to fetch Telegram config:", e?.message || e);
     }
   };
 
@@ -1763,9 +1747,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         : "টেলিগ্রাম বট টোকেন কানেক্ট ও টেস্ট করা হচ্ছে...",
     );
     try {
-      const res = await fetch("/api/telegram/save-config", {
+      const res = await safeApiFetch("/api/telegram/save-config", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           token: tgBotToken,
           username: tgBotUsername,
@@ -1773,11 +1756,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           forceSave: force,
         }),
       });
-      const data = await res.json();
       setIsSavingTgBot(false);
-      if (res.ok) {
+      if (res.ok && res.data) {
         setTgBotStatusOk(true);
-        setTgBotStatusMsg(data.message);
+        setTgBotStatusMsg(res.data.message);
         setTgBotIsOnline(true);
         setTgBotLastErr(null);
         
@@ -1864,16 +1846,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     }
     setIsAddingSmtp(true);
     try {
-      const res = await fetch("/api/admin/add-smtp", {
+      const res = await safeApiFetch("/api/admin/add-smtp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user: smtpFormUser,
           pass: smtpFormPass,
           limit: smtpFormLimit,
         }),
       });
-      const data = await res.json();
       if (res.ok) {
         notify("SMTP সফলভাবে যোগ/আপডেট করা হয়েছে!");
 
@@ -1908,7 +1888,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         setSmtpFormLimit(500);
         fetchEmailCounters();
       } else {
-        notify(data.error || "SMTP যোগ করতে ব্যর্থ হয়েছে।");
+        notify(res.error || res.data?.error || "SMTP যোগ করতে ব্যর্থ হয়েছে।");
       }
     } catch (e) {
       console.error(e);
@@ -1921,12 +1901,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleDeleteSmtp = async (userEmail: string) => {
     if (!window.confirm(`${userEmail} কনফিগারেশনটি মুছে ফেলতে চান?`)) return;
     try {
-      const res = await fetch("/api/admin/delete-smtp", {
+      const res = await safeApiFetch("/api/admin/delete-smtp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user: userEmail }),
       });
-      const data = await res.json();
       if (res.ok) {
         notify("SMTP সফলভাবে মুছে ফেলা হয়েছে!");
 
@@ -1946,7 +1924,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
         fetchEmailCounters();
       } else {
-        notify(data.error || "SMTP মুছতে ব্যর্থ হয়েছে।");
+        notify(res.error || res.data?.error || "SMTP মুছতে ব্যর্থ হয়েছে।");
       }
     } catch (e) {
       console.error(e);
@@ -1967,23 +1945,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         : "Testing active Gmail SMTP credentials...",
     );
     try {
-      const res = await fetch("/api/admin/test-smtp", {
+      const res = await safeApiFetch("/api/admin/test-smtp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user: typeof specificUser === "string" ? specificUser : undefined,
           pass: typeof specificPass === "string" ? specificPass : undefined,
         }),
       });
-      const data = await res.json();
-      if (res.ok) {
+      if (res.ok && res.data) {
         setSmtpDiagnosticOk(true);
-        setSmtpDiagnosticMsg(data.message);
+        setSmtpDiagnosticMsg(res.data.message);
         notify("SMTP Connection Successful!");
       } else {
         setSmtpDiagnosticOk(false);
         setSmtpDiagnosticMsg(
-          data.error || "Failed to establish secure handshake.",
+          res.error || res.data?.error || "Failed to establish secure handshake.",
         );
         notify("SMTP connection failed.");
       }
@@ -2013,14 +1989,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
     setIsVerifyingCleanupPassword(true);
     try {
-      const res = await fetch("/api/admin/verify-app-password", {
+      const res = await safeApiFetch("/api/admin/verify-app-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ appPassword: cleanupAppPassword }),
       });
-      const data = await res.json();
       if (!res.ok) {
-        notify(data.error || "পাসওয়ার্ড যাচাইকরণ ব্যর্থ হয়েছে।");
+        notify(res.error || res.data?.error || "পাসওয়ার্ড যাচাইকরণ ব্যর্থ হয়েছে।");
         return;
       }
 
@@ -2128,9 +2102,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     // Send withdrawal approved email notification
     const targetUser = (users || []).find((u) => u.id === withdraw.userId);
     if (targetUser && targetUser.email) {
-      fetch("/api/email/notify", {
+      safeApiFetch("/api/email/notify", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: targetUser.email,
           name: targetUser.name,
@@ -2227,9 +2200,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       // Send withdrawal approved email notification
       const targetUser = (users || []).find((u) => u.id === withdraw.userId);
       if (targetUser && targetUser.email) {
-        fetch("/api/email/notify", {
+        safeApiFetch("/api/email/notify", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email: targetUser.email,
             name: targetUser.name,
@@ -2359,9 +2331,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
         // Send account status verification email notification
         if (targetUser.email) {
-          fetch("/api/email/notify", {
+          safeApiFetch("/api/email/notify", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               email: targetUser.email,
               name: targetUser.name,
@@ -2723,9 +2694,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
     // Send account suspension status changed email notification
     if (selectedUserForManage.email) {
-      fetch("/api/email/notify", {
+      safeApiFetch("/api/email/notify", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: selectedUserForManage.email,
           name: selectedUserForManage.name,

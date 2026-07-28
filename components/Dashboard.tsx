@@ -8,6 +8,7 @@ import { Crown, Trophy, Medal, Sparkles, ArrowUpRight, RefreshCw } from 'lucide-
 import { LocalizedReward, convertCurrency } from './localization';
 import { hapticFeedback } from '../utils/haptics';
 import { preloadTaskAssetsAndUserPhotos } from '../utils/assetCache';
+import { safeApiFetch } from '../utils/apiClient';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -518,9 +519,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
 
     if (isUpgraded && user.email) {
-      fetch("/api/email/notify", {
+      safeApiFetch("/api/email/notify", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: user.email,
           name: user.name,
