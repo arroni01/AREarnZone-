@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { User } from '../types';
 import { ICONS } from '../constants';
 import { auth } from '../firebase';
-import { GoogleAuthProvider, signInWithPopup, signInWithCredential } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithCredential } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
 import { safeApiFetch, getApiUrl as resolveApiUrl } from '../utils/apiClient';
 
@@ -1026,8 +1026,33 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     };
   }, [users]);
 
-  // Check URL hash for direct redirect authentication parameters on mount/update
+  // Check URL hash or Firebase redirect results on mount/update
   useEffect(() => {
+    // 1. Firebase redirect auth result check
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result && result.user) {
+          console.log("[Firebase Redirect Auth] Callback successful for user:", result.user.email);
+          const googleUserPayload = {
+            email: result.user.email,
+            name: result.user.displayName || result.user.email?.split('@')[0] || "Google User",
+            id: result.user.uid
+          };
+          const pendingReferral = localStorage.getItem('arez_pending_referral') || '';
+          localStorage.removeItem('arez_pending_referral');
+          handleGoogleAuthSuccess(googleUserPayload, pendingReferral);
+        }
+      })
+      .catch((err) => {
+        console.error("[Firebase Redirect Auth Callback Error]:", err);
+        if (err && err.code) {
+          const friendlyError = `Firebase Sign-In error (${err.code}): ${err.message}`;
+          setError(friendlyError);
+          notify(friendlyError);
+        }
+      });
+
+    // 2. Hash-based direct redirect check
     const hash = window.location.hash || '';
     if (hash.includes('/auth/google/success')) {
       try {
@@ -1209,34 +1234,51 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
         try { popupWin.close(); } catch (e) {}
       }
 
-      // --- Fallback to original Firebase Auth popup if backend custom URL is not configured/available ---
-      console.log("[Google Auth] Server OAuth URL not available. Falling back to Firebase popup...");
+      // --- Fallback to original Firebase Auth popup/redirect if backend custom URL is not configured/available ---
+      console.log("[Google Auth Callback Chain] Server OAuth URL not available. Attempting Firebase Auth...");
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({
         prompt: 'select_account'
       });
 
-      const result = await signInWithPopup(auth, provider);
-      const firebaseUser = result.user;
-
-      if (!firebaseUser || !firebaseUser.email) {
-        throw new Error("Could not retrieve user info from Google authentication. (গুগল সাইন-ইন থেকে ব্যবহারকারীর ইমেল পাওয়া যায়নি।)");
+      if (isMobileDevice) {
+        console.log("[Google Auth Callback Chain] Mobile/WebView detected. Initiating signInWithRedirect...");
+        await signInWithRedirect(auth, provider);
+        return;
       }
 
-      console.log("[Google Auth] Firebase authentication succeeded for:", firebaseUser.email);
+      try {
+        console.log("[Google Auth Callback Chain] Desktop environment detected. Initiating signInWithPopup...");
+        const result = await signInWithPopup(auth, provider);
+        const firebaseUser = result.user;
 
-      // Create a unique user login/registration payload
-      const googleUserPayload = {
-        email: firebaseUser.email,
-        name: firebaseUser.displayName || firebaseUser.email.split('@')[0] || "Google User",
-        id: firebaseUser.uid
-      };
+        if (!firebaseUser || !firebaseUser.email) {
+          throw new Error("Could not retrieve user info from Google authentication. (গুগল সাইন-ইন থেকে ব্যবহারকারীর ইমেল পাওয়া যায়নি।)");
+        }
 
-      // Proceed with login/registration flow
-      handleGoogleAuthSuccess(googleUserPayload);
+        console.log("[Google Auth Callback Chain] Firebase authentication succeeded for:", firebaseUser.email);
+
+        // Create a unique user login/registration payload
+        const googleUserPayload = {
+          email: firebaseUser.email,
+          name: firebaseUser.displayName || firebaseUser.email.split('@')[0] || "Google User",
+          id: firebaseUser.uid
+        };
+
+        // Proceed with login/registration flow
+        handleGoogleAuthSuccess(googleUserPayload);
+      } catch (popupErr: any) {
+        console.warn("[Google Auth Callback Chain] signInWithPopup encountered error or popup blocking:", popupErr?.code || popupErr?.message);
+        if (popupErr?.code === 'auth/popup-blocked' || popupErr?.code === 'auth/popup-closed-by-user') {
+          console.log("[Google Auth Callback Chain] Switching to signInWithRedirect as popup fallback...");
+          await signInWithRedirect(auth, provider);
+          return;
+        }
+        throw popupErr;
+      }
 
     } catch (err: any) {
-      console.error("Google Login via Firebase Auth Error:", err);
+      console.error("[Google Auth Callback Chain Error]:", err);
       
       const isUnauthorized = (err.code && err.code.includes('unauthorized-domain')) || (err.message && err.message.includes('unauthorized-domain'));
       const errCode = err.code || "unknown_code";
