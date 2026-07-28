@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { saveDocument } from "../firebase";
 import { compressImage } from "../utils/imageCompressor";
 import { safeApiFetch } from "../utils/apiClient";
+import { safeFetch } from "../utils/corsProxy";
 import { Eye, EyeOff, Plus, Edit, Trash2, Play, Image as ImageIcon, Globe, ArrowUpDown, PlusCircle, CheckCircle2, XCircle, RefreshCw, Download, Activity, TrendingUp, TrendingDown, DollarSign, Calendar, Terminal, AlertTriangle, Search, Folder, ArrowLeft, CheckSquare, Square, ShieldCheck, Shield } from "lucide-react";
 import {
   Task,
@@ -1339,6 +1340,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [tgBotIsOnline, setTgBotIsOnline] = useState<boolean | null>(null);
   const [tgBotMaskedToken, setTgBotMaskedToken] = useState<string | null>(null);
   const [tgBotLastErr, setTgBotLastErr] = useState<string | null>(null);
+  const [isTestingTgConnection, setIsTestingTgConnection] = useState(false);
+  const [tgDiagnosticLogs, setTgDiagnosticLogs] = useState<
+    Array<{ timestamp: string; level: 'info' | 'success' | 'warn' | 'error'; message: string; details?: any }>
+  >([]);
 
   const [telegramFilter, setTelegramFilter] = useState<
     "all" | "pending" | "approved" | "rejected"
@@ -1757,13 +1762,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         }),
       });
       setIsSavingTgBot(false);
+      const data = res.data || {};
       if (res.ok && res.data) {
         setTgBotStatusOk(true);
-        setTgBotStatusMsg(res.data.message);
+        setTgBotStatusMsg(data.message || "টেলিগ্রাম বট সফলভাবে সেভ হয়েছে!");
         setTgBotIsOnline(true);
         setTgBotLastErr(null);
         
-        const finalUsername = data.config?.username || tgBotUsername;
+        const finalUsername = data.config?.username || data.botUsername || tgBotUsername;
         if (data.config?.username) {
           setTgBotUsername(data.config.username);
         }
@@ -1799,17 +1805,94 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         setCanForceTgSave(false);
       } else {
         setTgBotStatusOk(false);
-        setTgBotStatusMsg(data.error || "টোকেন কানেক্ট করতে ব্যর্থ হয়েছে।");
+        setTgBotStatusMsg(res.error || data.error || "টোকেন কানেক্ট করতে ব্যর্থ হয়েছে।");
         if (data.canForce) {
           setCanForceTgSave(true);
         }
-        notify("বট কানেকশন ব্যর্থ হয়েছে।");
+        notify(res.error || data.error || "বট কানেকশন ব্যর্থ হয়েছে।");
       }
     } catch (err: any) {
       setIsSavingTgBot(false);
       setTgBotStatusOk(false);
       setTgBotStatusMsg("বট কানেকশন সার্ভার ত্রুটি: " + err.message);
       notify("সার্ভার এরর।");
+    }
+  };
+
+  const handleTestTelegramConnection = async () => {
+    setIsTestingTgConnection(true);
+    const now = new Date().toLocaleTimeString();
+
+    setTgDiagnosticLogs((prev) => [
+      {
+        timestamp: now,
+        level: "info",
+        message: "Initiating Telegram Bot Connection Diagnostics via safeFetch...",
+      },
+      ...prev,
+    ]);
+
+    try {
+      // Step 1: Query local bot config
+      const configRes = await safeFetch("/api/telegram/config");
+      setTgDiagnosticLogs((prev) => [
+        {
+          timestamp: new Date().toLocaleTimeString(),
+          level: configRes.ok ? "success" : "warn",
+          message: `[Step 1] Config Check: HTTP ${configRes.status} ${configRes.isSimulated ? "(Simulated Mode)" : "(Direct Mode)"}`,
+          details: configRes.data,
+        },
+        ...prev,
+      ]);
+
+      // Step 2: Test Endpoint
+      const tokenToTest = tgBotToken.trim() || globalConfig?.telegramBotToken || "";
+      let targetUrl = "/api/telegram/check-code?code=test_diagnostic";
+      if (tokenToTest) {
+        targetUrl = `https://api.telegram.org/bot${tokenToTest}/getMe`;
+      }
+
+      setTgDiagnosticLogs((prev) => [
+        {
+          timestamp: new Date().toLocaleTimeString(),
+          level: "info",
+          message: `[Step 2] Querying Endpoint: ${tokenToTest ? "https://api.telegram.org/bot<masked>/getMe" : targetUrl}...`,
+        },
+        ...prev,
+      ]);
+
+      const testRes = await safeFetch(targetUrl);
+      const isSuccess = testRes.ok && testRes.data?.ok !== false && testRes.data?.success !== false;
+
+      if (isSuccess) {
+        setTgBotIsOnline(true);
+        setTgBotStatusOk(true);
+        setTgBotStatusMsg("Telegram Bot connection verified successfully via safeFetch diagnostic test!");
+      }
+
+      setTgDiagnosticLogs((prev) => [
+        {
+          timestamp: new Date().toLocaleTimeString(),
+          level: isSuccess ? "success" : "error",
+          message: `[Step 3] Diagnostics Completed: ${isSuccess ? "Bot is ACTIVE & ONLINE ✅" : "Connection Test Failed ❌"}`,
+          details: testRes.data || testRes.error,
+        },
+        ...prev,
+      ]);
+
+      notify(isSuccess ? "Telegram Bot connection test successful! ✅" : "Telegram Bot connection test failed.");
+    } catch (err: any) {
+      setTgDiagnosticLogs((prev) => [
+        {
+          timestamp: new Date().toLocaleTimeString(),
+          level: "error",
+          message: `[Diagnostic Error] Exception: ${err.message || String(err)}`,
+        },
+        ...prev,
+      ]);
+      notify("Telegram Bot connection test encountered an error.");
+    } finally {
+      setIsTestingTgConnection(false);
     }
   };
 
@@ -4651,6 +4734,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
 
                   <div className="flex flex-wrap justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleTestTelegramConnection}
+                      disabled={isTestingTgConnection}
+                      className="px-5 py-3.5 rounded-2xl text-[9px] uppercase font-black tracking-widest transition-all bg-emerald-500 text-white hover:bg-emerald-600 shadow-[0_0_12px_rgba(16,185,129,0.2)] flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isTestingTgConnection ? 'animate-spin' : ''}`} />
+                      {isTestingTgConnection ? "টেস্ট করা হচ্ছে..." : "Test Telegram Connection"}
+                    </button>
                     {canForceTgSave && (
                       <button
                         type="button"
@@ -4690,6 +4782,65 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {/* Telegram Bot Diagnostic Panel */}
+                  <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 text-slate-100 font-mono text-xs space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+                        <span className="font-black text-white uppercase text-[10px] tracking-wider font-sans">
+                          Telegram Diagnostic Panel
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleTestTelegramConnection}
+                          disabled={isTestingTgConnection}
+                          className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-[10px] font-sans font-bold hover:bg-emerald-500/30 transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${isTestingTgConnection ? 'animate-spin' : ''}`} />
+                          Test Telegram Connection
+                        </button>
+                        {tgDiagnosticLogs.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setTgDiagnosticLogs([])}
+                            className="px-2 py-1 text-slate-400 hover:text-white text-[10px] font-sans cursor-pointer"
+                          >
+                            Clear Logs
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {tgDiagnosticLogs.length === 0 ? (
+                      <p className="text-slate-500 italic text-[10px] py-1">
+                        No diagnostic scans performed yet. Click 'Test Telegram Connection' above to trigger a live status check via safeFetch.
+                      </p>
+                    ) : (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {tgDiagnosticLogs.map((log, idx) => (
+                          <div key={idx} className="p-2.5 rounded bg-slate-950/80 border border-slate-800/80 text-[10px] font-mono">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`font-bold ${
+                                log.level === 'success' ? 'text-emerald-400' :
+                                log.level === 'error' ? 'text-rose-400' :
+                                log.level === 'warn' ? 'text-amber-400' : 'text-blue-400'
+                              }`}>
+                                [{log.timestamp}] {log.message}
+                              </span>
+                            </div>
+                            {log.details && (
+                              <pre className="mt-1.5 text-[9px] text-slate-300 overflow-x-auto p-2 bg-slate-900 rounded border border-slate-800">
+                                {JSON.stringify(log.details, null, 2)}
+                              </pre>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </form>
 
                 {/* Sender Authentication & Anti-Spam Setup Guide */}
