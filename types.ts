@@ -175,6 +175,9 @@ export interface Task {
   category?: string;
   buttonText?: string;
   taskImage?: string;
+  // Country Targeting System fields
+  targetCountriesType?: 'ALL' | 'SELECTED'; // 'ALL' = 🌐 All Countries, 'SELECTED' = 🌍 Custom Countries
+  allowedCountries?: string[]; // e.g. ["BD", "IN", "US", "CA", "GB", "AU", "AE", "SA", "MY", "SG"]
 }
 
 export interface TaskSubmission {
@@ -190,6 +193,7 @@ export interface TaskSubmission {
   submittedAt: string;
   securityHash?: string; // For fake task detection (Screenshot Validation Hash)
   clientIp?: string; // Tracking IP at submission time
+  countryCode?: string; // Track user country code at submission time (e.g. BD, US, IN)
   telegramIdUsed?: string; // Verified Telegram User ID used for the task
   aiAuditLog?: string; // AI dynamic tracking and audit log
   aiVerified?: boolean; // Flag if AI has verified user-specific ID matching

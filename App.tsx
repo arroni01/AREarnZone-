@@ -158,6 +158,12 @@ const App: React.FC = () => {
     try {
       sessionStorage.removeItem('arez_show_welcome_splash');
     } catch {}
+    // Show social popup ONLY AFTER welcome screen completes
+    const hasShown = sessionStorage.getItem('arez_social_shown');
+    if (!hasShown) {
+      setShowSocialPopup(true);
+      sessionStorage.setItem('arez_social_shown', 'true');
+    }
   }, []);
   
   // 5-Minute Auto-Session Timeout & Security Auto-Logout System (300 seconds)
@@ -320,6 +326,15 @@ const App: React.FC = () => {
     }
   }));
 
+  // Preload Welcome Splash Screen image for instant, zero-flicker rendering
+  useEffect(() => {
+    const splashImgUrl = globalConfig?.welcomeSettings?.imageUrl || "/welcome_asset.png";
+    if (splashImgUrl) {
+      const img = new Image();
+      img.src = splashImgUrl;
+    }
+  }, [globalConfig?.welcomeSettings?.imageUrl]);
+
   // Fast Loading State
   const [isAppReady, setIsAppReady] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
@@ -392,26 +407,30 @@ const App: React.FC = () => {
   // Fetch CPA data from server API
   useEffect(() => {
     async function loadCPAData() {
+      const fetchSafe = async (url: string) => {
+        try {
+          const res = await fetch(url);
+          if (res.ok) {
+            return await res.json();
+          }
+        } catch {
+          // Gracefully fallback to localStorage/default state
+        }
+        return null;
+      };
+
       try {
-        const [netRes, convRes, txRes] = await Promise.all([
-          fetch('/api/cpa/networks'),
-          fetch('/api/cpa/conversions'),
-          fetch('/api/cpa/transactions')
+        const [netData, convData, txData] = await Promise.all([
+          fetchSafe('/api/cpa/networks'),
+          fetchSafe('/api/cpa/conversions'),
+          fetchSafe('/api/cpa/transactions')
         ]);
-        if (netRes.ok) {
-          const netData = await netRes.json();
-          if (netData.success && Array.isArray(netData.networks)) setCpaNetworks(netData.networks);
-        }
-        if (convRes.ok) {
-          const convData = await convRes.json();
-          if (convData.success && Array.isArray(convData.conversions)) setCpaConversions(convData.conversions);
-        }
-        if (txRes.ok) {
-          const txData = await txRes.json();
-          if (txData.success && Array.isArray(txData.transactions)) setCpaTransactions(txData.transactions);
-        }
-      } catch (err) {
-        console.error('[CPA Load Error]:', err);
+
+        if (netData?.success && Array.isArray(netData.networks)) setCpaNetworks(netData.networks);
+        if (convData?.success && Array.isArray(convData.conversions)) setCpaConversions(convData.conversions);
+        if (txData?.success && Array.isArray(txData.transactions)) setCpaTransactions(txData.transactions);
+      } catch {
+        // Silent fallback
       }
     }
     loadCPAData();
@@ -1354,14 +1373,14 @@ const App: React.FC = () => {
   }, [currentUser?.id]);
 
   useEffect(() => {
-    if (currentUser) {
+    if (currentUser && !showWelcomeSplash) {
       const hasShown = sessionStorage.getItem('arez_social_shown');
       if (!hasShown) {
         setShowSocialPopup(true);
         sessionStorage.setItem('arez_social_shown', 'true');
       }
     }
-  }, [currentUser]);
+  }, [currentUser, showWelcomeSplash]);
 
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
   const toggleLanguage = () => setLanguage(l => l === 'EN' ? 'BN' : 'EN');
@@ -1422,8 +1441,14 @@ const App: React.FC = () => {
     try {
       sessionStorage.setItem('arez_show_welcome_splash', 'true');
     } catch {}
+    const splashImgUrl = globalConfig?.welcomeSettings?.imageUrl || "/welcome_asset.png";
+    if (splashImgUrl) {
+      const img = new Image();
+      img.src = splashImgUrl;
+      if (img.decode) img.decode().catch(() => {});
+    }
     setShowWelcomeSplash(true);
-    setShowSocialPopup(true);
+    // Social popup will automatically trigger in handleWelcomeComplete after the Welcome Screen completes
   };
 
   const handleUpdateUser = (updatedUser: User) => {
@@ -2003,8 +2028,8 @@ const AppContent: React.FC<{
         />
       )}
 
-      {/* Social Join Modals */}
-      {showSocialPopup && <SocialPopup links={socialLinks} onClose={() => setShowSocialPopup(false)} />}
+      {/* Social Join Modals - Only rendered after Welcome Screen finishes */}
+      {!showWelcomeSplash && showSocialPopup && <SocialPopup links={socialLinks} onClose={() => setShowSocialPopup(false)} />}
 
       {/* Logout confirmation alert dialog */}
       {showLogoutConfirm && (
@@ -2021,7 +2046,7 @@ const AppContent: React.FC<{
       )}
 
       {/* Dynamic Toast System */}
-      {showNotification && (
+      {showNotification && !showWelcomeSplash && (
         <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-[10001] animate-in slide-in-from-bottom-10 duration-500 w-[92%] max-w-sm">
           <div className="bg-emerald-600 text-white px-8 py-3 rounded-full shadow-2xl flex items-center justify-center gap-2 border border-white/20 font-bold text-[10px] uppercase tracking-widest text-center">
             <ICONS.Check size={16} /> {notificationMsg.replace('🚨 [SYSTEM HEALTH ALERT] ', '')}
@@ -2030,7 +2055,7 @@ const AppContent: React.FC<{
       )}
 
       {/* Mandatory Sponsored Ads Overlay */}
-      <AdManagerOverlay currentUser={currentUser} globalConfig={globalConfig} adViewLogs={adViewLogs} setAdViewLogs={setAdViewLogs} isSocialPopupActive={showSocialPopup} />
+      <AdManagerOverlay currentUser={currentUser} globalConfig={globalConfig} adViewLogs={adViewLogs} setAdViewLogs={setAdViewLogs} isSocialPopupActive={showSocialPopup || showWelcomeSplash} />
 
       {/* System Maintenance Lock State */}
       {isMaintenanceLocked && (

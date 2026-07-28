@@ -61,6 +61,8 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [testingConnection, setTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [testingNetworkId, setTestingNetworkId] = useState<string | null>(null);
+  const [networkTestResults, setNetworkTestResults] = useState<Record<string, { success: boolean; message: string }>>({});
   const [loading, setLoading] = useState(false);
 
   // Form State for Add/Edit Network
@@ -183,7 +185,7 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
     }
   };
 
-  // Test Connection
+  // Test Connection for modal form
   const handleTestConnection = async () => {
     setTestingConnection(true);
     setTestResult(null);
@@ -192,6 +194,8 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          networkId: formData.id,
+          networkName: formData.name,
           postbackUrl: formData.postbackUrl,
           offerApiUrl: formData.offerApiUrl,
           apiKey: formData.apiKey
@@ -208,6 +212,40 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
       setTestResult({ success: false, message: "❌ Connection Test Error: " + err.message });
     } finally {
       setTestingConnection(false);
+    }
+  };
+
+  // Test Connection for a specific CPA Network card or directory item
+  const handleTestNetworkConnection = async (network: CPANetwork) => {
+    setTestingNetworkId(network.id);
+    try {
+      const res = await fetch("/api/cpa/test-connection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          networkId: network.id,
+          networkName: network.name,
+          postbackUrl: network.postbackUrl || `/api/cpa/postback?network=${network.id}&subid={subid}&offer_id={offer_id}&payout={payout}`,
+          offerApiUrl: network.offerApiUrl,
+          apiKey: network.apiKey
+        })
+      });
+      const data = await res.json();
+      const resObj = { success: !!data.success, message: data.message || "Test ping completed" };
+      setNetworkTestResults(prev => ({
+        ...prev,
+        [network.id]: resObj
+      }));
+      notify(data.message || `${network.name} connection test completed`);
+    } catch (err: any) {
+      const errMsg = "❌ Ping test error: " + (err?.message || "Network request failed");
+      setNetworkTestResults(prev => ({
+        ...prev,
+        [network.id]: { success: false, message: errMsg }
+      }));
+      notify(errMsg);
+    } finally {
+      setTestingNetworkId(null);
     }
   };
 
@@ -730,7 +768,7 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
                     <p className="text-[11px] truncate"><strong className="text-slate-300">Postback:</strong> {net.postbackUrl}</p>
                   </div>
 
-                  <div className="flex items-center justify-between pt-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/50 dark:border-white/5">
                     <button
                       type="button"
                       onClick={() => handleCopy(net.postbackUrl, net.id)}
@@ -739,14 +777,37 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
                       {copiedId === net.id ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
                       Copy Postback URL
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEditModal(net)}
-                      className="text-xs font-bold text-emerald-500 hover:underline cursor-pointer"
-                    >
-                      Edit
-                    </button>
+                    
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={testingNetworkId === net.id}
+                        onClick={() => handleTestNetworkConnection(net)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-black uppercase rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-all cursor-pointer"
+                        title="Simulate postback URL ping test"
+                      >
+                        <Zap size={12} className={testingNetworkId === net.id ? "animate-spin text-amber-400" : "text-emerald-400"} />
+                        {testingNetworkId === net.id ? "Testing..." : "Test Ping"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditModal(net)}
+                        className="text-xs font-bold text-emerald-500 hover:underline cursor-pointer"
+                      >
+                        Edit
+                      </button>
+                    </div>
                   </div>
+
+                  {networkTestResults[net.id] && (
+                    <div className={`p-2 rounded-lg text-[10px] font-bold border ${
+                      networkTestResults[net.id].success 
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                        : "bg-red-500/10 text-red-400 border-red-500/20"
+                    }`}>
+                      {networkTestResults[net.id].message}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -833,23 +894,42 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
                     <td className="p-4 max-w-xs font-mono text-[11px] text-slate-400 truncate">
                       {net.offerApiUrl || "—"}
                     </td>
-                    <td className="p-4 text-right space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEditModal(net)}
-                        className="p-2 text-slate-400 hover:text-emerald-400 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-emerald-500/10 transition-colors cursor-pointer"
-                        title="Edit Network"
-                      >
-                        <Edit size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteNetwork(net.id, net.name)}
-                        className="p-2 text-slate-400 hover:text-red-400 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-red-500/10 transition-colors cursor-pointer"
-                        title="Delete Network"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                    <td className="p-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          disabled={testingNetworkId === net.id}
+                          onClick={() => handleTestNetworkConnection(net)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-all cursor-pointer"
+                          title="Simulate postback URL ping test"
+                        >
+                          <Zap size={13} className={testingNetworkId === net.id ? "animate-spin text-amber-400" : "text-emerald-400"} />
+                          {testingNetworkId === net.id ? "Testing..." : "Test Connection"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditModal(net)}
+                          className="p-2 text-slate-400 hover:text-emerald-400 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+                          title="Edit Network"
+                        >
+                          <Edit size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteNetwork(net.id, net.name)}
+                          className="p-2 text-slate-400 hover:text-red-400 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-red-500/10 transition-colors cursor-pointer"
+                          title="Delete Network"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      {networkTestResults[net.id] && (
+                        <div className={`mt-1.5 text-[10px] font-bold text-right ${
+                          networkTestResults[net.id].success ? "text-emerald-400" : "text-red-400"
+                        }`}>
+                          {networkTestResults[net.id].message}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

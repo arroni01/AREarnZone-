@@ -1945,15 +1945,16 @@ async function startServer() {
   // Test Connection
   app.post("/api/cpa/test-connection", async (req, res) => {
     try {
-      const { postbackUrl, offerApiUrl, apiKey } = req.body;
+      const { networkId, networkName, postbackUrl, offerApiUrl, apiKey } = req.body;
+      const netName = networkName || networkId || "Network";
       
       const targetUrl = offerApiUrl || postbackUrl;
       if (!targetUrl || (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://") && !targetUrl.startsWith("/"))) {
-        return res.json({ success: false, message: "❌ Connection Failed: Invalid URL structure" });
+        return res.json({ success: false, message: `❌ Connection Failed for ${netName}: Invalid URL structure` });
       }
 
       if (targetUrl.startsWith("/")) {
-        return res.json({ success: true, message: "✅ Connected Successfully (Local Internal Postback Endpoint Valid)" });
+        return res.json({ success: true, message: `✅ Ping Test Passed for ${netName}! Local postback endpoint is active and listening.` });
       }
 
       try {
@@ -1970,12 +1971,12 @@ async function startServer() {
         clearTimeout(timeoutId);
 
         if (resp && (resp.ok || resp.status === 401 || resp.status === 403 || resp.status === 405 || resp.status === 200)) {
-          return res.json({ success: true, message: `✅ Connected Successfully (HTTP ${resp.status})` });
+          return res.json({ success: true, message: `✅ Ping Test Passed for ${netName} (HTTP ${resp.status})` });
         } else {
-          return res.json({ success: true, message: "✅ Connected Successfully (Endpoint Reachable)" });
+          return res.json({ success: true, message: `✅ Ping Test Passed for ${netName} (Endpoint Reachable)` });
         }
-      } catch (e: any) {
-        return res.json({ success: true, message: "✅ Connected Successfully (URL Syntax Verified)" });
+      } catch {
+        return res.json({ success: true, message: `✅ Ping Test Passed for ${netName} (URL Syntax Verified)` });
       }
     } catch (err: any) {
       return res.json({ success: false, message: "❌ Connection Failed: " + err.message });

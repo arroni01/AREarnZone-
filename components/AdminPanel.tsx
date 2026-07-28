@@ -33,6 +33,7 @@ import CPAControlCenter from "./CPAControlCenter";
 import { getErrors, clearErrors, trackError } from "../utils/errorTracker";
 import type { SystemErrorLog } from "../utils/errorTracker";
 import { getActiveStatus } from "./statusUtils";
+import { COUNTRIES } from "./localization";
 import { 
   getAIRecoveryConfig, 
   saveAIRecoveryConfig, 
@@ -178,6 +179,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     "membership" | "tasks" | "deposit" | "cpa"
   >("membership");
 
+  // Task Country Targeting Filter & Search State
+  const [taskCountryFilter, setTaskCountryFilter] = useState<string>('ALL');
+  const [taskCountrySearchQuery, setTaskCountrySearchQuery] = useState<string>('');
+
   // Referral Target Manager Filter & Form States
   const [targetFormPeriodType, setTargetFormPeriodType] = useState<'daily' | 'oneday' | 'weekly' | 'monthly' | 'custom'>('daily');
   const [targetFormStartDate, setTargetFormStartDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
@@ -215,7 +220,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     if (!file) return;
     setIsCompressingWelcomeImg(true);
     try {
-      const compressed = await compressImage(file, 1600, 1600, 0.90);
+      const compressed = await compressImage(file, 1200, 1200, 0.82);
       setWelcomeForm(prev => ({ ...prev, imageUrl: compressed }));
       notify("Welcome Image uploaded and compressed successfully!");
     } catch (err) {
@@ -7527,77 +7532,261 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       )}
 
       {/* TASK CONTROL TAB CONTENT */}
-      {activeTab === "tasks" && (
-        <div className="space-y-8 animate-in slide-in-from-bottom-4">
-          <div className="flex items-center justify-between px-4">
-            <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-none">
-              Mission Control
-            </h3>
-            <button
-              onClick={() =>
-                setEditingTask({
-                  id: "task_" + Date.now(),
-                  title: "New Task",
-                  reward: 10,
-                  type: "Link Open",
-                  description: "Briefing...",
-                  instructions: ["Step 1"],
-                  isActive: true,
-                })
-              }
-              className="bg-[#10b981] text-white px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg transition-all active:scale-95"
-            >
-              + New Mission
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {tasks.map((task) => (
-              <div
-                key={task.id}
-                className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-sm flex items-center justify-between hover:border-[#10b981]/30 transition-all"
-              >
-                <div className="flex items-center gap-4">
-                  <div
-                    className={`p-3 rounded-xl ${task.isActive ? "bg-[#10b981]/10 text-[#10b981]" : "bg-slate-100 text-slate-400"}`}
-                  >
-                    <ICONS.Zap size={20} />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-black uppercase italic dark:text-white leading-none mb-1">
-                      {task.title}
-                    </h4>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic">
-                      ৳{task.reward} • {task.type}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setEditingTask({ ...task })}
-                    className="p-2 text-slate-300 hover:text-emerald-500 transition-colors"
-                  >
-                    <ICONS.Settings size={18} />
-                  </button>
-                  <button
-                    onClick={() =>
-                      setTasks((prev) =>
-                        prev.map((t) =>
-                          t.id === task.id
-                            ? { ...t, isActive: !t.isActive }
-                            : t,
-                        ),
-                      )
-                    }
-                    className={`px-3 py-1.5 rounded-full text-[8px] font-black uppercase ${task.isActive ? "bg-emerald-500/10 text-emerald-500" : "bg-slate-100 text-slate-400"}`}
-                  >
-                    {task.isActive ? "LIVE" : "OFF"}
-                  </button>
-                </div>
+      {activeTab === "tasks" && (() => {
+        const filteredTasksByCountry = tasks.filter((t) => {
+          if (taskCountryFilter === "ALL") return true;
+          if (!t.targetCountriesType || t.targetCountriesType === "ALL") return true;
+          return t.allowedCountries && t.allowedCountries.includes(taskCountryFilter);
+        });
+
+        // Compute Country-wise Completion & Views Analytics
+        const countryStatsMap: Record<string, { totalSubs: number; approvedSubs: number; rejectedSubs: number; totalEarnings: number }> = {};
+        
+        COUNTRIES.forEach(c => {
+          countryStatsMap[c.code] = { totalSubs: 0, approvedSubs: 0, rejectedSubs: 0, totalEarnings: 0 };
+        });
+
+        (taskSubmissions || []).forEach(sub => {
+          const userObj = users.find(u => u.id === sub.userId);
+          const userCountry = sub.countryCode || (userObj as any)?.countryCode || (userObj as any)?.country || "BD";
+          if (!countryStatsMap[userCountry]) {
+            countryStatsMap[userCountry] = { totalSubs: 0, approvedSubs: 0, rejectedSubs: 0, totalEarnings: 0 };
+          }
+          countryStatsMap[userCountry].totalSubs += 1;
+          if (sub.status === "approved") {
+            countryStatsMap[userCountry].approvedSubs += 1;
+            countryStatsMap[userCountry].totalEarnings += (sub.reward || 0);
+          } else if (sub.status === "rejected") {
+            countryStatsMap[userCountry].rejectedSubs += 1;
+          }
+        });
+
+        return (
+          <div className="space-y-8 animate-in slide-in-from-bottom-4">
+            {/* Header & New Mission Action */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-2">
+              <div>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-none flex items-center gap-2">
+                  <Globe className="text-[#10b981]" size={22} />
+                  Mission Control & Country Targeting
+                </h3>
+                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">
+                  Manage tasks, configure country accessibility restrictions, and monitor country-wise completion analytics.
+                </p>
               </div>
-            ))}
+              <button
+                onClick={() =>
+                  setEditingTask({
+                    id: "task_" + Date.now(),
+                    title: "New Task",
+                    reward: 10,
+                    type: "Link Open",
+                    description: "Briefing...",
+                    instructions: ["Step 1"],
+                    isActive: true,
+                    targetCountriesType: "ALL",
+                    allowedCountries: ["BD"]
+                  })
+                }
+                className="bg-[#10b981] text-white px-6 py-3.5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+              >
+                <Plus size={16} /> + New Mission
+              </button>
+            </div>
+
+            {/* Country Filter Selector Bar */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 p-5 rounded-[2.5rem] shadow-sm space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <Globe size={14} className="text-[#10b981]" /> Filter Tasks by Country Availability:
+                </span>
+                <span className="text-[10px] font-mono text-emerald-500 font-bold">
+                  Showing {filteredTasksByCountry.length} of {tasks.length} tasks
+                </span>
+              </div>
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                <button
+                  type="button"
+                  onClick={() => setTaskCountryFilter("ALL")}
+                  className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all ${
+                    taskCountryFilter === "ALL"
+                      ? "bg-[#10b981] text-white shadow-md scale-105"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
+                  }`}
+                >
+                  🌐 All Countries ({tasks.length})
+                </button>
+                {COUNTRIES.map((c) => {
+                  const count = tasks.filter(t => !t.targetCountriesType || t.targetCountriesType === "ALL" || (t.allowedCountries && t.allowedCountries.includes(c.code))).length;
+                  return (
+                    <button
+                      key={c.code}
+                      type="button"
+                      onClick={() => setTaskCountryFilter(c.code)}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                        taskCountryFilter === c.code
+                          ? "bg-[#10b981] text-white shadow-md scale-105"
+                          : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
+                      }`}
+                    >
+                      <span>{c.flag}</span>
+                      <span>{c.code}</span>
+                      <span className="text-[9px] opacity-75">({count})</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Task Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredTasksByCountry.length === 0 ? (
+                <div className="col-span-full bg-white dark:bg-slate-900 p-12 rounded-[2.5rem] border border-dashed border-slate-200 dark:border-white/10 text-center">
+                  <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">No tasks found for the selected country filter.</p>
+                </div>
+              ) : (
+                filteredTasksByCountry.map((task) => {
+                  const isAllCountries = !task.targetCountriesType || task.targetCountriesType === "ALL";
+                  const allowedList = task.allowedCountries || [];
+                  const countrySummaryText = isAllCountries
+                    ? "All Countries"
+                    : allowedList.length === 0
+                    ? "None Selected"
+                    : allowedList.slice(0, 3).map(code => COUNTRIES.find(c => c.code === code)?.name || code).join(", ") + (allowedList.length > 3 ? ` (+${allowedList.length - 3} more)` : "");
+
+                  return (
+                    <div
+                      key={task.id}
+                      className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-sm flex flex-col justify-between hover:border-[#10b981]/30 transition-all gap-4"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-4">
+                          <div
+                            className={`p-3 rounded-xl flex-shrink-0 ${task.isActive ? "bg-[#10b981]/10 text-[#10b981]" : "bg-slate-100 text-slate-400"}`}
+                          >
+                            <ICONS.Zap size={20} />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-black uppercase italic dark:text-white leading-tight mb-1">
+                              {task.title}
+                            </h4>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic">
+                              ৳{task.reward} • {task.type}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setEditingTask({ ...task })}
+                            className="p-2 text-slate-400 hover:text-emerald-500 transition-colors"
+                            title="Edit / Configure Mission"
+                          >
+                            <ICONS.Settings size={18} />
+                          </button>
+                          <button
+                            onClick={() =>
+                              setTasks((prev) =>
+                                prev.map((t) =>
+                                  t.id === task.id
+                                    ? { ...t, isActive: !t.isActive }
+                                    : t,
+                                ),
+                              )
+                            }
+                            className={`px-3 py-1.5 rounded-full text-[8px] font-black uppercase ${task.isActive ? "bg-emerald-500/10 text-emerald-500" : "bg-slate-100 text-slate-400"}`}
+                          >
+                            {task.isActive ? "LIVE" : "OFF"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Country Targeting Summary Badge */}
+                      <div className="pt-3 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] font-bold">
+                        <span className="text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                          <Globe size={12} className="text-[#10b981]" /> Countries:
+                        </span>
+                        {isAllCountries ? (
+                          <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-full font-black uppercase text-[9px] border border-emerald-500/20">
+                            🌐 All Countries
+                          </span>
+                        ) : (
+                          <span className="bg-blue-500/10 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full font-black uppercase text-[9px] border border-blue-500/20 truncate max-w-[220px]" title={countrySummaryText}>
+                            🌍 {countrySummaryText}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Country-wise Analytics & Completion Report Card */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 p-6 rounded-[2.5rem] shadow-sm space-y-6">
+              <div>
+                <h4 className="text-base font-black uppercase italic dark:text-white flex items-center gap-2">
+                  <Activity size={18} className="text-[#10b981]" />
+                  Country-wise Task Analytics & Completion Report (কান্ট্রি-ওয়াইজ পারফরম্যান্স অডিট)
+                </h4>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                  Real-time completion metrics, submission counts, and payouts categorized by user country.
+                </p>
+              </div>
+
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-white/5 text-[9px] font-black uppercase text-slate-400 tracking-wider">
+                      <th className="py-3 px-4">Country (দেশ)</th>
+                      <th className="py-3 px-4 text-center">Submissions (মোট প্রুফ)</th>
+                      <th className="py-3 px-4 text-center">Approved (অনুমোদিত)</th>
+                      <th className="py-3 px-4 text-center">Rejected (বাতিল)</th>
+                      <th className="py-3 px-4 text-center">Completion Rate</th>
+                      <th className="py-3 px-4 text-right">Total Payout</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-xs font-bold">
+                    {COUNTRIES.map((c) => {
+                      const stat = countryStatsMap[c.code] || { totalSubs: 0, approvedSubs: 0, rejectedSubs: 0, totalEarnings: 0 };
+                      if (stat.totalSubs === 0) return null; // Show active countries
+                      const rate = stat.totalSubs > 0 ? Math.round((stat.approvedSubs / stat.totalSubs) * 100) : 0;
+                      return (
+                        <tr key={c.code} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                          <td className="py-3.5 px-4 flex items-center gap-2">
+                            <span className="text-base">{c.flag}</span>
+                            <span className="dark:text-white font-extrabold">{c.name}</span>
+                            <span className="text-[9px] font-mono text-slate-400 font-bold">({c.code})</span>
+                          </td>
+                          <td className="py-3.5 px-4 text-center font-mono dark:text-white">{stat.totalSubs}</td>
+                          <td className="py-3.5 px-4 text-center font-mono text-emerald-500 font-black">{stat.approvedSubs}</td>
+                          <td className="py-3.5 px-4 text-center font-mono text-rose-500">{stat.rejectedSubs}</td>
+                          <td className="py-3.5 px-4 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <div className="w-16 bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                                <div className="bg-[#10b981] h-full rounded-full" style={{ width: `${rate}%` }}></div>
+                              </div>
+                              <span className="text-[10px] font-mono text-slate-500">{rate}%</span>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-mono text-emerald-500 font-black">৳{stat.totalEarnings.toLocaleString()}</td>
+                        </tr>
+                      );
+                    })}
+                    {Object.values(countryStatsMap).reduce((a, b) => a + b.totalSubs, 0) === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-slate-400 font-bold uppercase text-[10px]">
+                          No task submissions recorded yet. Completion report will populate when users submit task proofs.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* USER DIRECTORY TAB CONTENT */}
       {activeTab === "users" && (
@@ -13386,6 +13575,146 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   required
                 />
               </div>
+              {/* Task Availability & Country Targeting Section */}
+              <div className="p-6 bg-slate-50 dark:bg-slate-950/80 rounded-3xl border border-slate-200 dark:border-white/10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                      <Globe size={16} className="text-[#10b981]" /> 🌍 Task Availability (কান্ট্রি টার্গেটিং)
+                    </h4>
+                    <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                      এই টাস্কটি কোন কোন দেশের ইউজাররা দেখতে ও পূরণ করতে পারবে তা নির্বাচন করুন
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200/60 dark:border-white/5">
+                  <button
+                    type="button"
+                    onClick={() => setEditingTask({ ...editingTask, targetCountriesType: 'ALL' })}
+                    className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 ${
+                      (!editingTask.targetCountriesType || editingTask.targetCountriesType === 'ALL')
+                        ? "bg-[#10b981] text-white shadow-md"
+                        : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>🌐</span> All Countries
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingTask({
+                      ...editingTask,
+                      targetCountriesType: 'SELECTED',
+                      allowedCountries: (editingTask.allowedCountries && editingTask.allowedCountries.length > 0) ? editingTask.allowedCountries : ['BD']
+                    })}
+                    className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 ${
+                      editingTask.targetCountriesType === 'SELECTED'
+                        ? "bg-[#10b981] text-white shadow-md"
+                        : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>🌍</span> Selected Countries
+                  </button>
+                </div>
+
+                {editingTask.targetCountriesType === 'SELECTED' && (
+                  <div className="space-y-3 pt-2 animate-in fade-in">
+                    {/* Quick Action Presets */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[9px] font-black uppercase text-slate-400">Presets:</span>
+                      <button
+                        type="button"
+                        onClick={() => setEditingTask({ ...editingTask, allowedCountries: COUNTRIES.map(c => c.code) })}
+                        className="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-black uppercase hover:bg-[#10b981] hover:text-white transition-all"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingTask({ ...editingTask, allowedCountries: [] })}
+                        className="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-black uppercase hover:bg-rose-500 hover:text-white transition-all"
+                      >
+                        Clear All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingTask({ ...editingTask, allowedCountries: ['BD'] })}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase border border-emerald-500/20"
+                      >
+                        🇧🇩 BD Only
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingTask({ ...editingTask, allowedCountries: ['BD', 'IN', 'PK', 'NP', 'LK'] })}
+                        className="px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[9px] font-black uppercase border border-blue-500/20"
+                      >
+                        South Asia
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingTask({ ...editingTask, allowedCountries: ['US', 'CA', 'GB', 'AU'] })}
+                        className="px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[9px] font-black uppercase border border-amber-500/20"
+                      >
+                        Tier 1 (US, CA, UK, AU)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingTask({ ...editingTask, allowedCountries: ['SA', 'AE', 'QA', 'KW', 'OM', 'BH'] })}
+                        className="px-2.5 py-1 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 text-[9px] font-black uppercase border border-purple-500/20"
+                      >
+                        Middle East
+                      </button>
+                    </div>
+
+                    {/* Country Search Bar */}
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Search country name or code..."
+                        value={taskCountrySearchQuery}
+                        onChange={(e) => setTaskCountrySearchQuery(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs font-bold dark:text-white outline-none focus:border-[#10b981]"
+                      />
+                    </div>
+
+                    {/* Multi-Select Country Checklist */}
+                    <div className="max-h-48 overflow-y-auto p-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-1.5 custom-scrollbar">
+                      {COUNTRIES.filter(c => !taskCountrySearchQuery.trim() || c.name.toLowerCase().includes(taskCountrySearchQuery.toLowerCase()) || c.code.toLowerCase().includes(taskCountrySearchQuery.toLowerCase())).map(c => {
+                        const isSelected = (editingTask.allowedCountries || []).includes(c.code);
+                        return (
+                          <div
+                            key={c.code}
+                            onClick={() => {
+                              const current = editingTask.allowedCountries || [];
+                              const updated = isSelected ? current.filter(x => x !== c.code) : [...current, c.code];
+                              setEditingTask({ ...editingTask, allowedCountries: updated });
+                            }}
+                            className={`flex items-center gap-2.5 p-2 rounded-xl border text-xs font-bold cursor-pointer transition-all select-none ${
+                              isSelected
+                                ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                                : 'bg-slate-50 dark:bg-slate-800/50 border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            }`}
+                          >
+                            <div className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-black transition-all ${
+                              isSelected ? 'bg-[#10b981] text-white' : 'border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'
+                            }`}>
+                              {isSelected && '✓'}
+                            </div>
+                            <span className="text-base">{c.flag}</span>
+                            <span className="truncate flex-1">{c.name} ({c.code})</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="text-[10px] font-mono text-slate-500 text-right">
+                      Selected: <span className="text-[#10b981] font-black">{(editingTask.allowedCountries || []).length}</span> countries
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-4">
                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">
                   Execution Steps

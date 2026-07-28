@@ -19,7 +19,24 @@ export const COUNTRIES: CountryConfig[] = [
   { code: 'US', name: 'United States', flag: '🇺🇸', currency: 'USD', currencySymbol: '$', rateToBDT: 0.0085, languageCode: 'EN', languageName: 'English' },
   { code: 'SA', name: 'Saudi Arabia', flag: '🇸🇦', currency: 'SAR', currencySymbol: 'SR ', rateToBDT: 0.032, languageCode: 'AR', languageName: 'العربية' },
   { code: 'PK', name: 'Pakistan', flag: '🇵🇰', currency: 'PKR', currencySymbol: '₨', rateToBDT: 2.38, languageCode: 'UR', languageName: 'اردو' },
-  { code: 'GB', name: 'United Kingdom', flag: '🇬🇧', currency: 'GBP', currencySymbol: '£', rateToBDT: 0.0067, languageCode: 'EN', languageName: 'English' }
+  { code: 'GB', name: 'United Kingdom', flag: '🇬🇧', currency: 'GBP', currencySymbol: '£', rateToBDT: 0.0067, languageCode: 'EN', languageName: 'English' },
+  { code: 'CA', name: 'Canada', flag: '🇨🇦', currency: 'CAD', currencySymbol: 'CA$', rateToBDT: 0.011, languageCode: 'EN', languageName: 'English' },
+  { code: 'AU', name: 'Australia', flag: '🇦🇺', currency: 'AUD', currencySymbol: 'A$', rateToBDT: 0.012, languageCode: 'EN', languageName: 'English' },
+  { code: 'AE', name: 'United Arab Emirates', flag: '🇦🇪', currency: 'AED', currencySymbol: 'AED ', rateToBDT: 0.031, languageCode: 'AR', languageName: 'العربية' },
+  { code: 'MY', name: 'Malaysia', flag: '🇲🇾', currency: 'MYR', currencySymbol: 'RM ', rateToBDT: 0.039, languageCode: 'EN', languageName: 'English' },
+  { code: 'SG', name: 'Singapore', flag: '🇸🇬', currency: 'SGD', currencySymbol: 'S$', rateToBDT: 0.011, languageCode: 'EN', languageName: 'English' },
+  { code: 'NP', name: 'Nepal', flag: '🇳🇵', currency: 'NPR', currencySymbol: 'रू ', rateToBDT: 1.13, languageCode: 'EN', languageName: 'English' },
+  { code: 'LK', name: 'Sri Lanka', flag: '🇱🇰', currency: 'LKR', currencySymbol: 'Rs ', rateToBDT: 2.58, languageCode: 'EN', languageName: 'English' },
+  { code: 'QA', name: 'Qatar', flag: '🇶🇦', currency: 'QAR', currencySymbol: 'QR ', rateToBDT: 0.031, languageCode: 'AR', languageName: 'العربية' },
+  { code: 'KW', name: 'Kuwait', flag: '🇰🇼', currency: 'KWD', currencySymbol: 'KD ', rateToBDT: 0.0026, languageCode: 'AR', languageName: 'العربية' },
+  { code: 'OM', name: 'Oman', flag: '🇴🇲', currency: 'OMR', currencySymbol: 'OMR ', rateToBDT: 0.0032, languageCode: 'AR', languageName: 'العربية' },
+  { code: 'BH', name: 'Bahrain', flag: '🇧🇭', currency: 'BHD', currencySymbol: 'BD ', rateToBDT: 0.0032, languageCode: 'AR', languageName: 'العربية' },
+  { code: 'DE', name: 'Germany', flag: '🇩🇪', currency: 'EUR', currencySymbol: '€', rateToBDT: 0.0078, languageCode: 'EN', languageName: 'English' },
+  { code: 'FR', name: 'France', flag: '🇫🇷', currency: 'EUR', currencySymbol: '€', rateToBDT: 0.0078, languageCode: 'EN', languageName: 'English' },
+  { code: 'JP', name: 'Japan', flag: '🇯🇵', currency: 'JPY', currencySymbol: '¥', rateToBDT: 1.32, languageCode: 'EN', languageName: 'English' },
+  { code: 'KR', name: 'South Korea', flag: '🇰🇷', currency: 'KRW', currencySymbol: '₩', rateToBDT: 11.5, languageCode: 'EN', languageName: 'English' },
+  { code: 'BR', name: 'Brazil', flag: '🇧🇷', currency: 'BRL', currencySymbol: 'R$', rateToBDT: 0.048, languageCode: 'EN', languageName: 'English' },
+  { code: 'ZA', name: 'South Africa', flag: '🇿🇦', currency: 'ZAR', currencySymbol: 'R ', rateToBDT: 0.15, languageCode: 'EN', languageName: 'English' }
 ];
 
 export const DICTIONARY: Record<string, Record<LanguageCode, string>> = {

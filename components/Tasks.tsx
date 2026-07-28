@@ -1,11 +1,12 @@
 
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Globe } from 'lucide-react';
 import { Task, User, TaskSubmission } from '../types';
 import { ICONS } from '../constants';
 import { useNavigate } from 'react-router-dom';
 import { compressImage } from '../utils/imageCompressor';
-import { LocalizedReward } from './localization';
+import { LocalizedReward, COUNTRIES } from './localization';
 import { hapticFeedback } from '../utils/haptics';
 
 export const isTelegramTask = (task: Task): boolean => {
@@ -65,6 +66,18 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
 
   const isVerified = user.status === 'Verified' || user.role === 'admin';
   const deviceId = getOrInitializeDeviceId();
+  const userCountryCode = (user.countryCode || (user as any).country || selectedCountryCode || 'BD').trim().toUpperCase();
+
+  const isTaskAvailableInCountry = (task: Task): boolean => {
+    if (!task.targetCountriesType || task.targetCountriesType === 'ALL') {
+      return true;
+    }
+    if (task.targetCountriesType === 'SELECTED') {
+      if (!task.allowedCountries || task.allowedCountries.length === 0) return true;
+      return task.allowedCountries.some(code => code.trim().toUpperCase() === userCountryCode);
+    }
+    return true;
+  };
 
   const safeSubmissions = submissions || [];
   const baseTasks = tasks.filter(t => {
@@ -104,6 +117,13 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
   }
 
   const handleLaunchTask = (task: Task) => {
+    const isCountryAllowed = isTaskAvailableInCountry(task);
+    if (!isCountryAllowed) {
+      hapticFeedback.warning();
+      notify(`এই টাস্কটি আপনার দেশে (${userCountryCode}) উপলব্ধ নয়। (This task is not available in your country)`);
+      return;
+    }
+
     const isTelegram = isTelegramTask(task);
 
     if (isTelegram && !user.isTelegramVerified) {
@@ -154,6 +174,11 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
 
   const handleSubmit = () => {
     if (!selectedTask) return;
+    if (!isTaskAvailableInCountry(selectedTask)) {
+      hapticFeedback.warning();
+      notify(`এই টাস্কটি আপনার দেশে (${userCountryCode}) উপলব্ধ নয়।`);
+      return;
+    }
     if (completedSteps.length < selectedTask.instructions.length) {
       hapticFeedback.warning();
       notify("সবগুলো নির্দেশাবলী সম্পন্ন করুন।");
@@ -185,6 +210,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
         submittedAt: new Date().toLocaleString(),
         securityHash: securityHash,
         clientIp: user.ip,
+        countryCode: userCountryCode,
         telegramIdUsed: selectedTask.type === 'Telegram' ? user.telegramId : undefined,
         deviceFingerprint: deviceId
       };
@@ -251,24 +277,36 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {availableTasks.map(task => {
           const isTelegramLocked = isTelegramTask(task) && !user.isTelegramVerified;
+          const isCountryAllowed = isTaskAvailableInCountry(task);
+
           return (
             <div 
               key={task.id} 
               className={`bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl border-2 transition-all duration-300 hover:-translate-y-1 flex flex-col h-full min-h-[340px] relative overflow-hidden ${
-                isTelegramLocked 
+                !isCountryAllowed
+                  ? 'border-rose-500/40 bg-slate-900/90'
+                  : isTelegramLocked 
                   ? 'border-blue-500/50 bg-slate-900' 
                   : 'border-white/10 hover:border-emerald-500/50'
               }`}
             >
-              {isTelegramLocked && (
-                <div className="absolute top-4 right-4 bg-blue-600 text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-md border border-blue-400">
+              {!isCountryAllowed && (
+                <div className="absolute top-4 right-4 bg-rose-600 text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-md border border-rose-400 z-10">
+                  <Globe size={12} className="animate-pulse" /> UNAVAILABLE IN {userCountryCode}
+                </div>
+              )}
+
+              {isCountryAllowed && isTelegramLocked && (
+                <div className="absolute top-4 right-4 bg-blue-600 text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-md border border-blue-400 z-10">
                   <ICONS.Lock size={12} className="animate-pulse" /> TELEGRAM LOCKED
                 </div>
               )}
 
               <div className="flex justify-between items-start mb-8">
                 <div className={`p-4 rounded-2xl shadow-inner border border-white/10 ${
-                  isTelegramLocked 
+                  !isCountryAllowed
+                    ? 'bg-rose-950/60 text-rose-400 border-rose-500/30'
+                    : isTelegramLocked 
                     ? 'bg-blue-950 text-blue-400 border-blue-500/40' 
                     : task.type === 'Watch & Earn' 
                       ? 'bg-rose-950 text-rose-400 border-rose-500/40' 
@@ -290,7 +328,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
                   )}
                 </div>
                 <div className="text-right flex flex-col items-end justify-center">
-                  <LocalizedReward bdtAmount={task.reward} countryCode={selectedCountryCode} className="flex flex-col items-end" textClassName={`text-2xl font-black italic tracking-tighter leading-none ${isTelegramLocked ? 'text-blue-400' : 'text-[#10b981]'}`} usdClassName="text-xs font-black text-emerald-300 mt-1 uppercase tracking-wider" />
+                  <LocalizedReward bdtAmount={task.reward} countryCode={selectedCountryCode} className="flex flex-col items-end" textClassName={`text-2xl font-black italic tracking-tighter leading-none ${!isCountryAllowed ? 'text-slate-500' : isTelegramLocked ? 'text-blue-400' : 'text-[#10b981]'}`} usdClassName="text-xs font-black text-emerald-300 mt-1 uppercase tracking-wider" />
                   <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] mt-1 italic">Reward</p>
                 </div>
               </div>
@@ -304,7 +342,14 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
                 {task.description}
               </p>
 
-              {isTelegramLocked && (
+              {!isCountryAllowed && (
+                <div className="mb-4 p-3.5 bg-rose-950/80 border border-rose-500/40 rounded-2xl text-xs font-bold text-rose-300 uppercase tracking-wide leading-relaxed text-left flex items-start gap-2">
+                  <span className="flex-shrink-0 text-base">🌐</span>
+                  <span>এই টাস্কটি আপনার দেশে ({userCountryCode}) উপলব্ধ নয়। (This task is not available in your country.)</span>
+                </div>
+              )}
+
+              {isCountryAllowed && isTelegramLocked && (
                 <div className="mb-4 p-3.5 bg-blue-950/80 border border-blue-500/40 rounded-2xl text-xs font-bold text-blue-300 uppercase tracking-wide leading-relaxed text-left flex items-start gap-2">
                   <span className="flex-shrink-0 text-base">🔒</span>
                   <span>টেলিগ্রাম ভেরিফিকেশন করা নেই! টাস্কটি সম্পন্ন করতে প্রথমে আপনার টেলিগ্রাম অ্যাকাউন্ট ভেরিফাই করুন।</span>
@@ -313,15 +358,20 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
 
               <button 
                 onClick={() => handleLaunchTask(task)} 
+                disabled={!isCountryAllowed}
                 className={`w-full font-black py-4.5 rounded-2xl shadow-2xl uppercase text-xs tracking-[0.15em] active:scale-95 transition-all cursor-pointer ${
-                  isTelegramLocked 
+                  !isCountryAllowed
+                    ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-75'
+                    : isTelegramLocked 
                     ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/30' 
                     : !isVerified 
                       ? 'bg-amber-500 hover:bg-amber-400 text-slate-950' 
                       : 'bg-[#10b981] hover:bg-emerald-400 text-slate-950 shadow-emerald-500/30'
                 }`}
               >
-                {isTelegramLocked 
+                {!isCountryAllowed
+                  ? 'Unavailable in Your Country'
+                  : isTelegramLocked 
                   ? 'Verify Telegram to Unlock' 
                   : !isVerified 
                     ? 'Upgrade to Unlock' 
@@ -351,6 +401,17 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
             </div>
 
             <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+              {!isTaskAvailableInCountry(selectedTask) && (
+                <div className="bg-rose-500/10 p-5 rounded-3xl border border-rose-500/30 space-y-2 text-left">
+                  <div className="flex items-center gap-2 text-rose-500 font-black text-xs uppercase tracking-wider">
+                    <Globe size={16} /> 🚫 Country Restriction Active
+                  </div>
+                  <p className="text-xs font-bold text-rose-600 dark:text-rose-300 leading-relaxed uppercase">
+                    এই টাস্কটি আপনার দেশে ({userCountryCode}) সাবমিট করা অনুমোদিত নয়। আপনি শুধুমাত্র আপনার জন্য নির্ধারিত অনুমোদিত দেশের টাস্ক সাবমিট করতে পারবেন।
+                  </p>
+                </div>
+              )}
+
               <div className="bg-emerald-500/5 p-4 rounded-2xl border border-emerald-500/10 flex items-center gap-3">
                  <ICONS.Shield size={16} className="text-emerald-500" />
                  <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest italic">FRAUD PROTECTION: This session is encrypted.</span>
@@ -439,8 +500,22 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
             </div>
 
             <div className="p-8 bg-slate-50 dark:bg-slate-800 border-t border-slate-100 dark:border-white/5">
-               <button onClick={handleSubmit} disabled={isSubmitting} className="w-full bg-[#10b981] text-white font-black py-5 rounded-[1.8rem] shadow-2xl shadow-emerald-500/30 uppercase text-[11px] tracking-[0.3em] flex items-center justify-center gap-3 active:scale-95 transition-all">
-                 {isSubmitting ? <div className="w-5 h-5 border-3 border-white/20 border-t-white rounded-full animate-spin"></div> : <><ICONS.Zap size={20} /> Submit Proof</>}
+               <button 
+                 onClick={handleSubmit} 
+                 disabled={isSubmitting || !isTaskAvailableInCountry(selectedTask)} 
+                 className={`w-full font-black py-5 rounded-[1.8rem] uppercase text-[11px] tracking-[0.3em] flex items-center justify-center gap-3 active:scale-95 transition-all ${
+                   !isTaskAvailableInCountry(selectedTask)
+                     ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 cursor-not-allowed shadow-none'
+                     : 'bg-[#10b981] text-white shadow-2xl shadow-emerald-500/30'
+                 }`}
+               >
+                 {isSubmitting ? (
+                   <div className="w-5 h-5 border-3 border-white/20 border-t-white rounded-full animate-spin"></div>
+                 ) : !isTaskAvailableInCountry(selectedTask) ? (
+                   <>🚫 Unavailable in Your Country</>
+                 ) : (
+                   <><ICONS.Zap size={20} /> Submit Proof</>
+                 )}
                </button>
             </div>
           </div>
