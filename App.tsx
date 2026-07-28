@@ -411,9 +411,9 @@ const App: React.FC = () => {
     async function loadCPAData() {
       const fetchSafe = async (url: string) => {
         try {
-          const res = await fetch(url);
-          if (res.ok) {
-            return await res.json();
+          const res = await safeApiFetch(url);
+          if (res.ok && res.data) {
+            return res.data;
           }
         } catch {
           // Gracefully fallback to localStorage/default state

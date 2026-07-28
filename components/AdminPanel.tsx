@@ -9680,16 +9680,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                       ...prev,
                                       [req.id]: "loading",
                                     }));
-                                    fetch(
+                                    safeApiFetch(
                                       `/api/telegram/check-join?userId=${req.telegramId}`,
                                     )
-                                      .then(async (r) => {
-                                        const data = await r.json();
-                                        if (!r.ok)
+                                      .then((res) => {
+                                        if (!res.ok)
                                           throw new Error(
-                                            data.error || "Not joined",
+                                            res.error || "Not joined",
                                           );
-                                        return data;
+                                        return res.data;
                                       })
                                       .then(() => {
                                         setCheckingSubs((prev) => ({
@@ -9922,16 +9921,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                   ...prev,
                                   [req.id]: "loading",
                                 }));
-                                fetch(
+                                safeApiFetch(
                                   `/api/telegram/check-join?userId=${req.telegramId}`,
                                 )
-                                  .then(async (r) => {
-                                    const data = await r.json();
-                                    if (!r.ok)
+                                  .then((res) => {
+                                    if (!res.ok)
                                       throw new Error(
-                                        data.error || "Not joined",
+                                        res.error || "Not joined",
                                       );
-                                    return data;
+                                    return res.data;
                                   })
                                   .then(() => {
                                     setCheckingSubs((prev) => ({

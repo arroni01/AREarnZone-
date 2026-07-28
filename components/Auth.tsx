@@ -663,10 +663,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       const safeOrigin = getOriginSafe();
       const fetchUrl = getApiUrl(`/api/auth/google/url?origin=${encodeURIComponent(safeOrigin || '')}`);
       
-      fetch(fetchUrl)
+      safeApiFetch(`/api/auth/google/url?origin=${encodeURIComponent(safeOrigin || '')}`)
         .then(res => {
-          if (!res.ok) throw new Error(`HTTP status ${res.status}`);
-          return res.json();
+          if (!res.ok || !res.data) throw new Error(`Status ${res.status}`);
+          return res.data;
         })
         .then(data => {
           if (data && data.redirectUri) {
@@ -1093,12 +1093,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       
       let authUrl = '';
       try {
-        const res = await fetch(fetchUrl);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.url) {
-            authUrl = data.url;
-          }
+        const res = await safeApiFetch(`/api/auth/google/url?origin=${encodeURIComponent(origin || '')}`);
+        if (res.ok && res.data?.url) {
+          authUrl = res.data.url;
         }
       } catch (fetchErr) {
         console.warn("[Google Auth] Could not retrieve server-side OAuth URL:", fetchErr);
