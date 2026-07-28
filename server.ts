@@ -675,7 +675,7 @@ async function startServer() {
         "https://www.googleapis.com/auth/userinfo.profile",
         "https://www.googleapis.com/auth/userinfo.email"
       ],
-      prompt: "consent",
+      prompt: "select_account consent",
       state: encodedState
     });
 
