@@ -23,6 +23,7 @@ import {
   Check
 } from "lucide-react";
 import { analyzeFeatureImpact, AREARNZONE_SYSTEM_MODULES, ImpactAnalysisResult } from "../utils/impactAnalysis";
+import { getApiUrl } from "../src/utils/apiConfig";
 
 export interface TestCaseResult {
   id: string;
@@ -83,7 +84,7 @@ export const RegressionTestDashboard: React.FC<RegressionTestDashboardProps> = (
   const runSuite = async () => {
     setIsRunning(true);
     try {
-      const res = await fetch("/api/regression-test");
+      const res = await fetch(getApiUrl("/api/regression-test"));
       if (res.ok) {
         const data: RegressionSuiteReport = await res.json();
         setReport(data);
@@ -108,7 +109,7 @@ export const RegressionTestDashboard: React.FC<RegressionTestDashboardProps> = (
   const runProductionDiagnostics = async () => {
     setIsVerifyingIntegrations(true);
     try {
-      const res = await fetch("/api/admin/production-integration-verify");
+      const res = await fetch(getApiUrl("/api/admin/production-integration-verify"));
       if (res.ok) {
         const data: ProductionDiagnosticsReport = await res.json();
         setProdReport(data);

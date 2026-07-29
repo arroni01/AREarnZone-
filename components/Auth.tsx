@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { User } from '../types';
+import { getApiUrl } from '../src/utils/apiConfig';
 import { ICONS } from '../constants';
 import { auth } from '../firebase';
 import { GoogleAuthProvider, signInWithPopup, signInWithCredential } from 'firebase/auth';
@@ -606,12 +607,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     let liveUri = "https://arearnzone-asia-no1-freelance.web.app/api/auth/callback/google";
     
     return { devUri, preUri, liveUri };
-  };
-
-  const getApiUrl = (endpoint: string): string => {
-    const origin = getOriginSafe().replace(/\/$/, "");
-    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    return origin && origin !== 'null' ? `${origin}${cleanEndpoint}` : cleanEndpoint;
   };
 
   const isCurrentlyInApp = (): boolean => {

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { User, Task, Transaction, TaskSubmission, ReferralTarget, TargetHistory } from '../types';
+import { getApiUrl } from '../src/utils/apiConfig';
 import { ICONS } from '../constants';
 import { Crown, Trophy, Medal, Sparkles, ArrowUpRight, RefreshCw } from 'lucide-react';
 import { LocalizedReward, convertCurrency } from './localization';
@@ -510,7 +511,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
 
     if (isUpgraded && user.email) {
-      fetch("/api/email/notify", {
+      fetch(getApiUrl("/api/email/notify"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

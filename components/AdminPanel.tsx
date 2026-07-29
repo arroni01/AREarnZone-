@@ -28,6 +28,7 @@ import {
   CPATransaction,
 } from "../types";
 import { ICONS } from "../constants";
+import { getApiUrl } from "../src/utils/apiConfig";
 import MonitorDashboard from "./MonitorDashboard";
 import CPAControlCenter from "./CPAControlCenter";
 import RegressionTestDashboard from "./RegressionTestDashboard";
@@ -1589,7 +1590,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const fetchEmailCounters = async () => {
     try {
-      const res = await fetch("/api/admin/email-counters");
+      const res = await fetch(getApiUrl("/api/admin/email-counters"));
       if (res.ok) {
         const data = await res.json();
         setEmailCounters(data);
@@ -1615,14 +1616,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   "[SMTP Cache] Connection/configs lost. Restoring SMTP list in background...",
                 );
                 // Save the whole list using bulk save API
-                await fetch("/api/admin/save-smtp-list", {
+                await fetch(getApiUrl("/api/admin/save-smtp-list"), {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ smtpList: cachedSmtps }),
                 });
                 console.log("[SMTP Cache] SMTP configurations successfully restored!");
                 // Trigger a refresh after background restoration
-                const refreshedRes = await fetch("/api/admin/email-counters");
+                const refreshedRes = await fetch(getApiUrl("/api/admin/email-counters"));
                 if (refreshedRes.ok) {
                   const refreshedData = await refreshedRes.json();
                   setEmailCounters(refreshedData);
@@ -1647,7 +1648,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleResetCounters = async () => {
     try {
-      const res = await fetch("/api/admin/email-counters/reset", {
+      const res = await fetch(getApiUrl("/api/admin/email-counters/reset"), {
         method: "POST",
       });
       const data = await res.json();
@@ -1665,7 +1666,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const fetchTelegramConfig = async () => {
     try {
-      const res = await fetch("/api/telegram/config");
+      const res = await fetch(getApiUrl("/api/telegram/config"));
       if (res.ok) {
         const data = await res.json();
         setTgBotUsername(data.botUsername || "@AREarnZone_bot");
@@ -1687,7 +1688,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             console.log(
               "[Telegram Bot Cache] Ephemeral connection lost. Restoring bot from globalConfig in background...",
             );
-            await fetch("/api/telegram/save-config", {
+            await fetch(getApiUrl("/api/telegram/save-config"), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -1712,7 +1713,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 console.log(
                   "[Telegram Bot Cache] Ephemeral connection lost. Restoring bot in background...",
                 );
-                await fetch("/api/telegram/save-config", {
+                await fetch(getApiUrl("/api/telegram/save-config"), {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -1765,7 +1766,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         : "টেলিগ্রাম বট টোকেন কানেক্ট ও টেস্ট করা হচ্ছে...",
     );
     try {
-      const res = await fetch("/api/telegram/save-config", {
+      const res = await fetch(getApiUrl("/api/telegram/save-config"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1866,7 +1867,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     }
     setIsAddingSmtp(true);
     try {
-      const res = await fetch("/api/admin/add-smtp", {
+      const res = await fetch(getApiUrl("/api/admin/add-smtp"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1923,7 +1924,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleDeleteSmtp = async (userEmail: string) => {
     if (!window.confirm(`${userEmail} কনফিগারেশনটি মুছে ফেলতে চান?`)) return;
     try {
-      const res = await fetch("/api/admin/delete-smtp", {
+      const res = await fetch(getApiUrl("/api/admin/delete-smtp"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user: userEmail }),
@@ -1969,7 +1970,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         : "Testing active Gmail SMTP credentials...",
     );
     try {
-      const res = await fetch("/api/admin/test-smtp", {
+      const res = await fetch(getApiUrl("/api/admin/test-smtp"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2015,7 +2016,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
     setIsVerifyingCleanupPassword(true);
     try {
-      const res = await fetch("/api/admin/verify-app-password", {
+      const res = await fetch(getApiUrl("/api/admin/verify-app-password"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ appPassword: cleanupAppPassword }),
@@ -9726,7 +9727,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                       [req.id]: "loading",
                                     }));
                                     fetch(
-                                      `/api/telegram/check-join?userId=${req.telegramId}`,
+                                      getApiUrl(`/api/telegram/check-join?userId=${req.telegramId}`),
                                     )
                                       .then(async (r) => {
                                         const data = await r.json();
@@ -9968,7 +9969,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                   [req.id]: "loading",
                                 }));
                                 fetch(
-                                  `/api/telegram/check-join?userId=${req.telegramId}`,
+                                  getApiUrl(`/api/telegram/check-join?userId=${req.telegramId}`),
                                 )
                                   .then(async (r) => {
                                     const data = await r.json();

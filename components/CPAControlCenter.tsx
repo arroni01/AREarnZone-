@@ -26,6 +26,7 @@ import {
   Calendar
 } from "lucide-react";
 import { CPANetwork, CPAConversion, CPATransaction, Task, User } from "../types";
+import { getApiUrl } from "../src/utils/apiConfig";
 import { compressImage } from "../utils/imageCompressor";
 
 interface CPAControlCenterProps {
@@ -101,7 +102,7 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
   // Fetch CPA Analytics
   const fetchAnalytics = async () => {
     try {
-      const res = await fetch("/api/cpa/analytics");
+      const res = await fetch(getApiUrl("/api/cpa/analytics"));
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
@@ -190,7 +191,7 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
     setTestingConnection(true);
     setTestResult(null);
     try {
-      const res = await fetch("/api/cpa/test-connection", {
+      const res = await fetch(getApiUrl("/api/cpa/test-connection"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -219,7 +220,7 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
   const handleTestNetworkConnection = async (network: CPANetwork) => {
     setTestingNetworkId(network.id);
     try {
-      const res = await fetch("/api/cpa/test-connection", {
+      const res = await fetch(getApiUrl("/api/cpa/test-connection"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -259,7 +260,7 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
 
     setLoading(true);
     try {
-      const res = await fetch("/api/cpa/networks", {
+      const res = await fetch(getApiUrl("/api/cpa/networks"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
@@ -284,7 +285,7 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
     if (!window.confirm(`Are you sure you want to delete CPA Network "${name}"?`)) return;
 
     try {
-      const res = await fetch(`/api/cpa/networks/${id}`, { method: "DELETE" });
+      const res = await fetch(getApiUrl(`/api/cpa/networks/${id}`), { method: "DELETE" });
       const data = await res.json();
       if (data.success) {
         setCpaNetworks(data.networks);
@@ -309,7 +310,7 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
   const handleConversionAction = async (conversionId: string, action: "approve" | "reject", reason?: string) => {
     setLoading(true);
     try {
-      const res = await fetch("/api/cpa/conversions/action", {
+      const res = await fetch(getApiUrl("/api/cpa/conversions/action"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

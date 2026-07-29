@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { User, Transaction, MembershipPlan, ReferralTarget, TargetHistory } from '../types';
+import { getApiUrl } from '../src/utils/apiConfig';
 import { ICONS } from '../constants';
 import { LocalizedReward, convertCurrency } from './localization';
 import { ReferralAnalytics } from './ReferralAnalytics';
@@ -237,7 +238,7 @@ const Referral: React.FC<ReferralProps> = ({
     }
 
     if (isUpgraded && user.email) {
-      fetch("/api/email/notify", {
+      fetch(getApiUrl("/api/email/notify"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

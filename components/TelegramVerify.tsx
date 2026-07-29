@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { User, TelegramVerificationRequest, Task, TaskSubmission } from '../types';
 import { ICONS } from '../constants';
 import { compressImage } from '../utils/imageCompressor';
+import { getApiUrl } from '../src/utils/apiConfig';
 
 export const isTelegramTask = (task: Task): boolean => {
   if (!task) return false;
@@ -169,7 +170,7 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
 
   // Load backend Telegram configuration dynamically
   React.useEffect(() => {
-    fetch('/api/telegram/config')
+    fetch(getApiUrl('/api/telegram/config'))
       .then(r => {
         if (!r.ok) throw new Error("HTTP error " + r.status);
         return r.json();
@@ -198,7 +199,7 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
   const handleVerifyBotConnection = () => {
     if (!verificationCode) return;
     setIsCheckingBot(true);
-    fetch(`/api/telegram/check-code?code=${verificationCode}`)
+    fetch(getApiUrl(`/api/telegram/check-code?code=${verificationCode}`))
       .then(r => {
         if (!r.ok) throw new Error("HTTP error " + r.status);
         return r.json();
@@ -230,7 +231,7 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
       return;
     }
     setIsCheckingChannel(true);
-    fetch(`/api/telegram/check-join?userId=${telegramId}`)
+    fetch(getApiUrl(`/api/telegram/check-join?userId=${telegramId}`))
       .then(async r => {
         const data = await r.json();
         if (!r.ok) {
@@ -266,7 +267,7 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
     const code = 'AREZ-' + Math.floor(100000 + Math.random() * 900000);
     setVerificationCode(code);
 
-    fetch('/api/telegram/register-code', {
+    fetch(getApiUrl('/api/telegram/register-code'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
