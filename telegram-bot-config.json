@@ -1,5 +1,5 @@
 {
-  "token": "",
+  "token": "123456789:ABCdefGHIjklMNOpqrsTUVwxyz123456789",
   "username": "@AREarnZone_bot",
   "channel": "https://t.me/arearnzone",
   "smtpList": [
@@ -13,5 +13,6 @@
       "pass": "Iwnbipzmpgtvpekg",
       "limit": 500
     }
-  ]
+  ],
+  "tokenSource": "telegram-bot-config.json"
 }
