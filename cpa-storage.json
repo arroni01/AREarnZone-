@@ -1,0 +1,86 @@
+{
+  "networks": [
+    {
+      "id": "cpalead",
+      "name": "CPAlead",
+      "logoUrl": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&auto=format&fit=crop&q=80",
+      "status": "Active",
+      "postbackUrl": "/api/cpa/postback?network=cpalead&subid={subid}&offer_id={offer_id}&payout={payout}",
+      "apiKey": "",
+      "secretKey": "",
+      "offerApiUrl": "https://cpalead.com/dashboard/reports/campaign_api.php",
+      "currency": "USD",
+      "autoApprove": false,
+      "description": "Global CPA network supporting mobile apps and surveys",
+      "createdAt": "2026-07-29T11:12:42.585Z"
+    },
+    {
+      "id": "cpagrip",
+      "name": "CPAGrip",
+      "logoUrl": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&auto=format&fit=crop&q=80",
+      "status": "Active",
+      "postbackUrl": "/api/cpa/postback?network=cpagrip&subid={subid}&offer_id={offer_id}&payout={payout}",
+      "apiKey": "",
+      "secretKey": "",
+      "offerApiUrl": "https://www.cpagrip.com/common/offer_feed_json.php",
+      "currency": "USD",
+      "autoApprove": false,
+      "description": "High-payout CPA and content locking network",
+      "createdAt": "2026-07-29T11:12:42.585Z"
+    },
+    {
+      "id": "adgate",
+      "name": "AdGate",
+      "logoUrl": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&auto=format&fit=crop&q=80",
+      "status": "Active",
+      "postbackUrl": "/api/cpa/postback?network=adgate&subid={subid}&offer_id={offer_id}&payout={payout}",
+      "apiKey": "",
+      "secretKey": "",
+      "offerApiUrl": "https://wall.adgatemedia.com/api/v1/vc/",
+      "currency": "USD",
+      "autoApprove": true,
+      "description": "Premium offerwall and mobile app install network",
+      "createdAt": "2026-07-29T11:12:42.585Z"
+    },
+    {
+      "id": "offertoro",
+      "name": "OfferToro",
+      "logoUrl": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&auto=format&fit=crop&q=80",
+      "status": "Active",
+      "postbackUrl": "/api/cpa/postback?network=offertoro&subid={subid}&offer_id={offer_id}&payout={payout}",
+      "apiKey": "",
+      "secretKey": "",
+      "offerApiUrl": "https://www.offertoro.com/api/v2/offers",
+      "currency": "USD",
+      "autoApprove": true,
+      "description": "Global offerwall providing web and app tasks",
+      "createdAt": "2026-07-29T11:12:42.585Z"
+    }
+  ],
+  "conversions": [
+    {
+      "id": "CPACONV-1785324327282-706",
+      "userId": "regression_user_01",
+      "userUid": "regression_user_01",
+      "userName": "User (regression_user_01)",
+      "taskId": "OFFER_REG_101",
+      "taskTitle": "CPA Offer #OFFER_REG_101",
+      "offerId": "OFFER_REG_101",
+      "networkId": "cpalead",
+      "cpaNetworkId": "cpalead",
+      "networkName": "CPAlead",
+      "cpaNetworkName": "CPAlead",
+      "reward": 2.5,
+      "revenue": 2.5,
+      "country": "US",
+      "status": "pending",
+      "cpaConfirmed": true,
+      "walletStatus": "Pending",
+      "autoApproved": false,
+      "conversionTime": "2026-07-29T11:25:27.282Z",
+      "clickId": "CLK-1785324327281",
+      "ip": "127.0.0.1"
+    }
+  ],
+  "transactions": []
+}

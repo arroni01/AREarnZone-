@@ -30,6 +30,7 @@ import {
 import { ICONS } from "../constants";
 import MonitorDashboard from "./MonitorDashboard";
 import CPAControlCenter from "./CPAControlCenter";
+import RegressionTestDashboard from "./RegressionTestDashboard";
 import { getErrors, clearErrors, trackError } from "../utils/errorTracker";
 import type { SystemErrorLog } from "../utils/errorTracker";
 import { getActiveStatus } from "./statusUtils";
@@ -174,6 +175,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     | "targets"
     | "welcome"
     | "cpa_control"
+    | "regression_test"
   >("cpa_control");
   const [approvalSubTab, setApprovalSubTab] = useState<
     "membership" | "tasks" | "deposit" | "cpa"
@@ -3078,6 +3080,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             badge={aiMetrics.healthScore < 100 ? "AI" : undefined}
           />
         )}
+        {!isMonitor && (
+          <AdminTab
+            active={activeTab === "regression_test"}
+            onClick={() => setActiveTab("regression_test")}
+            label="REGRESSION TESTER"
+            icon={<ShieldCheck className="text-emerald-500" size={14} />}
+          />
+        )}
 
         {(!isMonitor ||
           permissions.canApproveMembership ||
@@ -3208,6 +3218,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           notify={notify}
           currentUser={currentUser}
         />
+      )}
+
+      {/* REGRESSION TESTER TAB CONTENT */}
+      {activeTab === "regression_test" && (
+        <RegressionTestDashboard notify={notify} />
       )}
 
       {/* WELCOME SCREEN MANAGEMENT TAB CONTENT */}

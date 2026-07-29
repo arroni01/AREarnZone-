@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import path from "path";
 import nodemailer from "nodemailer";
 import fs from "fs";
+import { runAllRegressionTests } from "./scripts/runRegressionTests.js";
 
 // Storage and Local DB File Constants
 const STORAGE_FILE = path.join(process.cwd(), "telegram-bot-storage.json");
@@ -815,6 +816,18 @@ async function startServer() {
     emailStats.gmailCount = 0;
     emailStats.smtpCounts = {};
     res.json({ success: true, message: "Counters reset successful." });
+  });
+
+  // API 6.1: Automated Non-Breaking Regression Test Endpoint
+  app.get("/api/regression-test", async (req, res) => {
+    try {
+      const baseUrl = getRequestOrigin(req);
+      const report = await runAllRegressionTests(baseUrl);
+      res.json(report);
+    } catch (err: any) {
+      console.error("[Regression Test API Error]:", err);
+      res.status(500).json({ error: "Failed to execute regression test suite: " + err.message });
+    }
   });
 
   // API 6.5: Save SMTP list (AdminPanel)
