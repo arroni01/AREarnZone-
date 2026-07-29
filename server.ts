@@ -44,19 +44,37 @@ function getTelegramConfig() {
     channel: "https://t.me/arearnzone",
     smtpList: []
   };
+  let source = "none";
   try {
     if (fs.existsSync(CONFIG_FILE)) {
-      config = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
+      const fileConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
+      config = { ...config, ...fileConfig };
+      if (fileConfig.token && typeof fileConfig.token === "string" && fileConfig.token.trim()) {
+        source = "telegram-bot-config.json";
+      }
     }
   } catch (e) {}
 
   // Use environment variables ONLY if config.token in file is empty/missing
   if (!config.token || !config.token.trim()) {
     const envToken = process.env.TELEGRAM_BOT_TOKEN || process.env.VITE_TELEGRAM_BOT_TOKEN;
-    if (envToken && envToken.trim()) {
+    if (envToken && envToken.trim() && !envToken.includes("8008225715:AAEcA2qivE4QE_55Za_GyUd7f31B0s-4FgE")) {
       config.token = envToken.trim();
+      source = process.env.TELEGRAM_BOT_TOKEN ? "process.env.TELEGRAM_BOT_TOKEN" : "process.env.VITE_TELEGRAM_BOT_TOKEN";
     }
   }
+
+  // Sanitize token (strip accidental URL or "bot" prefix)
+  if (config.token && typeof config.token === "string") {
+    config.token = config.token
+      .trim()
+      .replace(/^(https?:\/\/)?(api\.telegram\.org\/)?(bot)?/i, "")
+      .replace(/[:.\s]+$/, "")
+      .replace(/^[:.\s]+/, "")
+      .trim();
+  }
+
+  config.tokenSource = source;
   return config;
 }
 
@@ -2131,6 +2149,7 @@ async function startServer() {
         configChannel: config.channel,
         tokenLength: token.length,
         tokenMasked: maskedToken,
+        tokenSource: config.tokenSource,
         envTokenPresent: !!process.env.TELEGRAM_BOT_TOKEN
       });
     } catch (err: any) {
