@@ -4,9 +4,8 @@ import { motion } from 'motion/react';
 import { User } from '../types';
 import { ICONS } from '../constants';
 import { auth } from '../firebase';
-import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithCredential } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInWithCredential } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
-import { safeApiFetch, getApiUrl as resolveApiUrl } from '../utils/apiClient';
 
 interface AuthProps {
   onLogin: (user: User, referralUsed?: string) => void;
@@ -610,7 +609,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
   };
 
   const getApiUrl = (endpoint: string): string => {
-    return resolveApiUrl(endpoint);
+    const origin = getOriginSafe().replace(/\/$/, "");
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    return origin && origin !== 'null' ? `${origin}${cleanEndpoint}` : cleanEndpoint;
   };
 
   const isCurrentlyInApp = (): boolean => {
@@ -663,10 +664,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       const safeOrigin = getOriginSafe();
       const fetchUrl = getApiUrl(`/api/auth/google/url?origin=${encodeURIComponent(safeOrigin || '')}`);
       
-      safeApiFetch(`/api/auth/google/url?origin=${encodeURIComponent(safeOrigin || '')}`)
+      fetch(fetchUrl)
         .then(res => {
-          if (!res.ok || !res.data) throw new Error(`Status ${res.status}`);
-          return res.data;
+          if (!res.ok) throw new Error(`HTTP status ${res.status}`);
+          return res.json();
         })
         .then(data => {
           if (data && data.redirectUri) {
@@ -880,16 +881,17 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     }
 
     try {
-      const res = await safeApiFetch('/api/auth/send-otp', {
+      const res = await fetch(getApiUrl('/api/auth/send-otp'), {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, name }),
       });
+      const data = await res.json();
       
       if (!res.ok) {
-        throw new Error(res.error || res.data?.error || 'Failed to send verification email. Please try again.');
+        throw new Error(data.error || 'Failed to send verification email. Please try again.');
       }
 
-      const data = res.data;
       setView('verify');
       setIsLoading(false);
       
@@ -900,7 +902,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       setCooldownSeconds(30 * 60);
       
       setOtp(['', '', '', '', '', '']);
-      notify(data?.message || "ভেরিফিকেশন কোড পাঠানো হয়েছে।");
+      notify(data.message || "ভেরিফিকেশন কোড পাঠানো হয়েছে।");
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Verification email dynamically failed. Try again.');
@@ -919,16 +921,16 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     setFallbackNotice('');
 
     try {
-      const res = await safeApiFetch('/api/auth/send-otp', {
+      const res = await fetch(getApiUrl('/api/auth/send-otp'), {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, name }),
       });
+      const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(res.error || res.data?.error || 'Failed to send verification email.');
+        throw new Error(data.error || 'Failed to send verification email.');
       }
-
-      const data = res.data;
 
       // Start 30-min Cooldown on Success
       const targetEmail = email.toLowerCase().trim();
@@ -970,89 +972,12 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       }
     };
 
-    // Storage listener for cross-tab or popup completion
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'arez_google_auth_event' && e.newValue) {
-        try {
-          const data = JSON.parse(e.newValue);
-          if (data?.type === 'GOOGLE_AUTH_SUCCESS' && data?.user) {
-            localStorage.removeItem('arez_google_auth_event');
-            handleGoogleAuthSuccess(data.user);
-          }
-        } catch (err) {}
-      }
-    };
-
-    // Check stored event on visibility change / focus
-    const checkStoredAuth = () => {
-      try {
-        const item = localStorage.getItem('arez_google_auth_event');
-        if (item) {
-          const data = JSON.parse(item);
-          if (data?.type === 'GOOGLE_AUTH_SUCCESS' && data?.user) {
-            localStorage.removeItem('arez_google_auth_event');
-            handleGoogleAuthSuccess(data.user);
-          }
-        }
-      } catch (err) {}
-    };
-
     window.addEventListener('message', handleMessage);
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('focus', checkStoredAuth);
-    document.addEventListener('visibilitychange', checkStoredAuth);
-
-    // BroadcastChannel listener
-    let bc: BroadcastChannel | null = null;
-    try {
-      if (typeof BroadcastChannel !== 'undefined') {
-        bc = new BroadcastChannel('arez_google_auth');
-        bc.onmessage = (event) => {
-          if (event.data?.type === 'GOOGLE_AUTH_SUCCESS' && event.data?.user) {
-            handleGoogleAuthSuccess(event.data.user);
-          }
-        };
-      }
-    } catch (e) {}
-
-    checkStoredAuth();
-
-    return () => {
-      window.removeEventListener('message', handleMessage);
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('focus', checkStoredAuth);
-      document.removeEventListener('visibilitychange', checkStoredAuth);
-      if (bc) bc.close();
-    };
+    return () => window.removeEventListener('message', handleMessage);
   }, [users]);
 
-  // Check URL hash or Firebase redirect results on mount/update
+  // Check URL hash for direct redirect authentication parameters on mount/update
   useEffect(() => {
-    // 1. Firebase redirect auth result check
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result && result.user) {
-          console.log("[Firebase Redirect Auth] Callback successful for user:", result.user.email);
-          const googleUserPayload = {
-            email: result.user.email,
-            name: result.user.displayName || result.user.email?.split('@')[0] || "Google User",
-            id: result.user.uid
-          };
-          const pendingReferral = localStorage.getItem('arez_pending_referral') || '';
-          localStorage.removeItem('arez_pending_referral');
-          handleGoogleAuthSuccess(googleUserPayload, pendingReferral);
-        }
-      })
-      .catch((err) => {
-        console.error("[Firebase Redirect Auth Callback Error]:", err);
-        if (err && err.code) {
-          const friendlyError = `Firebase Sign-In error (${err.code}): ${err.message}`;
-          setError(friendlyError);
-          notify(friendlyError);
-        }
-      });
-
-    // 2. Hash-based direct redirect check
     const hash = window.location.hash || '';
     if (hash.includes('/auth/google/success')) {
       try {
@@ -1164,89 +1089,84 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
         localStorage.removeItem('arez_pending_referral');
       }
 
-      const isMobileDevice = typeof window !== 'undefined' && (
-        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|mobile/i.test(navigator.userAgent) ||
-        window.innerWidth < 768 ||
-        isCurrentlyInApp()
-      );
-
-      console.log("[Google Auth] Starting Google Sign-In. Mobile/InApp detected:", isMobileDevice);
-
-      // Synchronously open a blank popup ON DESKTOP immediately during user gesture to prevent popup blocking
-      let popupWin: Window | null = null;
-      if (!isMobileDevice && typeof window !== 'undefined') {
-        const width = 500;
-        const height = 650;
-        const left = window.screen.width / 2 - width / 2;
-        const top = window.screen.height / 2 - height / 2;
-        try {
-          popupWin = window.open('about:blank', 'google_oauth_popup', `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,resizable=yes`);
-        } catch (e) {
-          console.warn("[Google Auth] Synchronous window.open failed:", e);
-        }
-      }
-
+      console.log("[Google Auth] Checking server-side custom Google OAuth URL...");
       const origin = getOriginSafe();
+      const fetchUrl = getApiUrl(`/api/auth/google/url?origin=${encodeURIComponent(origin || '')}`);
+      
       let authUrl = '';
       try {
-        const res = await safeApiFetch(`/api/auth/google/url?origin=${encodeURIComponent(origin || '')}`);
-        if (res.ok && res.data?.url) {
-          authUrl = res.data.url;
+        const res = await fetch(fetchUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.url) {
+            authUrl = data.url;
+          }
         }
       } catch (fetchErr) {
         console.warn("[Google Auth] Could not retrieve server-side OAuth URL:", fetchErr);
       }
 
       if (authUrl) {
-        console.log("[Google Auth] Navigating to Google Auth URL:", authUrl);
-        
-        if (isMobileDevice) {
-          // Mobile devices or In-App WebViews work best with full-page navigation
-          if (popupWin) {
-            try { popupWin.close(); } catch (e) {}
-          }
+        console.log("[Google Auth] Using server-side Google OAuth. Opening popup window:", authUrl);
+        const width = 500;
+        const height = 650;
+        const left = window.screen.width / 2 - width / 2;
+        const top = window.screen.height / 2 - height / 2;
+
+        const popup = window.open(
+          authUrl,
+          'google_oauth_popup',
+          `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,resizable=yes`
+        );
+
+        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+          // Popup blocked by browser! Redirect current frame instead of failing
+          console.log("[Google Auth] Popup blocked or failed. Performing direct page redirect instead...");
           window.location.href = authUrl;
           return;
         }
 
-        if (popupWin && !popupWin.closed) {
-          popupWin.location.href = authUrl;
-          
-          const timer = setInterval(() => {
-            if (popupWin?.closed) {
-              clearInterval(timer);
-              setTimeout(() => {
-                setIsGoogleLoading(false);
-              }, 1000);
-            }
-          }, 500);
-          return;
-        }
+        // Periodically monitor popup closed state
+        const timer = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(timer);
+            setTimeout(() => {
+              setIsGoogleLoading(false);
+            }, 1000);
+          }
+        }, 500);
 
-        // Popup was blocked or unavailable - fallback to full page redirect
-        console.log("[Google Auth] Popup blocked or unavailable. Falling back to direct page redirect...");
-        window.location.href = authUrl;
         return;
       }
 
-      // If popup window was opened but authUrl failed, close it
-      if (popupWin && !popupWin.closed) {
-        try { popupWin.close(); } catch (e) {}
-      }
-
-      // --- Fallback to original Firebase Auth redirect if backend custom URL is not configured/available ---
-      console.log("[Google Auth Callback Chain] Server OAuth URL not available. Attempting Firebase Auth redirect...");
+      // --- Fallback to original Firebase Auth popup if backend custom URL is not configured/available ---
+      console.log("[Google Auth] Server OAuth URL not available. Falling back to Firebase popup...");
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({
         prompt: 'select_account'
       });
 
-      console.log("[Google Auth Callback Chain] Initiating signInWithRedirect with forced account selection...");
-      await signInWithRedirect(auth, provider);
-      return;
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
+
+      if (!firebaseUser || !firebaseUser.email) {
+        throw new Error("Could not retrieve user info from Google authentication. (গুগল সাইন-ইন থেকে ব্যবহারকারীর ইমেল পাওয়া যায়নি।)");
+      }
+
+      console.log("[Google Auth] Firebase authentication succeeded for:", firebaseUser.email);
+
+      // Create a unique user login/registration payload
+      const googleUserPayload = {
+        email: firebaseUser.email,
+        name: firebaseUser.displayName || firebaseUser.email.split('@')[0] || "Google User",
+        id: firebaseUser.uid
+      };
+
+      // Proceed with login/registration flow
+      handleGoogleAuthSuccess(googleUserPayload);
 
     } catch (err: any) {
-      console.error("[Google Auth Callback Chain Error]:", err);
+      console.error("Google Login via Firebase Auth Error:", err);
       
       const isUnauthorized = (err.code && err.code.includes('unauthorized-domain')) || (err.message && err.message.includes('unauthorized-domain'));
       const errCode = err.code || "unknown_code";
@@ -1310,13 +1230,15 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     }
 
     try {
-      const res = await safeApiFetch('/api/auth/verify-otp', {
+      const res = await fetch(getApiUrl('/api/auth/verify-otp'), {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code: finalOtp }),
       });
+      const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(res.error || res.data?.error || 'Incorrect verification code. Please check and try again.');
+        throw new Error(data.error || 'Incorrect verification code. Please check and try again.');
       }
 
       // Unique UID generation for new manual signup
@@ -1754,13 +1676,15 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
 
                       setIsLoading(true);
                       try {
-                        const res = await safeApiFetch('/api/auth/send-otp', {
+                        const res = await fetch(getApiUrl('/api/auth/send-otp'), {
                           method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ email: targetEmail, name: 'Password Recovery' }),
                         });
+                        const data = await res.json();
 
                         if (!res.ok) {
-                          throw new Error(res.error || res.data?.error || 'Failed to send OTP code.');
+                          throw new Error(data.error || 'Failed to send OTP code.');
                         }
 
                         setForgotStep(2);
@@ -1831,13 +1755,15 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
                           const finalOtp = forgotOtp.join('');
 
                           try {
-                            const res = await safeApiFetch('/api/auth/verify-otp', {
+                            const res = await fetch(getApiUrl('/api/auth/verify-otp'), {
                               method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ email: forgotEmail.toLowerCase().trim(), code: finalOtp }),
                             });
+                            const data = await res.json();
 
                             if (!res.ok) {
-                              throw new Error(res.error || res.data?.error || 'Incorrect or expired OTP');
+                              throw new Error(data.error || 'Incorrect or expired OTP');
                             }
 
                             setForgotStep(3);

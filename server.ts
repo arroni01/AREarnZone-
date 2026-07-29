@@ -623,24 +623,9 @@ async function startServer() {
     }
   });
 
-  // Helper to resolve Google Client ID from process.env or firebase-applet-config.json
-  const getGoogleClientId = () => {
-    let cid = process.env.GOOGLE_CLIENT_ID || "";
-    if (!cid) {
-      try {
-        const cfgPath = path.join(process.cwd(), "firebase-applet-config.json");
-        if (fs.existsSync(cfgPath)) {
-          const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf-8"));
-          if (cfg?.oAuthClientId) cid = cfg.oAuthClientId;
-        }
-      } catch (e) {}
-    }
-    return cid;
-  };
-
   // API 3: Get Google OAuth URL
   app.get("/api/auth/google/url", (req, res) => {
-    const client_id = getGoogleClientId();
+    const client_id = process.env.GOOGLE_CLIENT_ID;
     const client_secret = process.env.GOOGLE_CLIENT_SECRET;
     
     // Retrieve origin from query parameter (sent from window.location.origin) or fallback
@@ -675,7 +660,7 @@ async function startServer() {
         "https://www.googleapis.com/auth/userinfo.profile",
         "https://www.googleapis.com/auth/userinfo.email"
       ],
-      prompt: "select_account consent",
+      prompt: "consent",
       state: encodedState
     });
 
@@ -686,7 +671,7 @@ async function startServer() {
     });
   });
 
-  // API 4: Google OAuth Callback Handler (Multi-Channel Cross-Device Receiver)
+  // API 4: Google OAuth Callback Handler (Popup Receiver)
   app.get(["/auth/google/callback", "/api/auth/callback/google"], async (req, res) => {
     const { code, state } = req.query;
 
@@ -730,13 +715,12 @@ async function startServer() {
       }
     }
 
-    const clientId = getGoogleClientId();
-    if (code && code !== "sandbox_demo" && clientId && process.env.GOOGLE_CLIENT_SECRET) {
+    if (code && code !== "sandbox_demo" && process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       try {
         console.log("[Google OAuth Callback] Exchanging code using matching redirectUri:", redirectUri);
 
         const oauth2Client = new OAuth2Client(
-          clientId,
+          process.env.GOOGLE_CLIENT_ID,
           process.env.GOOGLE_CLIENT_SECRET,
           redirectUri
         );
@@ -786,46 +770,20 @@ async function startServer() {
 
     return res.send(`
       <html>
-        <body style="font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #0f172a; color: white;">
-          <div style="text-align: center; padding: 32px; background: #1e293b; border-radius: 20px; border: 1px solid #334155; max-width: 360px; width: 90%;">
-            <div style="width: 48px; height: 48px; border-radius: 50%; background: #10b98120; border: 1px solid #10b98150; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            </div>
-            <h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 700;">Google Sign-In Successful!</h3>
-            <p style="margin: 0 0 20px; font-size: 13px; color: #94a3b8;">Authenticating your account and redirecting...</p>
-            <a id="direct-btn" href="${origin}/#/auth/google/success?user=${encodeURIComponent(JSON.stringify(profile))}" style="display: inline-block; padding: 12px 24px; background: #10b981; color: white; border-radius: 12px; font-size: 13px; font-weight: 700; text-decoration: none;">Continue to App</a>
-          </div>
+        <body>
           <script>
             const profileData = ${JSON.stringify(profile)};
-
-            // Multi-channel broadcast for cross-window/cross-tab/mobile support
-            try {
-              localStorage.setItem('arez_google_auth_event', JSON.stringify({ type: 'GOOGLE_AUTH_SUCCESS', user: profileData, time: Date.now() }));
-            } catch (e) {}
-
-            try {
-              if (typeof BroadcastChannel !== 'undefined') {
-                const bc = new BroadcastChannel('arez_google_auth');
-                bc.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', user: profileData });
-              }
-            } catch (e) {}
-
-            let hasOpener = false;
-            if (window.opener && !window.opener.closed) {
+            if (window.opener) {
               try {
                 window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', user: profileData }, '*');
-                hasOpener = true;
-              } catch (e) {}
-            }
-
-            if (hasOpener) {
-              setTimeout(() => {
-                try { window.close(); } catch (e) {}
-              }, 300);
-            } else {
-              setTimeout(() => {
+                window.close();
+              } catch (e) {
+                console.error("postMessage to opener failed, redirecting window:", e);
                 window.location.href = "${origin}/#/auth/google/success?user=" + encodeURIComponent(JSON.stringify(profileData));
-              }, 400);
+              }
+            } else {
+              console.log("No opener window, redirecting directly...");
+              window.location.href = "${origin}/#/auth/google/success?user=" + encodeURIComponent(JSON.stringify(profileData));
             }
           </script>
         </body>
