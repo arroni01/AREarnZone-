@@ -2,6 +2,7 @@
 // Trigger snapshot update
 import React, { useState, useEffect } from 'react';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
+import { safeApiFetch } from './utils/apiClient';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { User, Task, WithdrawRequest, Transaction, PaymentMethod, MembershipRequest, DepositRequest, MembershipPlan, TaskSubmission, WithdrawOption, AppNotification, SocialLink, Language, GlobalConfig, SellCategory, SellItem, StoreOrder, TelegramVerificationRequest, AdViewLog, GatewayLog, CPANetwork, CPAConversion, CPATransaction } from './types';
 import { ICONS } from './constants';
@@ -410,9 +411,9 @@ const App: React.FC = () => {
     async function loadCPAData() {
       const fetchSafe = async (url: string) => {
         try {
-          const res = await fetch(url);
-          if (res.ok) {
-            return await res.json();
+          const res = await safeApiFetch(url);
+          if (res.ok && res.data) {
+            return res.data;
           }
         } catch {
           // Gracefully fallback to localStorage/default state
@@ -1272,9 +1273,9 @@ const App: React.FC = () => {
 
   // Automatic Telegram Bot configuration restorer on app load (uses Firestore-persisted globalConfig & local storage fallback)
   useEffect(() => {
-    fetch('/api/telegram/config')
-      .then(res => res.json())
-      .then(async data => {
+    safeApiFetch('/api/telegram/config')
+      .then(async res => {
+        const data = res.data;
         if (data && !data.isConfigured) {
           // 1. Try to restore using Firestore-persisted globalConfig
           const firestoreToken = globalConfig?.telegramBotToken;
@@ -1283,9 +1284,8 @@ const App: React.FC = () => {
 
           if (firestoreToken && firestoreToken.trim()) {
             console.log("[Telegram Bot Global Cache] Restoring bot configuration from Firestore globalConfig...");
-            await fetch('/api/telegram/save-config', {
+            await safeApiFetch('/api/telegram/save-config', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 token: firestoreToken,
                 username: firestoreUsername,
@@ -1304,9 +1304,8 @@ const App: React.FC = () => {
               const parsed = JSON.parse(cached);
               if (parsed && parsed.token && parsed.token.trim()) {
                 console.log("[Telegram Bot Global Cache] Restoring bot configuration in background...");
-                await fetch('/api/telegram/save-config', {
+                await safeApiFetch('/api/telegram/save-config', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     token: parsed.token,
                     username: parsed.username || parsed.botUsername,
@@ -1323,13 +1322,7 @@ const App: React.FC = () => {
         }
       })
       .catch(err => {
-        // Gracefully handle background config checks if the backend server is not running or unreachable
-        const errMsg = err instanceof Error ? err.message : String(err);
-        if (errMsg.includes("Failed to fetch") || errMsg.includes("fetch")) {
-          console.log("[Telegram Bot Global Cache] Telegram server config check skipped (backend cold start or offline):", errMsg);
-        } else {
-          console.warn("[Telegram Bot Global Cache] Config check warning:", err);
-        }
+        console.log("[Telegram Bot Global Cache] Telegram server config check skipped:", err?.message || err);
       });
   }, [globalConfig?.telegramBotToken, globalConfig?.telegramBotUsername, globalConfig?.telegramChannelLink]);
 

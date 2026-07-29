@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { saveDocument } from "../firebase";
 import { compressImage } from "../utils/imageCompressor";
+import { safeApiFetch } from "../utils/apiClient";
+import { safeFetch } from "../utils/corsProxy";
 import { Eye, EyeOff, Plus, Edit, Trash2, Play, Image as ImageIcon, Globe, ArrowUpDown, PlusCircle, CheckCircle2, XCircle, RefreshCw, Download, Activity, TrendingUp, TrendingDown, DollarSign, Calendar, Terminal, AlertTriangle, Search, Folder, ArrowLeft, CheckSquare, Square, ShieldCheck, Shield } from "lucide-react";
 import {
   Task,
@@ -1338,6 +1340,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [tgBotIsOnline, setTgBotIsOnline] = useState<boolean | null>(null);
   const [tgBotMaskedToken, setTgBotMaskedToken] = useState<string | null>(null);
   const [tgBotLastErr, setTgBotLastErr] = useState<string | null>(null);
+  const [isTestingTgConnection, setIsTestingTgConnection] = useState(false);
+  const [tgDiagnosticLogs, setTgDiagnosticLogs] = useState<
+    Array<{ timestamp: string; level: 'info' | 'success' | 'warn' | 'error'; message: string; details?: any }>
+  >([]);
 
   const [telegramFilter, setTelegramFilter] = useState<
     "all" | "pending" | "approved" | "rejected"
@@ -1587,9 +1593,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const fetchEmailCounters = async () => {
     try {
-      const res = await fetch("/api/admin/email-counters");
-      if (res.ok) {
-        const data = await res.json();
+      const res = await safeApiFetch("/api/admin/email-counters");
+      if (res.ok && res.data) {
+        const data = res.data;
         setEmailCounters(data);
 
         // Ephemeral recovery for Multi-SMTP rotation pool
@@ -1603,7 +1609,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
               const isMissing = cachedSmtps.some(
                 (cached) =>
                   !serverSmtps.some(
-                    (serv) =>
+                    (serv: any) =>
                       serv.user.toLowerCase() === cached.user.toLowerCase(),
                   ),
               );
@@ -1613,17 +1619,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   "[SMTP Cache] Connection/configs lost. Restoring SMTP list in background...",
                 );
                 // Save the whole list using bulk save API
-                await fetch("/api/admin/save-smtp-list", {
+                await safeApiFetch("/api/admin/save-smtp-list", {
                   method: "POST",
-                  headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ smtpList: cachedSmtps }),
                 });
                 console.log("[SMTP Cache] SMTP configurations successfully restored!");
                 // Trigger a refresh after background restoration
-                const refreshedRes = await fetch("/api/admin/email-counters");
-                if (refreshedRes.ok) {
-                  const refreshedData = await refreshedRes.json();
-                  setEmailCounters(refreshedData);
+                const refreshedRes = await safeApiFetch("/api/admin/email-counters");
+                if (refreshedRes.ok && refreshedRes.data) {
+                  setEmailCounters(refreshedRes.data);
                 }
               }
             }
@@ -1633,27 +1637,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         }
       }
     } catch (e: any) {
-      if (e?.message === "Failed to fetch") {
-        console.warn(
-          "Failed to fetch email counters (temporary network/server disconnect).",
-        );
-      } else {
-        console.error("Failed to fetch email counters:", e);
-      }
+      console.warn("Failed to fetch email counters:", e?.message || e);
     }
   };
 
   const handleResetCounters = async () => {
     try {
-      const res = await fetch("/api/admin/email-counters/reset", {
+      const res = await safeApiFetch("/api/admin/email-counters/reset", {
         method: "POST",
       });
-      const data = await res.json();
       if (res.ok) {
         notify("Email limits manually reset!");
         fetchEmailCounters();
       } else {
-        notify(data.error || "Failed to reset counters.");
+        notify(res.error || res.data?.error || "Failed to reset counters.");
       }
     } catch (e) {
       console.error(e);
@@ -1663,9 +1660,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const fetchTelegramConfig = async () => {
     try {
-      const res = await fetch("/api/telegram/config");
-      if (res.ok) {
-        const data = await res.json();
+      const res = await safeApiFetch("/api/telegram/config");
+      if (res.ok && res.data) {
+        const data = res.data;
         setTgBotUsername(data.botUsername || "@AREarnZone_bot");
         setTgChannelLink(data.channelLink || "https://t.me/arearnzone");
         setTgBotIsOnline(!!data.isBotOnline);
@@ -1685,9 +1682,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             console.log(
               "[Telegram Bot Cache] Ephemeral connection lost. Restoring bot from globalConfig in background...",
             );
-            await fetch("/api/telegram/save-config", {
+            await safeApiFetch("/api/telegram/save-config", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 token: firestoreToken,
                 username: firestoreUsername,
@@ -1710,9 +1706,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 console.log(
                   "[Telegram Bot Cache] Ephemeral connection lost. Restoring bot in background...",
                 );
-                await fetch("/api/telegram/save-config", {
+                await safeApiFetch("/api/telegram/save-config", {
                   method: "POST",
-                  headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     token: parsed.token,
                     username: parsed.username || parsed.botUsername,
@@ -1734,13 +1729,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         }
       }
     } catch (e: any) {
-      if (e?.message === "Failed to fetch") {
-        console.warn(
-          "Failed to fetch Telegram config (temporary network/server disconnect).",
-        );
-      } else {
-        console.error("Failed to fetch Telegram config:", e);
-      }
+      console.warn("Failed to fetch Telegram config:", e?.message || e);
     }
   };
 
@@ -1763,9 +1752,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         : "টেলিগ্রাম বট টোকেন কানেক্ট ও টেস্ট করা হচ্ছে...",
     );
     try {
-      const res = await fetch("/api/telegram/save-config", {
+      const res = await safeApiFetch("/api/telegram/save-config", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           token: tgBotToken,
           username: tgBotUsername,
@@ -1773,15 +1761,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           forceSave: force,
         }),
       });
-      const data = await res.json();
       setIsSavingTgBot(false);
-      if (res.ok) {
+      const data = res.data || {};
+      if (res.ok && res.data) {
         setTgBotStatusOk(true);
-        setTgBotStatusMsg(data.message);
+        setTgBotStatusMsg(data.message || "টেলিগ্রাম বট সফলভাবে সেভ হয়েছে!");
         setTgBotIsOnline(true);
         setTgBotLastErr(null);
         
-        const finalUsername = data.config?.username || tgBotUsername;
+        const finalUsername = data.config?.username || data.botUsername || tgBotUsername;
         if (data.config?.username) {
           setTgBotUsername(data.config.username);
         }
@@ -1817,17 +1805,94 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         setCanForceTgSave(false);
       } else {
         setTgBotStatusOk(false);
-        setTgBotStatusMsg(data.error || "টোকেন কানেক্ট করতে ব্যর্থ হয়েছে।");
+        setTgBotStatusMsg(res.error || data.error || "টোকেন কানেক্ট করতে ব্যর্থ হয়েছে।");
         if (data.canForce) {
           setCanForceTgSave(true);
         }
-        notify("বট কানেকশন ব্যর্থ হয়েছে।");
+        notify(res.error || data.error || "বট কানেকশন ব্যর্থ হয়েছে।");
       }
     } catch (err: any) {
       setIsSavingTgBot(false);
       setTgBotStatusOk(false);
       setTgBotStatusMsg("বট কানেকশন সার্ভার ত্রুটি: " + err.message);
       notify("সার্ভার এরর।");
+    }
+  };
+
+  const handleTestTelegramConnection = async () => {
+    setIsTestingTgConnection(true);
+    const now = new Date().toLocaleTimeString();
+
+    setTgDiagnosticLogs((prev) => [
+      {
+        timestamp: now,
+        level: "info",
+        message: "Initiating Telegram Bot Connection Diagnostics via safeFetch...",
+      },
+      ...prev,
+    ]);
+
+    try {
+      // Step 1: Query local bot config
+      const configRes = await safeFetch("/api/telegram/config");
+      setTgDiagnosticLogs((prev) => [
+        {
+          timestamp: new Date().toLocaleTimeString(),
+          level: configRes.ok ? "success" : "warn",
+          message: `[Step 1] Config Check: HTTP ${configRes.status} ${configRes.isSimulated ? "(Simulated Mode)" : "(Direct Mode)"}`,
+          details: configRes.data,
+        },
+        ...prev,
+      ]);
+
+      // Step 2: Test Endpoint
+      const tokenToTest = tgBotToken.trim() || globalConfig?.telegramBotToken || "";
+      let targetUrl = "/api/telegram/check-code?code=test_diagnostic";
+      if (tokenToTest) {
+        targetUrl = `https://api.telegram.org/bot${tokenToTest}/getMe`;
+      }
+
+      setTgDiagnosticLogs((prev) => [
+        {
+          timestamp: new Date().toLocaleTimeString(),
+          level: "info",
+          message: `[Step 2] Querying Endpoint: ${tokenToTest ? "https://api.telegram.org/bot<masked>/getMe" : targetUrl}...`,
+        },
+        ...prev,
+      ]);
+
+      const testRes = await safeFetch(targetUrl);
+      const isSuccess = testRes.ok && testRes.data?.ok !== false && testRes.data?.success !== false;
+
+      if (isSuccess) {
+        setTgBotIsOnline(true);
+        setTgBotStatusOk(true);
+        setTgBotStatusMsg("Telegram Bot connection verified successfully via safeFetch diagnostic test!");
+      }
+
+      setTgDiagnosticLogs((prev) => [
+        {
+          timestamp: new Date().toLocaleTimeString(),
+          level: isSuccess ? "success" : "error",
+          message: `[Step 3] Diagnostics Completed: ${isSuccess ? "Bot is ACTIVE & ONLINE ✅" : "Connection Test Failed ❌"}`,
+          details: testRes.data || testRes.error,
+        },
+        ...prev,
+      ]);
+
+      notify(isSuccess ? "Telegram Bot connection test successful! ✅" : "Telegram Bot connection test failed.");
+    } catch (err: any) {
+      setTgDiagnosticLogs((prev) => [
+        {
+          timestamp: new Date().toLocaleTimeString(),
+          level: "error",
+          message: `[Diagnostic Error] Exception: ${err.message || String(err)}`,
+        },
+        ...prev,
+      ]);
+      notify("Telegram Bot connection test encountered an error.");
+    } finally {
+      setIsTestingTgConnection(false);
     }
   };
 
@@ -1864,16 +1929,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     }
     setIsAddingSmtp(true);
     try {
-      const res = await fetch("/api/admin/add-smtp", {
+      const res = await safeApiFetch("/api/admin/add-smtp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user: smtpFormUser,
           pass: smtpFormPass,
           limit: smtpFormLimit,
         }),
       });
-      const data = await res.json();
       if (res.ok) {
         notify("SMTP সফলভাবে যোগ/আপডেট করা হয়েছে!");
 
@@ -1908,7 +1971,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         setSmtpFormLimit(500);
         fetchEmailCounters();
       } else {
-        notify(data.error || "SMTP যোগ করতে ব্যর্থ হয়েছে।");
+        notify(res.error || res.data?.error || "SMTP যোগ করতে ব্যর্থ হয়েছে।");
       }
     } catch (e) {
       console.error(e);
@@ -1921,12 +1984,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleDeleteSmtp = async (userEmail: string) => {
     if (!window.confirm(`${userEmail} কনফিগারেশনটি মুছে ফেলতে চান?`)) return;
     try {
-      const res = await fetch("/api/admin/delete-smtp", {
+      const res = await safeApiFetch("/api/admin/delete-smtp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user: userEmail }),
       });
-      const data = await res.json();
       if (res.ok) {
         notify("SMTP সফলভাবে মুছে ফেলা হয়েছে!");
 
@@ -1946,7 +2007,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
         fetchEmailCounters();
       } else {
-        notify(data.error || "SMTP মুছতে ব্যর্থ হয়েছে।");
+        notify(res.error || res.data?.error || "SMTP মুছতে ব্যর্থ হয়েছে।");
       }
     } catch (e) {
       console.error(e);
@@ -1967,23 +2028,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         : "Testing active Gmail SMTP credentials...",
     );
     try {
-      const res = await fetch("/api/admin/test-smtp", {
+      const res = await safeApiFetch("/api/admin/test-smtp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user: typeof specificUser === "string" ? specificUser : undefined,
           pass: typeof specificPass === "string" ? specificPass : undefined,
         }),
       });
-      const data = await res.json();
-      if (res.ok) {
+      if (res.ok && res.data) {
         setSmtpDiagnosticOk(true);
-        setSmtpDiagnosticMsg(data.message);
+        setSmtpDiagnosticMsg(res.data.message);
         notify("SMTP Connection Successful!");
       } else {
         setSmtpDiagnosticOk(false);
         setSmtpDiagnosticMsg(
-          data.error || "Failed to establish secure handshake.",
+          res.error || res.data?.error || "Failed to establish secure handshake.",
         );
         notify("SMTP connection failed.");
       }
@@ -2013,14 +2072,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
     setIsVerifyingCleanupPassword(true);
     try {
-      const res = await fetch("/api/admin/verify-app-password", {
+      const res = await safeApiFetch("/api/admin/verify-app-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ appPassword: cleanupAppPassword }),
       });
-      const data = await res.json();
       if (!res.ok) {
-        notify(data.error || "পাসওয়ার্ড যাচাইকরণ ব্যর্থ হয়েছে।");
+        notify(res.error || res.data?.error || "পাসওয়ার্ড যাচাইকরণ ব্যর্থ হয়েছে।");
         return;
       }
 
@@ -2128,9 +2185,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     // Send withdrawal approved email notification
     const targetUser = (users || []).find((u) => u.id === withdraw.userId);
     if (targetUser && targetUser.email) {
-      fetch("/api/email/notify", {
+      safeApiFetch("/api/email/notify", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: targetUser.email,
           name: targetUser.name,
@@ -2227,9 +2283,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       // Send withdrawal approved email notification
       const targetUser = (users || []).find((u) => u.id === withdraw.userId);
       if (targetUser && targetUser.email) {
-        fetch("/api/email/notify", {
+        safeApiFetch("/api/email/notify", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email: targetUser.email,
             name: targetUser.name,
@@ -2359,9 +2414,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
         // Send account status verification email notification
         if (targetUser.email) {
-          fetch("/api/email/notify", {
+          safeApiFetch("/api/email/notify", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               email: targetUser.email,
               name: targetUser.name,
@@ -2723,9 +2777,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
     // Send account suspension status changed email notification
     if (selectedUserForManage.email) {
-      fetch("/api/email/notify", {
+      safeApiFetch("/api/email/notify", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: selectedUserForManage.email,
           name: selectedUserForManage.name,
@@ -4681,6 +4734,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
 
                   <div className="flex flex-wrap justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleTestTelegramConnection}
+                      disabled={isTestingTgConnection}
+                      className="px-5 py-3.5 rounded-2xl text-[9px] uppercase font-black tracking-widest transition-all bg-emerald-500 text-white hover:bg-emerald-600 shadow-[0_0_12px_rgba(16,185,129,0.2)] flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isTestingTgConnection ? 'animate-spin' : ''}`} />
+                      {isTestingTgConnection ? "টেস্ট করা হচ্ছে..." : "Test Telegram Connection"}
+                    </button>
                     {canForceTgSave && (
                       <button
                         type="button"
@@ -4720,6 +4782,65 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {/* Telegram Bot Diagnostic Panel */}
+                  <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 text-slate-100 font-mono text-xs space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+                        <span className="font-black text-white uppercase text-[10px] tracking-wider font-sans">
+                          Telegram Diagnostic Panel
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleTestTelegramConnection}
+                          disabled={isTestingTgConnection}
+                          className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-[10px] font-sans font-bold hover:bg-emerald-500/30 transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${isTestingTgConnection ? 'animate-spin' : ''}`} />
+                          Test Telegram Connection
+                        </button>
+                        {tgDiagnosticLogs.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setTgDiagnosticLogs([])}
+                            className="px-2 py-1 text-slate-400 hover:text-white text-[10px] font-sans cursor-pointer"
+                          >
+                            Clear Logs
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {tgDiagnosticLogs.length === 0 ? (
+                      <p className="text-slate-500 italic text-[10px] py-1">
+                        No diagnostic scans performed yet. Click 'Test Telegram Connection' above to trigger a live status check via safeFetch.
+                      </p>
+                    ) : (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {tgDiagnosticLogs.map((log, idx) => (
+                          <div key={idx} className="p-2.5 rounded bg-slate-950/80 border border-slate-800/80 text-[10px] font-mono">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`font-bold ${
+                                log.level === 'success' ? 'text-emerald-400' :
+                                log.level === 'error' ? 'text-rose-400' :
+                                log.level === 'warn' ? 'text-amber-400' : 'text-blue-400'
+                              }`}>
+                                [{log.timestamp}] {log.message}
+                              </span>
+                            </div>
+                            {log.details && (
+                              <pre className="mt-1.5 text-[9px] text-slate-300 overflow-x-auto p-2 bg-slate-900 rounded border border-slate-800">
+                                {JSON.stringify(log.details, null, 2)}
+                              </pre>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </form>
 
                 {/* Sender Authentication & Anti-Spam Setup Guide */}
@@ -9710,16 +9831,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                       ...prev,
                                       [req.id]: "loading",
                                     }));
-                                    fetch(
+                                    safeApiFetch(
                                       `/api/telegram/check-join?userId=${req.telegramId}`,
                                     )
-                                      .then(async (r) => {
-                                        const data = await r.json();
-                                        if (!r.ok)
+                                      .then((res) => {
+                                        if (!res.ok)
                                           throw new Error(
-                                            data.error || "Not joined",
+                                            res.error || "Not joined",
                                           );
-                                        return data;
+                                        return res.data;
                                       })
                                       .then(() => {
                                         setCheckingSubs((prev) => ({
@@ -9952,16 +10072,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                   ...prev,
                                   [req.id]: "loading",
                                 }));
-                                fetch(
+                                safeApiFetch(
                                   `/api/telegram/check-join?userId=${req.telegramId}`,
                                 )
-                                  .then(async (r) => {
-                                    const data = await r.json();
-                                    if (!r.ok)
+                                  .then((res) => {
+                                    if (!res.ok)
                                       throw new Error(
-                                        data.error || "Not joined",
+                                        res.error || "Not joined",
                                       );
-                                    return data;
+                                    return res.data;
                                   })
                                   .then(() => {
                                     setCheckingSubs((prev) => ({

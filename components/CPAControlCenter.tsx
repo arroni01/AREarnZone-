@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { safeApiFetch } from "../utils/apiClient";
 import { 
   Globe, 
   Plus, 
@@ -101,12 +102,9 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
   // Fetch CPA Analytics
   const fetchAnalytics = async () => {
     try {
-      const res = await fetch("/api/cpa/analytics");
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-          setAnalyticsData(data.analytics);
-        }
+      const res = await safeApiFetch("/api/cpa/analytics");
+      if (res.ok && res.data?.success) {
+        setAnalyticsData(res.data.analytics);
       }
     } catch (err) {
       console.error("[CPA Analytics Fetch Error]:", err);
@@ -190,9 +188,8 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
     setTestingConnection(true);
     setTestResult(null);
     try {
-      const res = await fetch("/api/cpa/test-connection", {
+      const res = await safeApiFetch("/api/cpa/test-connection", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           networkId: formData.id,
           networkName: formData.name,
@@ -201,13 +198,9 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
           apiKey: formData.apiKey
         })
       });
-      const data = await res.json();
+      const data = res.data || { success: false, message: res.error || "Connection failed" };
       setTestResult(data);
-      if (data.success) {
-        notify(data.message);
-      } else {
-        notify(data.message);
-      }
+      notify(data.message);
     } catch (err: any) {
       setTestResult({ success: false, message: "❌ Connection Test Error: " + err.message });
     } finally {
@@ -219,9 +212,8 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
   const handleTestNetworkConnection = async (network: CPANetwork) => {
     setTestingNetworkId(network.id);
     try {
-      const res = await fetch("/api/cpa/test-connection", {
+      const res = await safeApiFetch("/api/cpa/test-connection", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           networkId: network.id,
           networkName: network.name,
@@ -230,7 +222,7 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
           apiKey: network.apiKey
         })
       });
-      const data = await res.json();
+      const data = res.data || { success: false, message: res.error || "Network request failed" };
       const resObj = { success: !!data.success, message: data.message || "Test ping completed" };
       setNetworkTestResults(prev => ({
         ...prev,
@@ -259,18 +251,17 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
 
     setLoading(true);
     try {
-      const res = await fetch("/api/cpa/networks", {
+      const res = await safeApiFetch("/api/cpa/networks", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
       });
-      const data = await res.json();
-      if (data.success) {
+      const data = res.data;
+      if (res.ok && data?.success) {
         setCpaNetworks(data.networks);
         notify(data.message || "CPA Network saved successfully!");
         setShowAddModal(false);
       } else {
-        notify(data.error || "Failed to save network");
+        notify(res.error || data?.error || "Failed to save network");
       }
     } catch (err: any) {
       notify("Error saving network: " + err.message);
@@ -284,13 +275,13 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
     if (!window.confirm(`Are you sure you want to delete CPA Network "${name}"?`)) return;
 
     try {
-      const res = await fetch(`/api/cpa/networks/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (data.success) {
+      const res = await safeApiFetch(`/api/cpa/networks/${id}`, { method: "DELETE" });
+      const data = res.data;
+      if (res.ok && data?.success) {
         setCpaNetworks(data.networks);
         notify(`CPA Network "${name}" deleted.`);
       } else {
-        notify(data.error || "Failed to delete network");
+        notify(res.error || data?.error || "Failed to delete network");
       }
     } catch (err: any) {
       notify("Error deleting network: " + err.message);
@@ -309,9 +300,8 @@ export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
   const handleConversionAction = async (conversionId: string, action: "approve" | "reject", reason?: string) => {
     setLoading(true);
     try {
-      const res = await fetch("/api/cpa/conversions/action", {
+      const res = await safeApiFetch("/api/cpa/conversions/action", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversionId,
           action,
