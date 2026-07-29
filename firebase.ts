@@ -192,12 +192,7 @@ export async function fetchCollection<T>(collectionName: string): Promise<T[]> {
       console.warn(`[Firestore Safe-Guard] Quota or Offline limit detected during fetchCollection of ${collectionName}. Falling back.`);
       return [];
     }
-    try {
-      handleFirestoreError(error, OperationType.LIST, collectionName);
-    } catch (e) {
-      console.warn(`[Firestore fetchCollection Exception Logged]:`, e);
-      return [];
-    }
+    handleFirestoreError(error, OperationType.LIST, collectionName);
   }
 }
 
@@ -219,11 +214,7 @@ export async function saveDocument(collectionName: string, docId: string, data: 
       console.warn(`[Firestore Safe-Guard] Quota or Offline limit detected during saveDocument of ${collectionName}/${docId}. Falling back.`);
       return;
     }
-    try {
-      handleFirestoreError(error, OperationType.WRITE, `${collectionName}/${docId}`);
-    } catch (e) {
-      console.warn(`[Firestore saveDocument Exception Logged]:`, e);
-    }
+    handleFirestoreError(error, OperationType.WRITE, `${collectionName}/${docId}`);
   }
 }
 
@@ -241,11 +232,7 @@ export async function deleteDocument(collectionName: string, docId: string): Pro
       console.warn(`[Firestore Safe-Guard] Quota or Offline limit detected during deleteDocument of ${collectionName}/${docId}. Falling back.`);
       return;
     }
-    try {
-      handleFirestoreError(error, OperationType.DELETE, `${collectionName}/${docId}`);
-    } catch (e) {
-      console.warn(`[Firestore deleteDocument Exception Logged]:`, e);
-    }
+    handleFirestoreError(error, OperationType.DELETE, `${collectionName}/${docId}`);
   }
 }
 
@@ -280,12 +267,7 @@ export async function uploadInitialDataIfEmpty(collectionName: string, localData
       console.warn(`[Firestore Safe-Guard] Quota or Offline limit detected during uploadInitialData of ${collectionName}. Falling back.`);
       return false;
     }
-    try {
-      handleFirestoreError(error, OperationType.WRITE, collectionName);
-    } catch (e) {
-      console.warn(`[Firestore uploadInitialData Exception Logged]:`, e);
-      return false;
-    }
+    handleFirestoreError(error, OperationType.WRITE, collectionName);
   }
 }
 
@@ -314,12 +296,7 @@ export async function uploadConfigIfEmpty(collectionName: string, docId: string,
       console.warn(`[Firestore Safe-Guard] Quota or Offline limit detected during uploadConfig of ${collectionName}/${docId}. Falling back.`);
       return { data: localConfig, existed: true };
     }
-    try {
-      handleFirestoreError(error, OperationType.WRITE, `${collectionName}/${docId}`);
-    } catch (e) {
-      console.warn(`[Firestore uploadConfig Exception Logged]:`, e);
-      return { data: localConfig, existed: true };
-    }
+    handleFirestoreError(error, OperationType.WRITE, `${collectionName}/${docId}`);
   }
 }
 

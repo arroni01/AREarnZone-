@@ -5,7 +5,6 @@ import { ICONS } from '../constants';
 import { LocalizedReward, convertCurrency } from './localization';
 import { ReferralAnalytics } from './ReferralAnalytics';
 import { motion, AnimatePresence } from 'motion/react';
-import { safeApiFetch } from '../utils/apiClient';
 
 interface ReferralProps {
   user: User;
@@ -238,8 +237,9 @@ const Referral: React.FC<ReferralProps> = ({
     }
 
     if (isUpgraded && user.email) {
-      safeApiFetch("/api/email/notify", {
+      fetch("/api/email/notify", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: user.email,
           name: user.name,

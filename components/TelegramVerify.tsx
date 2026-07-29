@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import { User, TelegramVerificationRequest, Task, TaskSubmission } from '../types';
 import { ICONS } from '../constants';
 import { compressImage } from '../utils/imageCompressor';
-import { safeApiFetch } from '../utils/apiClient';
 
 export const isTelegramTask = (task: Task): boolean => {
   if (!task) return false;
@@ -170,12 +169,12 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
 
   // Load backend Telegram configuration dynamically
   React.useEffect(() => {
-    safeApiFetch('/api/telegram/config')
-      .then(res => {
-        if (!res.ok || !res.data) {
-          throw new Error(res.error || "Failed to load config");
-        }
-        const data = res.data;
+    fetch('/api/telegram/config')
+      .then(r => {
+        if (!r.ok) throw new Error("HTTP error " + r.status);
+        return r.json();
+      })
+      .then(data => {
         const configured = !!data.isConfigured;
         setBotConfig({
           isConfigured: configured,
@@ -196,50 +195,59 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
   }, []);
 
   // Poll/Verify the verification code inside bot database
-  const handleVerifyBotConnection = async () => {
+  const handleVerifyBotConnection = () => {
     if (!verificationCode) return;
     setIsCheckingBot(true);
-    try {
-      const res = await safeApiFetch(`/api/telegram/check-code?code=${verificationCode}`);
-      setIsCheckingBot(false);
-      if (res.ok && res.data?.success) {
-        setTelegramUsername(res.data.telegramUsername);
-        setTelegramId(res.data.telegramId);
-        if (res.data.telegramPhone) {
-          setTelegramPhone(res.data.telegramPhone);
+    fetch(`/api/telegram/check-code?code=${verificationCode}`)
+      .then(r => {
+        if (!r.ok) throw new Error("HTTP error " + r.status);
+        return r.json();
+      })
+      .then(data => {
+        setIsCheckingBot(false);
+        if (data.success) {
+          setTelegramUsername(data.telegramUsername);
+          setTelegramId(data.telegramId);
+          if (data.telegramPhone) {
+            setTelegramPhone(data.telegramPhone);
+          }
+          setIsBotConnected(true);
+          notify("সফলভাবে টেলিগ্রাম বটের সাথে কানেক্ট করা হয়েছে! ✅");
+        } else {
+          notify(data.message || "কোডটি এখনও বটে পাঠানো হয়নি। অনুগ্রহ করে প্রথমে বটে মেসেজ করুন।");
         }
-        setIsBotConnected(true);
-        notify("সফলভাবে টেলিগ্রাম বটের সাথে কানেক্ট করা হয়েছে! ✅");
-      } else {
-        notify(res.data?.message || res.error || "কোডটি এখনও বটে পাঠানো হয়নি। অনুগ্রহ করে প্রথমে বটে মেসেজ করুন।");
-      }
-    } catch (err: any) {
-      setIsCheckingBot(false);
-      console.error("Error verifying bot connection:", err);
-      notify("সংযোগ পরীক্ষা করতে ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।");
-    }
+      })
+      .catch(err => {
+        setIsCheckingBot(false);
+        console.error("Error verifying bot connection:", err);
+        notify("সংযোগ পরীক্ষা করতে ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।");
+      });
   };
 
-  const handleVerifyChannelMembership = async () => {
+  const handleVerifyChannelMembership = () => {
     if (!telegramId) {
       notify("প্রথমে টেলিগ্রাম বটের সাথে কানেক্ট করুন!");
       return;
     }
     setIsCheckingChannel(true);
-    try {
-      const res = await safeApiFetch(`/api/telegram/check-join?userId=${telegramId}`);
-      setIsCheckingChannel(false);
-      if (res.ok) {
+    fetch(`/api/telegram/check-join?userId=${telegramId}`)
+      .then(async r => {
+        const data = await r.json();
+        if (!r.ok) {
+          throw new Error(data.error || "চ্যানেলে জয়েন করা হয়নি");
+        }
+        return data;
+      })
+      .then(data => {
+        setIsCheckingChannel(false);
         setIsChannelJoined(true);
-        notify(res.data?.message || "অভিনন্দন! আপনি আমাদের টেলিগ্রাম চ্যানেলে জয়েন করেছেন। ✅");
-      } else {
-        notify(res.error || res.data?.error || "আপনি এখনও আমাদের টেলিগ্রাম চ্যানেলে জয়েন করেননি! ❌");
-      }
-    } catch (err: any) {
-      setIsCheckingChannel(false);
-      console.error("Error verifying channel status:", err);
-      notify(err.message || "আপনি এখনও আমাদের টেলিগ্রাম চ্যানেলে জয়েন করেননি! ❌");
-    }
+        notify(data.message || "অভিনন্দন! আপনি আমাদের টেলিগ্রাম চ্যানেলে জয়েন করেছেন। ✅");
+      })
+      .catch(err => {
+        setIsCheckingChannel(false);
+        console.error("Error verifying channel status:", err);
+        notify(err.message || "আপনি এখনও আমাদের টেলিগ্রাম চ্যানেলে জয়েন করেননি! ❌");
+      });
   };
 
   const BOT_USERNAME = botConfig.botUsername;
@@ -249,7 +257,7 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
   const pendingRequest = telegramRequests.find(req => req.userId === user.id && req.status === 'pending');
   const rejectedRequest = telegramRequests.find(req => req.userId === user.id && req.status === 'rejected');
 
-  const handleGenerateCode = async () => {
+  const handleGenerateCode = () => {
     if (!telegramPhone || telegramPhone.trim().length < 8) {
       notify("অনুগ্রহ করে আপনার সঠিক টেলিগ্রাম মোবাইল নম্বরটি আগে প্রদান করুন! ❌");
       return;
@@ -258,32 +266,40 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
     const code = 'AREZ-' + Math.floor(100000 + Math.random() * 900000);
     setVerificationCode(code);
 
-    const res = await safeApiFetch('/api/telegram/register-code', {
+    fetch('/api/telegram/register-code', {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({
         code,
         expectedPhone: telegramPhone
       })
-    });
-
-    if (res.ok) {
-      setIsBotConnected(false);
-      setTelegramUsername('');
-      setTelegramId('');
-      setIsChannelJoined(false);
-      onUpdateUser({ 
-        ...user, 
-        telegramVerificationCode: code,
-        telegramPhone: telegramPhone.replace('+', '').trim(),
-        telegramUsername: '',
-        telegramId: '',
-        hasJoinedTelegramChannel: false
+    })
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to register code on server.");
+        return res.json();
+      })
+      .then(() => {
+        setIsBotConnected(false);
+        setTelegramUsername('');
+        setTelegramId('');
+        setIsChannelJoined(false);
+        onUpdateUser({ 
+          ...user, 
+          telegramVerificationCode: code,
+          telegramPhone: telegramPhone.replace('+', '').trim(),
+          telegramUsername: '',
+          telegramId: '',
+          hasJoinedTelegramChannel: false
+        });
+        setStep(2);
+        notify("টোকেন সফলভাবে তৈরি হয়েছে এবং সার্ভারে সেভ করা হয়েছে! ✅");
+      })
+      .catch(err => {
+        console.error(err);
+        notify("সার্ভারে কোড রেজিস্টার করতে ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।");
       });
-      setStep(2);
-      notify("টোকেন সফলভাবে তৈরি হয়েছে এবং সার্ভারে সেভ করা হয়েছে! ✅");
-    } else {
-      notify(res.error || "Failed to register code on server.");
-    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

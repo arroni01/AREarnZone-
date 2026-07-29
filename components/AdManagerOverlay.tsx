@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, GlobalConfig, AdViewLog, Ad } from '../types';
-import { safeApiFetch } from '../utils/apiClient';
 import { 
   ShieldAlert, 
   Clock, 
@@ -430,10 +429,10 @@ const AdManagerOverlay: React.FC<AdManagerOverlayProps> = ({
       const targetUrl = currentAd.url;
       console.log("[Client TikTok] Fetching ID from API for:", targetUrl);
       
-      safeApiFetch(`/api/tiktok-id?url=${encodeURIComponent(targetUrl)}`)
+      fetch(`/api/tiktok-id?url=${encodeURIComponent(targetUrl)}`)
         .then(res => {
-          if (!res.ok || !res.data) throw new Error("Failed to resolve TikTok on server");
-          return res.data;
+          if (!res.ok) throw new Error("Failed to resolve TikTok on server");
+          return res.json();
         })
         .then(data => {
           if (data.videoId) {
