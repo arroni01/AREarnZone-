@@ -2131,7 +2131,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     // Send withdrawal approved email notification
     const targetUser = (users || []).find((u) => u.id === withdraw.userId);
     if (targetUser && targetUser.email) {
-      fetch("/api/email/notify", {
+      fetch(getApiUrl("/api/email/notify"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2230,7 +2230,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       // Send withdrawal approved email notification
       const targetUser = (users || []).find((u) => u.id === withdraw.userId);
       if (targetUser && targetUser.email) {
-        fetch("/api/email/notify", {
+        fetch(getApiUrl("/api/email/notify"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -2362,7 +2362,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
         // Send account status verification email notification
         if (targetUser.email) {
-          fetch("/api/email/notify", {
+          fetch(getApiUrl("/api/email/notify"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -2726,7 +2726,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
     // Send account suspension status changed email notification
     if (selectedUserForManage.email) {
-      fetch("/api/email/notify", {
+      fetch(getApiUrl("/api/email/notify"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
