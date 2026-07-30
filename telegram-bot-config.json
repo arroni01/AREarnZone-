@@ -1,6 +1,6 @@
 {
   "token": "",
-  "username": "@AREarnZone_bot",
+  "username": "@AREranZone_bot",
   "channel": "https://t.me/arearnzone",
   "smtpList": [
     {
@@ -13,6 +13,5 @@
       "pass": "Iwnbipzmpgtvpekg",
       "limit": 500
     }
-  ],
-  "tokenSource": "telegram-bot-config.json"
+  ]
 }

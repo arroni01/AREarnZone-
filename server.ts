@@ -44,47 +44,27 @@ function getTelegramConfig() {
     channel: "https://t.me/arearnzone",
     smtpList: []
   };
-  let source = "none";
 
-  // 1. Check process.env.TELEGRAM_BOT_TOKEN or VITE_TELEGRAM_BOT_TOKEN first
-  const envToken = process.env.TELEGRAM_BOT_TOKEN || process.env.VITE_TELEGRAM_BOT_TOKEN;
-  if (envToken && envToken.trim()) {
-    config.token = envToken.trim();
-    source = process.env.TELEGRAM_BOT_TOKEN ? "process.env.TELEGRAM_BOT_TOKEN" : "process.env.VITE_TELEGRAM_BOT_TOKEN";
-  }
-
-  // 2. Load file config if present (allows Admin Panel saves or persistent config)
+  // Load secondary settings (username, channel, smtpList) from config file if present
   try {
     if (fs.existsSync(CONFIG_FILE)) {
       const fileConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
-      config = { ...config, ...fileConfig };
-
-      if (fileConfig.token && typeof fileConfig.token === "string" && fileConfig.token.trim()) {
-        const fileToken = fileConfig.token.trim();
-        const isDummy = fileToken.startsWith("123456789") || fileToken === "123456789:ABCdefGHIjklMNOpqrsTUVwxyz123456789";
-
-        if (!isDummy) {
-          if (!envToken || !envToken.trim()) {
-            config.token = fileToken;
-            source = "telegram-bot-config.json";
-          }
-        } else if (!envToken || !envToken.trim()) {
-          config.token = ""; // clear dummy placeholder so it does not trigger 401
-        }
-      }
+      if (fileConfig.username) config.username = fileConfig.username;
+      if (fileConfig.channel) config.channel = fileConfig.channel;
+      if (Array.isArray(fileConfig.smtpList)) config.smtpList = fileConfig.smtpList;
     }
   } catch (e) {}
 
-  // 3. Sanitize token (strip accidental "bot" prefix or trailing whitespace)
-  if (config.token && typeof config.token === "string") {
-    let clean = config.token.trim();
-    if (clean.toLowerCase().startsWith("bot") && clean.includes(":")) {
-      clean = clean.substring(3);
+  // ONLY process.env.TELEGRAM_BOT_TOKEN is used for Telegram Bot Token
+  let rawToken = (process.env.TELEGRAM_BOT_TOKEN || "").trim();
+  if (rawToken) {
+    if (rawToken.toLowerCase().startsWith("bot") && rawToken.includes(":")) {
+      rawToken = rawToken.substring(3).trim();
     }
-    config.token = clean.trim();
   }
 
-  config.tokenSource = source;
+  config.token = rawToken;
+  config.tokenSource = rawToken ? "process.env.TELEGRAM_BOT_TOKEN" : "none";
   return config;
 }
 
