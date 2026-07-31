@@ -1,0 +1,10 @@
+name = "arearnzone-backend"
+main = "server.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = [ "nodejs_compat" ]
+
+[site]
+bucket = "./dist"
+
+[vars]
+NODE_ENV = "production"
