@@ -44,27 +44,37 @@ function getTelegramConfig() {
     channel: "https://t.me/arearnzone",
     smtpList: []
   };
-
-  // Load secondary settings (username, channel, smtpList) from config file if present
+  let source = "none";
   try {
     if (fs.existsSync(CONFIG_FILE)) {
       const fileConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
-      if (fileConfig.username) config.username = fileConfig.username;
-      if (fileConfig.channel) config.channel = fileConfig.channel;
-      if (Array.isArray(fileConfig.smtpList)) config.smtpList = fileConfig.smtpList;
+      config = { ...config, ...fileConfig };
+      if (fileConfig.token && typeof fileConfig.token === "string" && fileConfig.token.trim()) {
+        source = "telegram-bot-config.json";
+      }
     }
   } catch (e) {}
 
-  // ONLY process.env.TELEGRAM_BOT_TOKEN is used for Telegram Bot Token
-  let rawToken = (process.env.TELEGRAM_BOT_TOKEN || "").trim();
-  if (rawToken) {
-    if (rawToken.toLowerCase().startsWith("bot") && rawToken.includes(":")) {
-      rawToken = rawToken.substring(3).trim();
+  // Use environment variables ONLY if config.token in file is empty/missing
+  if (!config.token || !config.token.trim()) {
+    const envToken = process.env.TELEGRAM_BOT_TOKEN || process.env.VITE_TELEGRAM_BOT_TOKEN;
+    if (envToken && envToken.trim() && !envToken.includes("8008225715:AAEcA2qivE4QE_55Za_GyUd7f31B0s-4FgE")) {
+      config.token = envToken.trim();
+      source = process.env.TELEGRAM_BOT_TOKEN ? "process.env.TELEGRAM_BOT_TOKEN" : "process.env.VITE_TELEGRAM_BOT_TOKEN";
     }
   }
 
-  config.token = rawToken;
-  config.tokenSource = rawToken ? "process.env.TELEGRAM_BOT_TOKEN" : "none";
+  // Sanitize token (strip accidental URL or "bot" prefix)
+  if (config.token && typeof config.token === "string") {
+    config.token = config.token
+      .trim()
+      .replace(/^(https?:\/\/)?(api\.telegram\.org\/)?(bot)?/i, "")
+      .replace(/[:.\s]+$/, "")
+      .replace(/^[:.\s]+/, "")
+      .trim();
+  }
+
+  config.tokenSource = source;
   return config;
 }
 
@@ -97,7 +107,7 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // CORS Middleware to allow cross-origin requests from the custom Firebase Hosting domain & external clients
+  // CORS Middleware to allow cross-origin requests from the custom Firebase Hosting domain
   app.use((req, res, next) => {
     const origin = req.headers.origin;
     if (origin) {
@@ -105,13 +115,12 @@ async function startServer() {
     } else {
       res.setHeader("Access-Control-Allow-Origin", "*");
     }
-    res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, DELETE, PATCH, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers");
+    res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
     res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Access-Control-Max-Age", "86400");
     
     if (req.method === "OPTIONS") {
-      return res.status(200).end();
+      return res.sendStatus(200);
     }
     next();
   });

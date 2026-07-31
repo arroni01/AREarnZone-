@@ -543,7 +543,7 @@ export async function runAllRegressionTests(baseUrl: string = "http://localhost:
 }
 
 // CLI Execution Entry Point when script is executed directly
-if (process.argv[1]?.endsWith("runRegressionTests.ts") || process.argv[1]?.endsWith("runRegressionTests.js")) {
+if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("runRegressionTests.ts")) {
   console.log("=================================================");
   console.log("AREarnZone - Comprehensive 17-Module Non-Breaking Regression Test Suite");
   console.log("=================================================");

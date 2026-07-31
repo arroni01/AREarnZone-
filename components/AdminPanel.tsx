@@ -28,7 +28,7 @@ import {
   CPATransaction,
 } from "../types";
 import { ICONS } from "../constants";
-import { getApiUrl, getBackendUrl, setBackendUrl } from "../src/utils/apiConfig";
+import { getApiUrl } from "../src/utils/apiConfig";
 import MonitorDashboard from "./MonitorDashboard";
 import CPAControlCenter from "./CPAControlCenter";
 import RegressionTestDashboard from "./RegressionTestDashboard";
@@ -1342,45 +1342,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [tgBotMaskedToken, setTgBotMaskedToken] = useState<string | null>(null);
   const [tgBotLastErr, setTgBotLastErr] = useState<string | null>(null);
 
-  const [backendUrlInput, setBackendUrlInput] = useState(() => getBackendUrl());
-  const [isTestingBackendConn, setIsTestingBackendConn] = useState(false);
-  const [backendConnStatus, setBackendConnStatus] = useState<string | null>(null);
-
-  const handleSaveBackendUrl = (urlToSave?: string) => {
-    const target = urlToSave || backendUrlInput;
-    if (!target || !target.trim()) {
-      setBackendUrl("");
-      setBackendUrlInput(getBackendUrl());
-      notify("Backend API URL reset to default!");
-      return;
-    }
-    const clean = target.trim().replace(/\/$/, '');
-    setBackendUrl(clean);
-    setBackendUrlInput(clean);
-    notify("Backend API Server URL updated: " + clean);
-    fetchTelegramConfig();
-  };
-
-  const handleTestBackendConn = async () => {
-    setIsTestingBackendConn(true);
-    setBackendConnStatus(null);
-    try {
-      const url = getApiUrl("/api/telegram/config");
-      const res = await fetch(url);
-      if (res.ok) {
-        setBackendConnStatus("SUCCESS: Connected to backend server successfully! (200 OK)");
-        notify("Backend connection successful! ✅");
-      } else {
-        setBackendConnStatus(`WARNING: Backend server responded with status ${res.status}`);
-      }
-    } catch (err: any) {
-      setBackendConnStatus(`ERROR: Connection failed (${err.message}). Check Render Backend URL.`);
-      notify("Backend connection failed.");
-    } finally {
-      setIsTestingBackendConn(false);
-    }
-  };
-
   const [telegramFilter, setTelegramFilter] = useState<
     "all" | "pending" | "approved" | "rejected"
   >("pending");
@@ -1868,13 +1829,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     } catch (err: any) {
       setIsSavingTgBot(false);
       setTgBotStatusOk(false);
-      const isFetchErr = err?.message?.includes("Failed to fetch") || err?.message?.includes("NetworkError");
-      if (isFetchErr) {
-        setTgBotStatusMsg(`কানেকশন সার্ভার ত্রুটি (Failed to fetch): ব্রাউজার ব্যাকএন্ড URL (${getBackendUrl()}) এর সাথে কানেক্ট করতে পারছে না। নিচে "Backend API Server URL" সঠিক আছে কিনা চেক করুন।`);
-      } else {
-        setTgBotStatusMsg("বট কানেকশন সার্ভার ত্রুটি: " + err.message);
-      }
-      notify("সার্ভার কানেকশন এরর।");
+      setTgBotStatusMsg("বট কানেকশন সার্ভার ত্রুটি: " + err.message);
+      notify("সার্ভার এরর।");
     }
   };
 
@@ -4619,53 +4575,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       তাত্ক্ষণিকভাবে আপনার বটের সাথে সাইটের রিয়েল-টাইম সংযোগ
                       স্থাপন করবে।
                     </p>
-                  </div>
-
-                  {/* Backend API Server URL Configurator (Render Backend Connection) */}
-                  <div className="p-4 bg-slate-200/50 dark:bg-slate-900/50 border border-slate-300/50 dark:border-white/10 rounded-2xl space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div>
-                        <div className="text-[10px] font-black uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                          🌐 Render Backend API URL (ব্যাকএন্ড সার্ভার কানেকশন)
-                        </div>
-                        <div className="text-[9px] text-slate-500 dark:text-slate-400">
-                          লাইভ সাইট (Firebase Hosting) থেকে Render সার্ভারের API এর সাথে যোগাযোগের লিঙ্ক
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={handleTestBackendConn}
-                          disabled={isTestingBackendConn}
-                          className="px-3 py-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-500 hover:bg-blue-500 hover:text-white rounded-xl text-[9px] font-black uppercase transition-all cursor-pointer"
-                        >
-                          {isTestingBackendConn ? "টেস্ট করা হচ্ছে..." : "⚡ Test Connection"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSaveBackendUrl()}
-                          className="px-3 py-1.5 bg-emerald-500 text-slate-950 hover:bg-emerald-400 rounded-xl text-[9px] font-black uppercase transition-all cursor-pointer"
-                        >
-                          💾 Save Backend URL
-                        </button>
-                      </div>
-                    </div>
-                    <input
-                      type="text"
-                      value={backendUrlInput}
-                      onChange={(e) => setBackendUrlInput(e.target.value)}
-                      placeholder="https://arearnzone.onrender.com"
-                      className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl py-2 px-3 text-xs font-mono font-bold outline-none text-slate-800 dark:text-slate-100"
-                    />
-                    {backendConnStatus && (
-                      <div className={`text-[9px] p-2.5 rounded-xl font-mono font-bold border ${
-                        backendConnStatus.startsWith("SUCCESS") 
-                          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500" 
-                          : "bg-rose-500/10 border-rose-500/30 text-rose-500"
-                      }`}>
-                        {backendConnStatus}
-                      </div>
-                    )}
                   </div>
 
                   {/* Live Telegram Bot Health Status Badge */}

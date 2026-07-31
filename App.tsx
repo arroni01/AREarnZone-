@@ -43,7 +43,6 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { getAIRecoveryConfig, runAIHealthScanAndRecovery } from './utils/aiRecoveryEngine';
 import { WelcomeSplashScreen } from './components/WelcomeSplashScreen';
 import { AppLoadingScreen } from './components/AppLoadingScreen';
-import { getApiUrl } from './src/utils/apiConfig';
 
 // Global Translations Dictionary (Expanded)
 const TRANSLATIONS = {
@@ -1273,7 +1272,7 @@ const App: React.FC = () => {
 
   // Automatic Telegram Bot configuration restorer on app load (uses Firestore-persisted globalConfig & local storage fallback)
   useEffect(() => {
-    fetch(getApiUrl('/api/telegram/config'))
+    fetch('/api/telegram/config')
       .then(res => res.json())
       .then(async data => {
         if (data && !data.isConfigured) {
@@ -1284,7 +1283,7 @@ const App: React.FC = () => {
 
           if (firestoreToken && firestoreToken.trim()) {
             console.log("[Telegram Bot Global Cache] Restoring bot configuration from Firestore globalConfig...");
-            await fetch(getApiUrl('/api/telegram/save-config'), {
+            await fetch('/api/telegram/save-config', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -1305,7 +1304,7 @@ const App: React.FC = () => {
               const parsed = JSON.parse(cached);
               if (parsed && parsed.token && parsed.token.trim()) {
                 console.log("[Telegram Bot Global Cache] Restoring bot configuration in background...");
-                await fetch(getApiUrl('/api/telegram/save-config'), {
+                await fetch('/api/telegram/save-config', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
