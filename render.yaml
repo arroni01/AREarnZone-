@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: arearnzone-backend
+    name: arearnzone
     env: node
     buildCommand: npm install && npm run build
     startCommand: npm start

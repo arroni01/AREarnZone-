@@ -4654,7 +4654,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       type="text"
                       value={backendUrlInput}
                       onChange={(e) => setBackendUrlInput(e.target.value)}
-                      placeholder="https://arearnzone-backend.onrender.com"
+                      placeholder="https://arearnzone.onrender.com"
                       className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl py-2 px-3 text-xs font-mono font-bold outline-none text-slate-800 dark:text-slate-100"
                     />
                     {backendConnStatus && (

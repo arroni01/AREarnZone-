@@ -1,4 +1,4 @@
-const DEFAULT_BACKEND_URL = (import.meta.env.VITE_API_URL as string) || "https://arearnzone-backend.onrender.com";
+const DEFAULT_BACKEND_URL = (import.meta.env.VITE_API_URL as string) || "https://arearnzone.onrender.com";
 
 export const getBackendUrl = (): string => {
   if (typeof window !== 'undefined') {
@@ -14,16 +14,26 @@ export const getBackendUrl = (): string => {
     } catch (e) {}
 
     // 2. Check localStorage custom backend URL set by Admin
-    const localBackend = localStorage.getItem('AREARNZONE_BACKEND_URL') || localStorage.getItem('VITE_API_URL');
+    let localBackend = localStorage.getItem('AREARNZONE_BACKEND_URL') || localStorage.getItem('VITE_API_URL');
     if (localBackend && localBackend.trim()) {
-      return localBackend.trim().replace(/\/$/, '');
+      let clean = localBackend.trim().replace(/\/$/, '');
+      // Auto-migrate old non-existent 'arearnzone-backend.onrender.com' to active 'arearnzone.onrender.com'
+      if (clean.includes('arearnzone-backend.onrender.com')) {
+        clean = clean.replace('arearnzone-backend.onrender.com', 'arearnzone.onrender.com');
+        localStorage.setItem('AREARNZONE_BACKEND_URL', clean);
+      }
+      return clean;
     }
   }
 
   // 3. Environment variable if available
   const envApiUrl = import.meta.env.VITE_API_URL || (typeof process !== 'undefined' && process.env?.VITE_API_URL);
   if (envApiUrl && envApiUrl.trim()) {
-    return envApiUrl.trim().replace(/\/$/, '');
+    let clean = envApiUrl.trim().replace(/\/$/, '');
+    if (clean.includes('arearnzone-backend.onrender.com')) {
+      clean = clean.replace('arearnzone-backend.onrender.com', 'arearnzone.onrender.com');
+    }
+    return clean;
   }
 
   return DEFAULT_BACKEND_URL.replace(/\/$/, '');
