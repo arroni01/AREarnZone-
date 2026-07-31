@@ -23,6 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 
+# Bun lockfile
+bun.lock
+bun.lockb
+.bun
+
 # Credentials and secrets
 .env
 
