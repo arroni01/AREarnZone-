@@ -578,11 +578,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       }
     } catch (e) {}
     
-    // Check current window context to select best-effort fallback
-    if (typeof window !== 'undefined' && window.location.href.includes('-pre-')) {
-      return "https://ais-pre-h4thh2b6cws4brqp63elrb-90229307226.asia-southeast1.run.app";
-    }
-    return "https://ais-dev-h4thh2b6cws4brqp63elrb-90229307226.asia-southeast1.run.app";
+    return "https://arearnzone-asia-no1-freelance.web.app";
   };
 
   const isFramed = (): boolean => {
@@ -659,28 +655,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
   
   useEffect(() => {
     try {
-      const safeOrigin = getOriginSafe();
-      const fetchUrl = getApiUrl(`/api/auth/google/url?origin=${encodeURIComponent(safeOrigin || '')}`);
-      
-      fetch(fetchUrl)
-        .then(res => {
-          if (!res.ok) throw new Error(`HTTP status ${res.status}`);
-          return res.json();
-        })
-        .then(data => {
-          if (data && data.redirectUri) {
-            setGRedirectUri(data.redirectUri);
-          } else {
-            setGRedirectUri(getBothRedirectUris().devUri);
-          }
-        })
-        .catch(err => {
-          console.warn("[Google Auth] Using calculated fallback redirect URI for help panel:", err);
-          setGRedirectUri(getBothRedirectUris().devUri);
-        });
+      const firebaseHandlerUri = getBothRedirectUris().firebaseHandlerUri;
+      setGRedirectUri(firebaseHandlerUri);
     } catch (e) {
-      console.warn("[Google Auth] Exception during redirect URI resolution:", e);
-      setGRedirectUri(getBothRedirectUris().devUri);
+      console.warn("[Google Auth] Exception setting redirect URI for help panel:", e);
     }
   }, []);
   
@@ -1080,6 +1058,13 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       setError('');
       setIsGoogleLoading(true);
 
+      // Never use preview domain (*.run.app) for Google Authentication.
+      if (typeof window !== 'undefined' && window.location.hostname.endsWith('.run.app')) {
+        console.log("[Google Auth] Preview domain detected (*.run.app). Redirecting to production domain for Google Authentication...");
+        window.location.href = "https://arearnzone-asia-no1-freelance.web.app";
+        return;
+      }
+
       // Save referral code in local storage before login
       if (referral && referral.trim()) {
         localStorage.setItem('arez_pending_referral', referral.trim());
@@ -1088,14 +1073,20 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       }
 
       console.log("[Google Auth] Initializing GoogleAuthProvider for popup authentication...");
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
-
+      const exactClientId = firebaseConfig.oAuthClientId || "1090367277778-tnh08lj1oah2fkc3cn58458os3om1j39.apps.googleusercontent.com";
       const activeAuthDomain = (auth.app.options as any)?.authDomain || firebaseConfig.authDomain || 'arearnzone.firebaseapp.com';
       const exactRedirectUri = `https://${activeAuthDomain}/__/auth/handler`;
-      console.log(`[Google Auth] Exact Redirect URI being sent to Google OAuth: ${exactRedirectUri}`);
+      const exactAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${exactClientId}&redirect_uri=${encodeURIComponent(exactRedirectUri)}&response_type=token%20id_token&scope=openid%20profile%20email&prompt=select_account`;
+
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({
+        prompt: 'select_account',
+        client_id: exactClientId
+      });
+
+      console.log("[Google Auth] 1. Exact client_id:", exactClientId);
+      console.log("[Google Auth] 2. Exact redirect_uri:", exactRedirectUri);
+      console.log("[Google Auth] 3. Exact authorization URL:", exactAuthUrl);
 
       console.log("[Google Auth] Initiating Firebase signInWithPopup...");
       const result = await signInWithPopup(auth, provider);
@@ -1137,6 +1128,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       const isUnauthorized = rawCode === 'auth/unauthorized-domain' || rawMessage.includes('unauthorized-domain');
       const isOpNotAllowed = rawCode === 'auth/operation-not-allowed' || rawMessage.includes('operation-not-allowed');
       const isPopupBlocked = rawCode === 'auth/popup-blocked';
+      const isRedirectMismatch = rawMessage.includes('redirect_uri_mismatch') || rawMessage.includes('invalid_request') || rawCode.includes('redirect-uri-mismatch');
       
       let friendlyError = rawMessage || "Google Login failed.";
       if (isPopupClosed) {
@@ -1149,6 +1141,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
         friendlyError = `অননুমোদিত ডোমেন! এই ডোমেনটি (${domain}) ফায়ারবেস কনসোলে Authorized Domains হিসেবে যুক্ত করা নেই। (Unauthorized Domain: Add ${domain} to your Firebase authorized domains list.)`;
       } else if (isOpNotAllowed) {
         friendlyError = `গুগল লগইন সুবিধাটি ফায়ারবেস কনসোলে সক্রিয় করা নেই। (Google Sign-In provider is disabled in Firebase Console. Please enable Google sign-in in Firebase Authentication settings.)`;
+      } else if (isRedirectMismatch) {
+        setShowHelp(true);
+        friendlyError = `Error 400: redirect_uri_mismatch! Google Cloud Console-এ https://arearnzone.firebaseapp.com/__/auth/handler রিডাইরেক্ট ইউআরআই (Authorized redirect URIs) হিসেবে যোগ করুন।`;
       } else if (rawCode) {
         friendlyError = `গুগল সাইন-ইন ব্যর্থ হয়েছে। এরর কোড: ${rawCode} (${rawMessage})`;
       } else {

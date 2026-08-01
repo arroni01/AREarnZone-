@@ -5,7 +5,6 @@ import http from "http";
 import fs from "fs";
 import path from "path";
 import nodemailer from "nodemailer";
-import { OAuth2Client } from "google-auth-library";
 
 const app = new Hono();
 
@@ -280,102 +279,17 @@ app.post("/api/email/notify", async (c) => {
 });
 
 // ==========================================
-// 2. GOOGLE OAUTH APIS
+// 2. GOOGLE OAUTH APIS (Firebase Authentication standard)
 // ==========================================
 
 app.get("/api/auth/google/url", (c) => {
-  const origin = c.req.query("origin") || "http://localhost:3000";
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    return c.json({
-      url: null,
-      isSandbox: false,
-      message: "Google OAuth Client ID/Secret not configured on backend."
-    });
-  }
-
-  const redirectUri = `${origin}/auth/google/callback`;
-  const oauth2Client = new OAuth2Client(clientId, clientSecret, redirectUri);
-  const url = oauth2Client.generateAuthUrl({
-    access_type: "offline",
-    scope: [
-      "https://www.googleapis.com/auth/userinfo.profile",
-      "https://www.googleapis.com/auth/userinfo.email"
-    ],
-    prompt: "consent"
+  return c.json({
+    provider: "firebase",
+    authDomain: "arearnzone.firebaseapp.com",
+    redirectUri: "https://arearnzone.firebaseapp.com/__/auth/handler",
+    message: "Google Authentication is handled client-side via Firebase signInWithPopup."
   });
-
-  return c.json({ url, isSandbox: false });
 });
-
-const handleGoogleCallback = async (c: any) => {
-  try {
-    const code = c.req.query("code");
-    const host = c.req.header("host") || "localhost:3000";
-    const protocol = c.req.header("x-forwarded-proto") || "http";
-    const origin = `${protocol}://${host}`;
-    const redirectUri = `${origin}/auth/google/callback`;
-
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-
-    if (!clientId || !clientSecret || !code) {
-      const html = `<!DOCTYPE html>
-      <html>
-      <body>
-        <script>
-          if (window.opener) {
-            window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', user: { email: 'user@gmail.com', name: 'Google User', photoURL: '' } }, '*');
-            window.close();
-          } else {
-            window.location.href = '/';
-          }
-        </script>
-      </body>
-      </html>`;
-      return c.html(html);
-    }
-
-    const oauth2Client = new OAuth2Client(clientId, clientSecret, redirectUri);
-    const { tokens } = await oauth2Client.getToken(code);
-    oauth2Client.setCredentials(tokens);
-
-    const userRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
-      headers: { Authorization: `Bearer ${tokens.access_token}` }
-    });
-    const profile = await userRes.json();
-
-    const html = `<!DOCTYPE html>
-    <html>
-    <body>
-      <script>
-        if (window.opener) {
-          window.opener.postMessage({
-            type: 'GOOGLE_AUTH_SUCCESS',
-            user: {
-              email: ${JSON.stringify(profile.email)},
-              name: ${JSON.stringify(profile.name)},
-              photoURL: ${JSON.stringify(profile.picture || '')}
-            }
-          }, '*');
-          window.close();
-        } else {
-          window.location.href = '/?google_auth=success';
-        }
-      </script>
-    </body>
-    </html>`;
-    return c.html(html);
-  } catch (err: any) {
-    console.error("Google Callback Error:", err);
-    return c.html(`<h3>Google Sign-In failed: ${err.message}</h3><a href="/">Return Home</a>`);
-  }
-};
-
-app.get("/auth/google/callback", handleGoogleCallback);
-app.get("/api/auth/callback/google", handleGoogleCallback);
 
 // ==========================================
 // 3. ADMIN & SMTP CONFIG APIS
