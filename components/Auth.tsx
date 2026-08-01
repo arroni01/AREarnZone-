@@ -1108,49 +1108,25 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       handleGoogleAuthSuccess(googleUserPayload);
 
     } catch (err: any) {
-      let rawCode = err?.code || "";
-      let rawMessage = err?.message || String(err || "");
-      
-      // Extract Firebase error code if embedded in message
-      if (!rawCode && rawMessage) {
-        const codeMatch = rawMessage.match(/\((auth\/[a-zA-Z0-9-]+)\)/);
-        if (codeMatch && codeMatch[1]) {
-          rawCode = codeMatch[1];
-        }
-      }
+      console.error("[ORIGINAL FIREBASE ERROR]:", err);
+      console.error("error.code:", err?.code);
+      console.error("error.message:", err?.message);
+      console.error("error.stack:", err?.stack);
+      console.error("error.cause:", err?.cause);
 
-      console.error("Google Login via Firebase Auth Error:", err);
-      const domain = typeof window !== 'undefined' ? window.location.hostname : "unknown";
-      
-      const isPopupClosed = rawCode === 'auth/popup-closed-by-user';
-      const isCancelled = rawCode === 'auth/cancelled-popup-request';
-      const isUnauthorized = rawCode === 'auth/unauthorized-domain' || rawMessage.includes('unauthorized-domain');
-      const isOpNotAllowed = rawCode === 'auth/operation-not-allowed' || rawMessage.includes('operation-not-allowed');
-      const isPopupBlocked = rawCode === 'auth/popup-blocked';
-      const isRedirectMismatch = rawMessage.includes('redirect_uri_mismatch') || rawMessage.includes('invalid_request') || rawCode.includes('redirect-uri-mismatch');
-      
-      let friendlyError = rawMessage || "Google Login failed.";
-      if (isPopupClosed) {
-        friendlyError = "সাইন-ইন পপআপ উইন্ডোটি বন্ধ করা হয়েছে। গুগল অ্যাকাউন্ট নির্বাচন করতে আবার চেষ্টা করুন। (Sign-in popup was closed. Please try again and select your account.)";
-      } else if (isCancelled) {
-        friendlyError = "সাইন-ইন অনুরোধটি বাতিল করা হয়েছে। (Sign-in request was cancelled.)";
-      } else if (isPopupBlocked) {
-        friendlyError = "পপআপ ব্লক করা হয়েছে! অনুগ্রহ করে ব্রাউজারে পপআপ অনুমোদন করুন। (Popup blocked! Please allow popups for this site.)";
-      } else if (isUnauthorized) {
-        friendlyError = `অননুমোদিত ডোমেন! এই ডোমেনটি (${domain}) ফায়ারবেস কনসোলে Authorized Domains হিসেবে যুক্ত করা নেই। (Unauthorized Domain: Add ${domain} to your Firebase authorized domains list.)`;
-      } else if (isOpNotAllowed) {
-        friendlyError = `গুগল লগইন সুবিধাটি ফায়ারবেস কনসোলে সক্রিয় করা নেই। (Google Sign-In provider is disabled in Firebase Console. Please enable Google sign-in in Firebase Authentication settings.)`;
-      } else if (isRedirectMismatch) {
-        setShowHelp(true);
-        friendlyError = `Error 400: redirect_uri_mismatch! Google Cloud Console-এ https://arearnzone.firebaseapp.com/__/auth/handler রিডাইরেক্ট ইউআরআই (Authorized redirect URIs) হিসেবে যোগ করুন।`;
-      } else if (rawCode) {
-        friendlyError = `গুগল সাইন-ইন ব্যর্থ হয়েছে। এরর কোড: ${rawCode} (${rawMessage})`;
-      } else {
-        friendlyError = `গুগল সাইন-ইন ব্যর্থ হয়েছে। (${rawMessage})`;
-      }
-      
-      setError(friendlyError);
-      notify(friendlyError);
+      const rawCode = err?.code || "N/A";
+      const rawMessage = err?.message || String(err || "");
+      const rawStack = err?.stack || "N/A";
+      const rawCause = err?.cause ? (typeof err.cause === 'object' ? JSON.stringify(err.cause) : String(err.cause)) : "N/A";
+
+      const originalErrorDetails = `[ORIGINAL FIREBASE ERROR]
+error.code: ${rawCode}
+error.message: ${rawMessage}
+error.stack: ${rawStack}
+error.cause: ${rawCause}`;
+
+      setError(originalErrorDetails);
+      notify(originalErrorDetails);
       setIsGoogleLoading(false);
     }
   };
