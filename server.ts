@@ -290,9 +290,9 @@ app.get("/api/auth/google/url", (c) => {
 
   if (!clientId || !clientSecret) {
     return c.json({
-      url: `${origin}/?google_sandbox=true`,
-      isSandbox: true,
-      message: "Google OAuth Client ID/Secret not configured. Running in sandbox."
+      url: null,
+      isSandbox: false,
+      message: "Google OAuth Client ID/Secret not configured on backend."
     });
   }
 

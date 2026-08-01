@@ -16,8 +16,27 @@ import {
 import { getAuth } from "firebase/auth";
 import firebaseConfig from "./firebase-applet-config.json";
 
+// Dynamically determine appropriate authDomain based on runtime hostname
+const getResolvedFirebaseConfig = () => {
+  const config = { ...firebaseConfig };
+  // Ensure default authDomain uses standard <projectId>.firebaseapp.com
+  if (!config.authDomain || config.authDomain.includes('arearnzone-asia-no1-freelance')) {
+    config.authDomain = `${config.projectId || 'arearnzone'}.firebaseapp.com`;
+  }
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    if (hostname.endsWith('.web.app') || hostname.endsWith('.firebaseapp.com')) {
+      const authHost = hostname.endsWith('.web.app')
+        ? hostname.replace(/\.web\.app$/, '.firebaseapp.com')
+        : hostname;
+      config.authDomain = authHost;
+    }
+  }
+  return config;
+};
+
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+const app = initializeApp(getResolvedFirebaseConfig());
 export const auth = getAuth(app);
 
 

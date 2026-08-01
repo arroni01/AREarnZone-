@@ -1084,63 +1084,17 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
         localStorage.removeItem('arez_pending_referral');
       }
 
-      console.log("[Google Auth] Checking server-side custom Google OAuth URL...");
-      const origin = getOriginSafe();
-      const fetchUrl = getApiUrl(`/api/auth/google/url?origin=${encodeURIComponent(origin || '')}`);
-      
-      let authUrl = '';
-      try {
-        const res = await fetch(fetchUrl);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.url) {
-            authUrl = data.url;
-          }
-        }
-      } catch (fetchErr) {
-        console.warn("[Google Auth] Could not retrieve server-side OAuth URL:", fetchErr);
-      }
-
-      if (authUrl) {
-        console.log("[Google Auth] Using server-side Google OAuth. Opening popup window:", authUrl);
-        const width = 500;
-        const height = 650;
-        const left = window.screen.width / 2 - width / 2;
-        const top = window.screen.height / 2 - height / 2;
-
-        const popup = window.open(
-          authUrl,
-          'google_oauth_popup',
-          `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,resizable=yes`
-        );
-
-        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-          // Popup blocked by browser! Redirect current frame instead of failing
-          console.log("[Google Auth] Popup blocked or failed. Performing direct page redirect instead...");
-          window.location.href = authUrl;
-          return;
-        }
-
-        // Periodically monitor popup closed state
-        const timer = setInterval(() => {
-          if (popup.closed) {
-            clearInterval(timer);
-            setTimeout(() => {
-              setIsGoogleLoading(false);
-            }, 1000);
-          }
-        }, 500);
-
-        return;
-      }
-
-      // --- Fallback to original Firebase Auth popup if backend custom URL is not configured/available ---
-      console.log("[Google Auth] Server OAuth URL not available. Falling back to Firebase popup...");
+      console.log("[Google Auth] Initializing GoogleAuthProvider for popup authentication...");
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({
         prompt: 'select_account'
       });
 
+      const activeAuthDomain = (auth.app.options as any)?.authDomain || firebaseConfig.authDomain || 'arearnzone.firebaseapp.com';
+      const exactRedirectUri = `https://${activeAuthDomain}/__/auth/handler`;
+      console.log(`[Google Auth] Exact Redirect URI being sent to Google OAuth: ${exactRedirectUri}`);
+
+      console.log("[Google Auth] Initiating Firebase signInWithPopup...");
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
 
@@ -1161,23 +1115,41 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       handleGoogleAuthSuccess(googleUserPayload);
 
     } catch (err: any) {
-      console.error("Google Login via Firebase Auth Error:", err);
+      let rawCode = err?.code || "";
+      let rawMessage = err?.message || String(err || "");
       
-      const isUnauthorized = (err.code && err.code.includes('unauthorized-domain')) || (err.message && err.message.includes('unauthorized-domain'));
-      const errCode = err.code || "unknown_code";
+      // Extract Firebase error code if embedded in message
+      if (!rawCode && rawMessage) {
+        const codeMatch = rawMessage.match(/\((auth\/[a-zA-Z0-9-]+)\)/);
+        if (codeMatch && codeMatch[1]) {
+          rawCode = codeMatch[1];
+        }
+      }
+
+      console.error("Google Login via Firebase Auth Error:", err);
       const domain = typeof window !== 'undefined' ? window.location.hostname : "unknown";
       
-      let friendlyError = err.message || "Google Login failed.";
-      if (err.code === 'auth/popup-blocked') {
+      const isPopupClosed = rawCode === 'auth/popup-closed-by-user';
+      const isCancelled = rawCode === 'auth/cancelled-popup-request';
+      const isUnauthorized = rawCode === 'auth/unauthorized-domain' || rawMessage.includes('unauthorized-domain');
+      const isOpNotAllowed = rawCode === 'auth/operation-not-allowed' || rawMessage.includes('operation-not-allowed');
+      const isPopupBlocked = rawCode === 'auth/popup-blocked';
+      
+      let friendlyError = rawMessage || "Google Login failed.";
+      if (isPopupClosed) {
+        friendlyError = "সাইন-ইন পপআপ উইন্ডোটি বন্ধ করা হয়েছে। গুগল অ্যাকাউন্ট নির্বাচন করতে আবার চেষ্টা করুন। (Sign-in popup was closed. Please try again and select your account.)";
+      } else if (isCancelled) {
+        friendlyError = "সাইন-ইন অনুরোধটি বাতিল করা হয়েছে। (Sign-in request was cancelled.)";
+      } else if (isPopupBlocked) {
         friendlyError = "পপআপ ব্লক করা হয়েছে! অনুগ্রহ করে ব্রাউজারে পপআপ অনুমোদন করুন। (Popup blocked! Please allow popups for this site.)";
-      } else if (err.code === 'auth/popup-closed-by-user') {
-        friendlyError = "সাইন-ইন পপআপ উইন্ডোটি বন্ধ করা হয়েছে। (Sign-in popup closed before completion.)";
-      } else if (err.code === 'auth/cancelled-popup-request') {
-        friendlyError = "পূর্বের সাইন-ইন অনুরোধটি বাতিল করা হয়েছে। (Sign-in request cancelled.)";
       } else if (isUnauthorized) {
-        friendlyError = `অননুমোদিত ডোমেন! এই ডোমেনটি (${domain}) ফায়ারবেস কনসোলে Authorized Domains হিসেবে যুক্ত করা নেই। (Unauthorized Domain: Add ${domain} to your Firebase authorized domains.)`;
+        friendlyError = `অননুমোদিত ডোমেন! এই ডোমেনটি (${domain}) ফায়ারবেস কনসোলে Authorized Domains হিসেবে যুক্ত করা নেই। (Unauthorized Domain: Add ${domain} to your Firebase authorized domains list.)`;
+      } else if (isOpNotAllowed) {
+        friendlyError = `গুগল লগইন সুবিধাটি ফায়ারবেস কনসোলে সক্রিয় করা নেই। (Google Sign-In provider is disabled in Firebase Console. Please enable Google sign-in in Firebase Authentication settings.)`;
+      } else if (rawCode) {
+        friendlyError = `গুগল সাইন-ইন ব্যর্থ হয়েছে। এরর কোড: ${rawCode} (${rawMessage})`;
       } else {
-        friendlyError = `গুগল সাইন-ইন ব্যর্থ হয়েছে। এরর কোড: ${errCode}। (Google Sign-In failed. Error Code: ${errCode})`;
+        friendlyError = `গুগল সাইন-ইন ব্যর্থ হয়েছে। (${rawMessage})`;
       }
       
       setError(friendlyError);

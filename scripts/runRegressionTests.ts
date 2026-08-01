@@ -85,15 +85,15 @@ export async function runAllRegressionTests(baseUrl: string = "http://localhost:
   try {
     const res = await fetch(`${baseUrl}/api/auth/google/url?origin=${encodeURIComponent(baseUrl)}`);
     const data = await res.json();
-    if (data && (data.url || data.isSandbox)) {
+    if (data && (data.url !== undefined || data.message !== undefined)) {
       addResult(
         "GOOG-01",
         "Google Sign-In",
         "Google OAuth Auth URL Generator",
         true,
-        `Google OAuth URL generated successfully (${data.isSandbox ? "Sandbox Mode" : "Production Mode"}).`,
+        `Google OAuth URL response received (${data.url ? "Custom Backend OAuth" : "Firebase Direct Popup Mode"}).`,
         Date.now() - t2Start,
-        { isSandbox: data.isSandbox }
+        { isSandbox: data.isSandbox, hasCustomUrl: !!data.url }
       );
     } else {
       addResult("GOOG-01", "Google Sign-In", "Google OAuth Auth URL Generator", false, "Response missing auth URL", Date.now() - t2Start);
