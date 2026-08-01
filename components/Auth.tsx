@@ -1080,8 +1080,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
 
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({
-        prompt: 'select_account',
-        client_id: exactClientId
+        prompt: 'select_account'
       });
 
       console.log("[Google Auth] 1. Exact client_id:", exactClientId);
