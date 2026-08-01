@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serve, getRequestListener } from "@hono/node-server";
-import { createServer as createViteServer } from "vite";
 import http from "http";
 import fs from "fs";
 import path from "path";
@@ -788,6 +787,8 @@ if (process.env.NODE_ENV !== "production" || process.env.RUN_NODE_SERVER !== "fa
   const PORT = 3000;
   async function startServer() {
     if (process.env.NODE_ENV !== "production") {
+      const vitePkg = "vite";
+      const { createServer: createViteServer } = await import(vitePkg);
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: "spa"
