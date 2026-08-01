@@ -551,6 +551,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
   const [gRedirectUri, setGRedirectUri] = useState('');
   const [showHelp, setShowHelp] = useState(false);
   const [copiedRedirect, setCopiedRedirect] = useState(false);
+  const [copiedFirebaseHandler, setCopiedFirebaseHandler] = useState(false);
   const [copiedRedirectDev, setCopiedRedirectDev] = useState(false);
   const [copiedRedirectPre, setCopiedRedirectPre] = useState(false);
   const [copiedRedirectLive, setCopiedRedirectLive] = useState(false);
@@ -605,8 +606,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     }
     
     let liveUri = "https://arearnzone-asia-no1-freelance.web.app/api/auth/callback/google";
+    const activeAuthDomain = (auth.app?.options as any)?.authDomain || firebaseConfig.authDomain || 'arearnzone.firebaseapp.com';
+    const firebaseHandlerUri = `https://${activeAuthDomain}/__/auth/handler`;
     
-    return { devUri, preUri, liveUri };
+    return { devUri, preUri, liveUri, firebaseHandlerUri };
   };
 
   const isCurrentlyInApp = (): boolean => {
@@ -1901,10 +1904,27 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
                            <li>Go to <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="text-[#10b981] underline">Google Cloud Console</a>.</li>
                            <li>Open your project and go to <strong>APIs & Services &gt; Credentials</strong>.</li>
                            <li>Edit your <strong>OAuth 2.0 Client ID</strong> credential.</li>
-                           <li>Add BOTH of these redirect URIs under <strong>"Authorized redirect URIs"</strong>:
+                           <li>Add these redirect URIs under <strong>"Authorized redirect URIs"</strong>:
                              <div className="space-y-3 mt-2 pl-3 border-l-2 border-slate-200 text-left">
                                <div>
-                                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">1. Development Environment:</div>
+                                 <div className="text-[9px] font-black text-emerald-600 uppercase tracking-wider mb-1">1. Firebase Auth Handler (Primary Popup URI):</div>
+                                 <div className="bg-emerald-50 border border-emerald-200 p-2 rounded-lg font-mono text-[9.5px] text-emerald-700 flex items-center justify-between overflow-x-auto select-all">
+                                   <span>{getBothRedirectUris().firebaseHandlerUri}</span>
+                                   <button 
+                                     type="button"
+                                     onClick={() => {
+                                       navigator.clipboard.writeText(getBothRedirectUris().firebaseHandlerUri);
+                                       setCopiedFirebaseHandler(true);
+                                       setTimeout(() => setCopiedFirebaseHandler(false), 2000);
+                                     }}
+                                     className="text-[10px] text-emerald-700 font-bold hover:text-emerald-900 ml-2 shrink-0 bg-white border border-emerald-300 px-2 py-0.5 rounded shadow-sm"
+                                   >
+                                     {copiedFirebaseHandler ? 'Copied!' : 'Copy'}
+                                   </button>
+                                 </div>
+                               </div>
+                               <div>
+                                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">2. Development Environment:</div>
                                  <div className="bg-slate-100 p-2 rounded-lg font-mono text-[9.5px] text-emerald-600 flex items-center justify-between overflow-x-auto select-all">
                                    <span>{getBothRedirectUris().devUri}</span>
                                    <button 
@@ -1921,7 +1941,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
                                  </div>
                                </div>
                                <div>
-                                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">2. Shared/Published Environment:</div>
+                                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">3. Shared/Published Environment:</div>
                                  <div className="bg-slate-100 p-2 rounded-lg font-mono text-[9.5px] text-emerald-600 flex items-center justify-between overflow-x-auto select-all">
                                    <span>{getBothRedirectUris().preUri}</span>
                                    <button 
@@ -1937,7 +1957,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
                                    </button>
                                  </div>
                                 <div>
-                                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">3. Live Custom Domain:</div>
+                                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">4. Live Custom Domain:</div>
                                   <div className="bg-slate-100 p-2 rounded-lg font-mono text-[9.5px] text-emerald-600 flex items-center justify-between overflow-x-auto select-all">
                                     <span>{getBothRedirectUris().liveUri}</span>
                                     <button 
