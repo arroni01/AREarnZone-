@@ -6,8 +6,12 @@ import fs from "fs";
 import path from "path";
 import nodemailer from "nodemailer";
 import { testSupabaseConnection, isSupabaseConfigured } from "./supabase";
+import { workerApi } from "./routes/workerApi";
 
 const app = new Hono();
+
+// Mount Cloudflare Workers API routes
+app.route("/api", workerApi);
 
 // Global CORS Middleware
 app.use("*", cors({
@@ -764,3 +768,4 @@ if (process.env.NODE_ENV !== "production" || process.env.RUN_NODE_SERVER !== "fa
 
   startServer().catch(console.error);
 }
+
