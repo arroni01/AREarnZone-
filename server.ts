@@ -5,6 +5,7 @@ import http from "http";
 import fs from "fs";
 import path from "path";
 import nodemailer from "nodemailer";
+import { testSupabaseConnection, isSupabaseConfigured } from "./supabase";
 
 const app = new Hono();
 
@@ -313,6 +314,15 @@ app.post("/api/admin/email-counters/reset", (c) => {
   return c.json({ success: true, message: "Email counter reset" });
 });
 
+app.get("/api/database/status", async (c) => {
+  const result = await testSupabaseConnection();
+  return c.json({
+    configured: isSupabaseConfigured,
+    connection: result,
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.get("/api/admin/production-integration-verify", (c) => {
   const activeSmtp = getActiveTransporter();
   return c.json({
@@ -322,6 +332,7 @@ app.get("/api/admin/production-integration-verify", (c) => {
       smtpEmail: { active: Boolean(activeSmtp), account: activeSmtp?.config.user || "None" },
       cpaCenter: { activeNetworks: cpaData.networks.length },
       firebase: { status: "CONNECTED" },
+      supabaseDatabase: { configured: isSupabaseConfigured },
       cors: { enabled: true }
     }
   });

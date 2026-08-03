@@ -15,6 +15,14 @@ import {
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import firebaseConfig from "./firebase-applet-config.json";
+import {
+  isSupabaseConfigured,
+  fetchSupabaseCollection,
+  saveSupabaseDocument,
+  deleteSupabaseDocument,
+  listenToSupabaseCollection,
+  listenToSupabaseDocument
+} from "./supabase";
 
 // Use strict authDomain for Firebase project 'arearnzone'
 const getResolvedFirebaseConfig = () => {
@@ -185,9 +193,16 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 }
 
 /**
- * Generic function to fetch all documents from a Firestore collection
+ * Generic function to fetch all documents from a collection (Supabase / Firestore)
  */
 export async function fetchCollection<T>(collectionName: string): Promise<T[]> {
+  if (isSupabaseConfigured) {
+    const supabaseData = await fetchSupabaseCollection<T>(collectionName);
+    if (supabaseData !== null) {
+      return supabaseData;
+    }
+  }
+
   if (isQuotaExceeded) return [];
   try {
     const colRef = collection(db, collectionName);
@@ -204,9 +219,16 @@ export async function fetchCollection<T>(collectionName: string): Promise<T[]> {
 }
 
 /**
- * Generic function to save a document to a Firestore collection
+ * Generic function to save a document to a collection (Supabase / Firestore)
  */
 export async function saveDocument(collectionName: string, docId: string, data: any): Promise<void> {
+  if (isSupabaseConfigured) {
+    const currentUid = auth.currentUser?.uid;
+    saveSupabaseDocument(collectionName, docId, data, currentUid).catch((err) => {
+      console.warn(`[Supabase] saveDocument error for ${collectionName}/${docId}:`, err);
+    });
+  }
+
   if (isQuotaExceeded) return;
   try {
     const docRef = doc(db, collectionName, docId);
@@ -226,9 +248,15 @@ export async function saveDocument(collectionName: string, docId: string, data: 
 }
 
 /**
- * Generic function to delete a document from a Firestore collection
+ * Generic function to delete a document from a collection (Supabase / Firestore)
  */
 export async function deleteDocument(collectionName: string, docId: string): Promise<void> {
+  if (isSupabaseConfigured) {
+    deleteSupabaseDocument(collectionName, docId).catch((err) => {
+      console.warn(`[Supabase] deleteDocument error for ${collectionName}/${docId}:`, err);
+    });
+  }
+
   if (isQuotaExceeded) return;
   try {
     const docRef = doc(db, collectionName, docId);
@@ -244,9 +272,18 @@ export async function deleteDocument(collectionName: string, docId: string): Pro
 }
 
 /**
- * Sync initial local data to Firestore if Firestore collection is empty
+ * Sync initial local data to database if collection is empty
  */
 export async function uploadInitialDataIfEmpty(collectionName: string, localData: any[], idKey: string = "id"): Promise<boolean> {
+  if (isSupabaseConfigured && localData && localData.length > 0) {
+    localData.forEach(item => {
+      const docId = item[idKey];
+      if (docId) {
+        saveSupabaseDocument(collectionName, String(docId), item);
+      }
+    });
+  }
+
   if (isQuotaExceeded) return false;
   try {
     const colRef = collection(db, collectionName);
@@ -282,6 +319,10 @@ export async function uploadInitialDataIfEmpty(collectionName: string, localData
  * Check if a specific single config doc exists, if not write initial config
  */
 export async function uploadConfigIfEmpty(collectionName: string, docId: string, localConfig: any): Promise<{ data: any; existed: boolean }> {
+  if (isSupabaseConfigured && localConfig) {
+    saveSupabaseDocument(collectionName, docId, localConfig);
+  }
+
   if (isQuotaExceeded) return { data: localConfig, existed: true };
   try {
     const docRef = doc(db, collectionName, docId);
@@ -308,12 +349,18 @@ export async function uploadConfigIfEmpty(collectionName: string, docId: string,
 }
 
 /**
- * Set up a real-time listener for a Firestore collection
+ * Set up a real-time listener for a collection
  */
 export function listenToCollection<T>(collectionName: string, callback: (data: T[]) => void) {
-  if (isQuotaExceeded) {
-    return () => {};
+  let unsubSupabase = () => {};
+  if (isSupabaseConfigured) {
+    unsubSupabase = listenToSupabaseCollection<T>(collectionName, callback);
   }
+
+  if (isQuotaExceeded) {
+    return unsubSupabase;
+  }
+
   const colRef = collection(db, collectionName);
   
   let actualUnsub: (() => void) | null = null;
@@ -339,6 +386,7 @@ export function listenToCollection<T>(collectionName: string, callback: (data: T
 
   const unsub = () => {
     activeSubscriptions.delete(unsub);
+    try { unsubSupabase(); } catch (e) {}
     if (actualUnsub) {
       try {
         actualUnsub();
@@ -352,7 +400,7 @@ export function listenToCollection<T>(collectionName: string, callback: (data: T
         actualUnsub();
       } catch (e) {}
     }
-    return () => {};
+    return unsubSupabase;
   }
   
   activeSubscriptions.add(unsub);
@@ -363,9 +411,15 @@ export function listenToCollection<T>(collectionName: string, callback: (data: T
  * Set up a real-time listener for a single document
  */
 export function listenToDocument<T>(collectionName: string, docId: string, callback: (data: T | null) => void) {
-  if (isQuotaExceeded) {
-    return () => {};
+  let unsubSupabase = () => {};
+  if (isSupabaseConfigured) {
+    unsubSupabase = listenToSupabaseDocument<T>(collectionName, docId, callback);
   }
+
+  if (isQuotaExceeded) {
+    return unsubSupabase;
+  }
+
   const docRef = doc(db, collectionName, docId);
   
   let actualUnsub: (() => void) | null = null;
@@ -394,6 +448,7 @@ export function listenToDocument<T>(collectionName: string, docId: string, callb
 
   const unsub = () => {
     activeSubscriptions.delete(unsub);
+    try { unsubSupabase(); } catch (e) {}
     if (actualUnsub) {
       try {
         actualUnsub();
@@ -407,9 +462,10 @@ export function listenToDocument<T>(collectionName: string, docId: string, callb
         actualUnsub();
       } catch (e) {}
     }
-    return () => {};
+    return unsubSupabase;
   }
 
   activeSubscriptions.add(unsub);
   return unsub;
 }
+

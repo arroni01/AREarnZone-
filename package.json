@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.12",
+    "@supabase/supabase-js": "^2.111.0",
     "firebase": "^12.16.0",
     "google-auth-library": "^10.5.0",
     "hono": "^4.12.33",
