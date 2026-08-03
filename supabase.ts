@@ -24,11 +24,13 @@ const getEnvVar = (key: string): string => {
   return val;
 };
 
-export const SUPABASE_URL = getEnvVar('VITE_SUPABASE_URL') || getEnvVar('SUPABASE_URL');
+export const SUPABASE_URL =
+  getEnvVar('VITE_SUPABASE_URL') || getEnvVar('SUPABASE_URL') || 'https://uzmhfphwclvpwiiouqak.supabase.co';
 export const SUPABASE_ANON_KEY =
   getEnvVar('VITE_SUPABASE_ANON_KEY') ||
   getEnvVar('SUPABASE_ANON_KEY') ||
-  getEnvVar('SUPABASE_SERVICE_ROLE_KEY');
+  getEnvVar('SUPABASE_SERVICE_ROLE_KEY') ||
+  'sb_publishable_stzcP0VjBM_dL7LOsKTCLg_a2CFgbFy';
 
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
@@ -90,11 +92,11 @@ export async function testSupabaseConnection(): Promise<{ success: boolean; mess
     // Attempt a simple ping query on settings/config or users
     const { data, error } = await supabase.from('settings').select('*').limit(1);
 
-    if (error && error.code === '42P01') {
-      // Table does not exist yet, but connection was made to Postgres!
+    if (error && (error.code === '42P01' || error.code === 'PGRST205')) {
+      // Table does not exist yet in public schema, but connection to Supabase was authenticated and successful!
       return {
         success: true,
-        message: 'Connected to Supabase PostgreSQL successfully! (Tables ready to be created).',
+        message: 'Connected to Supabase PostgreSQL successfully! (Ready for table creation).',
         details: error,
       };
     }
