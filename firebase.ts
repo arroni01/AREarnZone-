@@ -1,5 +1,11 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { 
+  getAuth, 
+  initializeAuth, 
+  browserLocalPersistence, 
+  indexedDBLocalPersistence, 
+  inMemoryPersistence 
+} from "firebase/auth";
 import firebaseConfig from "./firebase-applet-config.json";
 import {
   isSupabaseConfigured,
@@ -19,7 +25,18 @@ const getResolvedFirebaseConfig = () => {
 
 // Initialize Firebase App & Auth strictly for Authentication
 const app = initializeApp(getResolvedFirebaseConfig());
-export const auth = getAuth(app);
+
+// Initialize Auth strictly with browserLocalPersistence first to prevent IndexedDB "Database is closing/hidden" crashes on mobile browsers
+let authInstance: ReturnType<typeof getAuth>;
+try {
+  authInstance = initializeAuth(app, {
+    persistence: [browserLocalPersistence, indexedDBLocalPersistence, inMemoryPersistence]
+  });
+} catch (e) {
+  authInstance = getAuth(app);
+}
+
+export const auth = authInstance;
 
 export enum OperationType {
   CREATE = 'create',

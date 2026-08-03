@@ -5,7 +5,7 @@ import { User } from '../types';
 import { getApiUrl } from '../src/utils/apiConfig';
 import { ICONS } from '../constants';
 import { auth } from '../firebase';
-import { GoogleAuthProvider, signInWithPopup, signInWithCredential } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInWithCredential, setPersistence, browserLocalPersistence, inMemoryPersistence } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
 
 interface AuthProps {
@@ -1088,8 +1088,21 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       console.log("[Google Auth] 3. Exact authorization URL:", exactAuthUrl);
 
       console.log("[Google Auth] Initiating Firebase signInWithPopup...");
-      const result = await signInWithPopup(auth, provider);
-      const firebaseUser = result.user;
+      let firebaseUser;
+      try {
+        await setPersistence(auth, browserLocalPersistence).catch(() => {});
+        const result = await signInWithPopup(auth, provider);
+        firebaseUser = result.user;
+      } catch (popupErr: any) {
+        if (popupErr?.message?.includes('Database is closing') || popupErr?.stack?.includes('_openDb')) {
+          console.warn("[Google Auth] IndexedDB closed unexpectedly. Falling back to inMemoryPersistence and retrying...");
+          await setPersistence(auth, inMemoryPersistence).catch(() => {});
+          const retryResult = await signInWithPopup(auth, provider);
+          firebaseUser = retryResult.user;
+        } else {
+          throw popupErr;
+        }
+      }
 
       if (!firebaseUser || !firebaseUser.email) {
         throw new Error("Could not retrieve user info from Google authentication. (গুগল সাইন-ইন থেকে ব্যবহারকারীর ইমেল পাওয়া যায়নি।)");
