@@ -1,7 +1,7 @@
 {
-  "token": "123456789:ABCdefGHIjklMNOpqrsTUVwxyz123456789",
-  "username": "@AREarnZone_bot",
-  "channel": "https://t.me/arearnzone",
+  "token": "8008225715:AAEcA2qivE4QE_55Za_GyUd7f3lBOs-4FgE",
+  "username": "@AREranZone_bot",
+  "channel": "ttps://t.me/arearnzone",
   "smtpList": [
     {
       "user": "arearnzone1@gmail.com",
@@ -14,5 +14,6 @@
       "limit": 500
     }
   ],
-  "tokenSource": "telegram-bot-config.json"
+  "tokenSource": "telegram-bot-config.json",
+  "forceSave": true
 }
