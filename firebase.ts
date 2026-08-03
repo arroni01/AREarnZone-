@@ -30,7 +30,7 @@ export enum OperationType {
   WRITE = 'write',
 }
 
-export interface FirestoreErrorInfo {
+export interface DatabaseErrorInfo {
   error: string;
   operationType: OperationType;
   path: string | null;
@@ -55,8 +55,8 @@ export function isOfflineError(_error: any): boolean {
   return false;
 }
 
-export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
-  const errInfo: FirestoreErrorInfo = {
+export function handleDatabaseError(error: unknown, operationType: OperationType, path: string | null): never {
+  const errInfo: DatabaseErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
       userId: auth.currentUser?.uid || null,

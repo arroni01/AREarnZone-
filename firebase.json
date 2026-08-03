@@ -1,7 +1,4 @@
 {
-  "firestore": {
-    "rules": "firestore.rules"
-  },
   "hosting": {
     "site": "arearnzone-asia-no1-freelance",
     "public": "dist",

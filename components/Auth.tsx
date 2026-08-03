@@ -998,7 +998,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
         return;
       }
 
-      // Check if a user with this Google UID or email already exists in Firestore users
+      // Check if a user with this Google UID or email already exists in Supabase users.
       const existing = users.find(u => 
         (googleUser.id && u.id === googleUser.id) || 
         u.email.toLowerCase().trim() === googleUser.email.toLowerCase().trim()
@@ -1025,7 +1025,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
 
         const newUid = 'ARZ-' + Math.random().toString(36).substr(2, 6).toUpperCase() + '-' + Date.now().toString().slice(-4);
         
-        // Ensure user metadata is populated correctly and the unique Firebase google uid is used as the Firestore document ID
+        // Ensure user metadata is populated correctly and the unique Firebase google uid is used as the Supabase record ID
         const newUser: User = {
           id: googleUser.id || 'g_' + Math.random().toString(36).substr(2, 9),
           uid: newUid,

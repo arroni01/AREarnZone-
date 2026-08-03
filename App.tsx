@@ -84,7 +84,7 @@ const TRANSLATIONS = {
   }
 };
 
-// Helper to safely merge remote Firestore data into local React state (initialized from localStorage)
+// Helper to safely merge remote Supabase data into local React state (initialized from localStorage)
 // without wiping out local-only records (created while offline/quota-exceeded) unless they were deleted from server.
 function mergeRemoteData<T extends { id: string }>(
   localList: T[],
@@ -489,29 +489,29 @@ const App: React.FC = () => {
   const lastSyncedTargets = React.useRef<ReferralTarget[]>([]);
   const lastSyncedTargetHistories = React.useRef<TargetHistory[]>([]);
 
-  // Initialize and Sync Firebase Firestore
+  // Initialize and Sync Supabase Database
   useEffect(() => {
     let active = true;
     const unsubscribes: (() => void)[] = [];
 
     async function initFirebaseSync() {
       try {
-        console.log("Initializing Cloud Sync with Firebase Firestore...");
+        console.log("Initializing Cloud Sync with Supabase Database...");
 
         if (getIsQuotaExceeded()) {
-          console.warn("[Firestore Safe-Guard] Pre-emptively skipped initial cloud sync because quota is exceeded.");
+          console.warn("[Database Safe-Guard] Pre-emptively skipped initial cloud sync because quota is exceeded.");
           setDbQuotaExceeded(true);
           setIsFirebaseLoaded(true);
           return;
         }
 
-        // 1. Upload local data if Firestore is empty (Initial migration)
+        // 1. Upload local data if Supabase is empty (Initial migration)
         // We use isSeeded flag inside the global config to track if initial seeding was completed.
         const remoteConfigResult = await uploadConfigIfEmpty("config", "global", { ...globalConfig, isSeeded: true });
         
         // If we hit quota during config load, remoteConfig is returned with localConfig but isQuotaExceeded will be set
         if (getIsQuotaExceeded()) {
-          console.warn("[Firestore Safe-Guard] Quota limit detected during config check. Fallback to sandbox.");
+          console.warn("[Database Safe-Guard] Quota limit detected during config check. Fallback to sandbox.");
           setDbQuotaExceeded(true);
           setIsFirebaseLoaded(true);
           return;
@@ -520,7 +520,7 @@ const App: React.FC = () => {
         const isAlreadySeeded = remoteConfigResult?.existed;
 
         if (!isAlreadySeeded) {
-          console.log("[Firestore Sync] Seeding empty database collections for the first time...");
+          console.log("[Supabase Sync] Seeding empty database collections for the first time...");
           await uploadInitialDataIfEmpty("users", users);
           await uploadInitialDataIfEmpty("tasks", tasks);
           await uploadInitialDataIfEmpty("submissions", taskSubmissions);
@@ -542,10 +542,10 @@ const App: React.FC = () => {
           await uploadInitialDataIfEmpty("targets", targets);
           await uploadInitialDataIfEmpty("targetHistories", targetHistories);
           
-          // Save config to Firestore to finalize seeding flag
+          // Save config to Supabase to finalize seeding flag
           await saveDocument("config", "global", { ...globalConfig, isSeeded: true });
         } else {
-          console.log("[Firestore Sync] Database is already seeded. Skipping initial data uploads (saved 17 collection scans).");
+          console.log("[Supabase Sync] Database is already seeded. Skipping initial data uploads (saved 17 collection scans).");
         }
 
         if (!active) return;
@@ -799,7 +799,7 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Periodically check if Firestore daily quota got exceeded
+  // Periodically check if database quota got exceeded
   useEffect(() => {
     const timer = setInterval(() => {
       const exceeded = getIsQuotaExceeded();
@@ -900,7 +900,7 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Diff-and-Sync React States to Firestore (Push Local Edits to Cloud)
+  // Diff-and-Sync React States to Supabase (Push Local Edits to Cloud)
   useEffect(() => {
     if (!isFirebaseLoaded) return;
     if (dbQuotaExceeded || getIsQuotaExceeded()) {
@@ -912,9 +912,9 @@ const App: React.FC = () => {
       lastSyncedRef: React.MutableRefObject<T[]>, 
       collectionName: string
     ) => {
-      // ONLY sync if the collection has been successfully loaded from Firestore first!
+      // ONLY sync if the collection has been successfully loaded from Supabase first!
       if (!loadedCollections.current[collectionName]) {
-        console.log(`[Firestore Sync] Skipping sync-to-cloud for ${collectionName} because it is not loaded yet.`);
+        console.log(`[Supabase Sync] Skipping sync-to-cloud for ${collectionName} because it is not loaded yet.`);
         return;
       }
 
@@ -971,7 +971,7 @@ const App: React.FC = () => {
       });
     }
 
-    // Sync all lists to Firestore
+    // Sync all lists to Supabase
     syncList(users, lastSyncedUsers, "users");
     syncList(tasks, lastSyncedTasks, "tasks");
     syncList(taskSubmissions, lastSyncedSubmissions, "submissions");
@@ -1270,30 +1270,30 @@ const App: React.FC = () => {
     }
   }, [currentUser?.id, currentUser?.isTelegramVerified, currentUser?.telegramUsername, currentUser?.telegramId]);
 
-  // Automatic Telegram Bot configuration restorer on app load (uses Firestore-persisted globalConfig & local storage fallback)
+  // Automatic Telegram Bot configuration restorer on app load (uses Supabase-persisted globalConfig & local storage fallback)
   useEffect(() => {
     fetch('/api/telegram/config')
       .then(res => res.json())
       .then(async data => {
         if (data && !data.isConfigured) {
-          // 1. Try to restore using Firestore-persisted globalConfig
-          const firestoreToken = globalConfig?.telegramBotToken;
-          const firestoreUsername = globalConfig?.telegramBotUsername || "@AREarnZone_bot";
-          const firestoreChannel = globalConfig?.telegramChannelLink || "https://t.me/arearnzone";
+          // 1. Try to restore using Supabase-persisted globalConfig
+          const cachedBotToken = globalConfig?.telegramBotToken;
+          const cachedBotUsername = globalConfig?.telegramBotUsername || "@AREarnZone_bot";
+          const cachedBotChannel = globalConfig?.telegramChannelLink || "https://t.me/arearnzone";
 
-          if (firestoreToken && firestoreToken.trim()) {
-            console.log("[Telegram Bot Global Cache] Restoring bot configuration from Firestore globalConfig...");
+          if (cachedBotToken && cachedBotToken.trim()) {
+            console.log("[Telegram Bot Global Cache] Restoring bot configuration from Supabase globalConfig...");
             await fetch('/api/telegram/save-config', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                token: firestoreToken,
-                username: firestoreUsername,
-                channel: firestoreChannel,
+                token: cachedBotToken,
+                username: cachedBotUsername,
+                channel: cachedBotChannel,
                 forceSave: true
               })
             });
-            console.log("[Telegram Bot Global Cache] Bot configuration successfully restored from Firestore!");
+            console.log("[Telegram Bot Global Cache] Bot configuration successfully restored from Supabase!");
             return;
           }
 

@@ -1679,12 +1679,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
         // Ephemeral recovery: If the server restarted and has no active token, but this admin has a cached copy, auto-restore it!
         if (!data.isConfigured) {
-          // 1. Try restoring from Firestore globalConfig first
-          const firestoreToken = globalConfig?.telegramBotToken;
-          const firestoreUsername = globalConfig?.telegramBotUsername || "@AREarnZone_bot";
-          const firestoreChannel = globalConfig?.telegramChannelLink || "https://t.me/arearnzone";
+          // 1. Try restoring from globalConfig first
+          const cachedBotToken = globalConfig?.telegramBotToken;
+          const cachedBotUsername = globalConfig?.telegramBotUsername || "@AREarnZone_bot";
+          const cachedBotChannel = globalConfig?.telegramChannelLink || "https://t.me/arearnzone";
 
-          if (firestoreToken && firestoreToken.trim()) {
+          if (cachedBotToken && cachedBotToken.trim()) {
             console.log(
               "[Telegram Bot Cache] Ephemeral connection lost. Restoring bot from globalConfig in background...",
             );
@@ -1692,9 +1692,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                token: firestoreToken,
-                username: firestoreUsername,
-                channel: firestoreChannel,
+                token: cachedBotToken,
+                username: cachedBotUsername,
+                channel: cachedBotChannel,
                 forceSave: true,
               }),
             });
@@ -1809,7 +1809,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           }),
         );
 
-        // Also persist in the Firestore-based globalConfig state so it auto-restores for ALL sessions
+        // Also persist in the globalConfig state so it auto-restores for ALL sessions
         setGlobalConfig((prev) => ({
           ...prev,
           telegramBotToken: tgBotToken,
@@ -2120,7 +2120,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
     setTransactions((prev) => [newTx, ...prev]);
 
-    // Direct Firestore Save
+    // Direct Supabase Save
     saveDocument("withdraws", updatedWithdraw.id, updatedWithdraw).catch((err) =>
       console.error("Error saving approved withdraw:", err),
     );
@@ -2184,7 +2184,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           }),
         );
 
-        // Direct Firestore Save
+        // Direct Supabase Save
         saveDocument("withdraws", updatedWithdraw.id, updatedWithdraw).catch((err) =>
           console.error("Error saving rejected withdraw:", err),
         );
@@ -2219,7 +2219,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         status: "completed",
       };
 
-      // Direct Firestore Save
+      // Direct Supabase Save
       saveDocument("withdraws", updatedWithdraw.id, updatedWithdraw).catch((err) =>
         console.error("Error saving approved withdraw:", err),
       );
@@ -2283,7 +2283,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             rejectionNote: note.trim() || undefined,
           };
           
-          // Direct Firestore Save
+          // Direct Supabase Save
           saveDocument("withdraws", updatedWithdraw.id, updatedWithdraw).catch((err) =>
             console.error("Error saving rejected withdraw:", err),
           );
@@ -5553,7 +5553,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       {aiMetrics.databaseStatus === 'connected' ? "Connected" : "Moderate Quota"}
                     </h4>
                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1.5 leading-relaxed">
-                      Real-time Firestore listeners synced securely with offline persistence safeguard fallback routing.
+                      Real-time Supabase listeners synced securely with offline persistence safeguard fallback routing.
                     </p>
                   </div>
                 </div>

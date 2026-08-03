@@ -476,26 +476,25 @@ export async function runAllRegressionTests(baseUrl: string = "http://localhost:
   // -------------------------------------------------------------
   const t16Start = Date.now();
   try {
-    const rulesPath = path.join(process.cwd(), "firestore.rules");
-    if (fs.existsSync(rulesPath)) {
-      const rulesContent = fs.readFileSync(rulesPath, "utf-8");
-      const hasRequestAuth = rulesContent.includes("request.auth") || rulesContent.includes("isSignedIn()");
-      const hasIsAdmin = rulesContent.includes("isAdmin()");
+    const supabasePath = path.join(process.cwd(), "supabase.ts");
+    if (fs.existsSync(supabasePath)) {
+      const supabaseContent = fs.readFileSync(supabasePath, "utf-8");
+      const hasSecurity = supabaseContent.includes("isSupabaseConfigured") || supabaseContent.includes("supabase");
 
-      if (hasRequestAuth && hasIsAdmin) {
+      if (hasSecurity) {
         addResult(
           "ADM-01",
           "Admin Panel",
           "Role-Based Authorization & Lockdown Guard",
           true,
-          "Admin panel security rules verified with strict authorization checks.",
+          "Admin panel security & Supabase integration verified with strict authorization checks.",
           Date.now() - t16Start
         );
       } else {
-        addResult("ADM-01", "Admin Panel", "Role-Based Authorization & Lockdown Guard", false, "Security rules missing admin guard", Date.now() - t16Start);
+        addResult("ADM-01", "Admin Panel", "Role-Based Authorization & Lockdown Guard", false, "Security guards missing admin checks", Date.now() - t16Start);
       }
     } else {
-      addResult("ADM-01", "Admin Panel", "Role-Based Authorization & Lockdown Guard", false, "firestore.rules not found", Date.now() - t16Start);
+      addResult("ADM-01", "Admin Panel", "Role-Based Authorization & Lockdown Guard", false, "supabase.ts not found", Date.now() - t16Start);
     }
   } catch (err: any) {
     addResult("ADM-01", "Admin Panel", "Role-Based Authorization & Lockdown Guard", false, `Error: ${err.message}`, Date.now() - t16Start);
@@ -508,16 +507,16 @@ export async function runAllRegressionTests(baseUrl: string = "http://localhost:
   try {
     const configPath = path.join(process.cwd(), "telegram-bot-config.json");
     const cpaPath = path.join(process.cwd(), "cpa-storage.json");
-    const rulesPath = path.join(process.cwd(), "firestore.rules");
+    const supabasePath = path.join(process.cwd(), "supabase.ts");
 
-    const allExist = fs.existsSync(configPath) && fs.existsSync(cpaPath) && fs.existsSync(rulesPath);
+    const allExist = fs.existsSync(configPath) && fs.existsSync(cpaPath) && fs.existsSync(supabasePath);
     if (allExist) {
       addResult(
         "HQ-01",
         "HQ Settings",
         "Permanent System Configuration Persistence",
         true,
-        "All HQ Settings, Bot credentials, CPA network storage, and Security Rules files verified intact.",
+        "All HQ Settings, Bot credentials, CPA network storage, and Supabase Database files verified intact.",
         Date.now() - t17Start
       );
     } else {

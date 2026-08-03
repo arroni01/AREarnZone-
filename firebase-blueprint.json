@@ -232,7 +232,7 @@
       }
     }
   },
-  "firestore": {
+  "supabase": {
     "config": {
       "schema": "GlobalConfig",
       "description": "System config settings"

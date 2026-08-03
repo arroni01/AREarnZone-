@@ -42,8 +42,8 @@ const FAQ_DATA: FAQItem[] = [
       BN: "AREARNZONE ব্যবহার করা কি নিরাপদ এবং বৈধ?"
     },
     answer: {
-      EN: "Absolutely. We run a fully secure, verified system protected by industry-standard protocols and strict firestore rules. We never sell your personal data, and we pay all verified users promptly according to our withdrawal rules.",
-      BN: "হ্যাঁ, সম্পূর্ণ নিরাপদ। আমাদের সিস্টেমটি ইন্ডাস্ট্রি-স্ট্যান্ডার্ড প্রোটোকল এবং কঠোর ফায়ারস্টোর সিকিউরিটি দ্বারা সুরক্ষিত। আমরা ব্যবহারকারীদের ব্যক্তিগত তথ্যের সর্বোচ্চ নিরাপত্তা নিশ্চিত করি এবং ভেরিফাইড ইউজারদের উইথড্র রিকোয়েস্টগুলো দ্রুত পেমেন্ট করে থাকি।"
+      EN: "Absolutely. We run a fully secure, verified system protected by industry-standard protocols and strict database security rules. We never sell your personal data, and we pay all verified users promptly according to our withdrawal rules.",
+      BN: "হ্যাঁ, সম্পূর্ণ নিরাপদ। আমাদের সিস্টেমটি ইন্ডাস্ট্রি-স্ট্যান্ডার্ড প্রোটোকল এবং কঠোর সিকিউরিটি দ্বারা সুরক্ষিত। আমরা ব্যবহারকারীদের ব্যক্তিগত তথ্যের সর্বোচ্চ নিরাপত্তা নিশ্চিত করি এবং ভেরিফাইড ইউজারদের উইথড্র রিকোয়েস্টগুলো দ্রুত পেমেন্ট করে থাকি।"
     }
   },
   {

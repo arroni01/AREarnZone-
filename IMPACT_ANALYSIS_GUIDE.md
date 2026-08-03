@@ -29,18 +29,18 @@ Before making changes to any file or feature:
    - User UID and authentication state must remain valid and non-null.
    - User balance equations must remain accurate (`total_earned = task_rewards + cpa_rewards + referral_bonuses`).
    - Withdrawal requests must check `available_balance >= withdrawal_amount`.
-   - Firestore Security Rules must strictly validate `request.auth != null`.
+   - Database Security Rules must strictly validate authenticated user identity.
 4. Run pre-implementation impact check via `analyzeFeatureImpact(featureName, targetModuleId, proposedChanges)`.
 5. Execute the **Automated Regression Suite** using `npm test` or the Admin Regression Dashboard.
 
 ---
 
-## 3. Firestore Rules Security Lockdown
+## 3. Database Security Lockdown
 
-The `firestore.rules` file enforces zero-trust Attribute-Based Access Control (ABAC):
-- **Authentication Guard**: `isSignedIn()` enforces `request.auth != null`.
-- **Identity Isolation**: User documents `/users/{userId}` can only be updated by `isOwner(userId)` or `isAdmin()`.
-- **Request Ownership**: Financial/Task requests (`/withdraws`, `/submissions`, `/depositRequests`, `/membershipRequests`) mandate `request.resource.data.userId == request.auth.uid`.
+The database configuration enforces zero-trust Attribute-Based Access Control (ABAC):
+- **Authentication Guard**: Enforces user authentication.
+- **Identity Isolation**: User documents `/users/{userId}` can only be updated by the owner or admin.
+- **Request Ownership**: Financial/Task requests (`/withdraws`, `/submissions`, `/depositRequests`, `/membershipRequests`) mandate user ownership.
 - **Admin Isolation**: System configs, network parameters, and payout configurations (`/config`, `/cpaNetworks`, `/withdrawOptions`, `/membershipPlans`) can only be modified by verified admin accounts.
 
 ---

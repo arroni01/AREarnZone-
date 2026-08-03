@@ -233,7 +233,7 @@ export async function runAIHealthScanAndRecovery(isManual: boolean = false): Pro
         id: `rec_${Date.now()}_db`,
         timestamp: new Date().toISOString(),
         issueType: 'Database Connection Degraded',
-        description: 'Firestore API report suggests resource quota limit is temporarily reached.',
+        description: 'Database API report suggests resource quota limit is temporarily reached.',
         rootCause: 'High transaction and query frequency in client interface.',
         status: 'resolved',
         actionsTaken: [

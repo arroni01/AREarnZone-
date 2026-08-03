@@ -273,7 +273,7 @@ export function analyzeFeatureImpact(
   });
 
   const nonBreakingStrategy = [
-    `1. Verify Firestore security rules enforce request.auth for ${targetModule.moduleName}.`,
+    `1. Verify database security rules enforce authentication for ${targetModule.moduleName}.`,
     `2. Keep interface contract backward-compatible for dependent modules: ${targetModule.directDependencies.join(", ")}.`,
     `3. Run automated regression tests on all ${requiredTestSuites.length} mandatory test scenarios.`,
     `4. Validate zero-breaking state across all 17 system modules.`

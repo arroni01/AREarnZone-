@@ -49,7 +49,7 @@ export function trackError(
 
     if (isQuota) {
       try {
-        localStorage.setItem('arez_firestore_quota_exceeded_timestamp', Date.now().toString());
+        localStorage.setItem('arez_db_quota_exceeded_timestamp', Date.now().toString());
         window.dispatchEvent(new Event('arez_quota_exceeded_detected'));
       } catch (e) {}
     }
