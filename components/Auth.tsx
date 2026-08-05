@@ -5,7 +5,7 @@ import { User } from '../types';
 import { getApiUrl } from '../src/utils/apiConfig';
 import { ICONS } from '../constants';
 import { auth, googleProvider } from '../firebase';
-import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, getRedirectResult, setPersistence, browserLocalPersistence, GoogleAuthProvider } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
 
 interface AuthProps {
@@ -969,6 +969,34 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     return () => window.removeEventListener('message', handleMessage);
   }, [users]);
 
+  // Handle Google OAuth redirect completion on mount
+  useEffect(() => {
+    if (auth) {
+      getRedirectResult(auth)
+        .then((result) => {
+          if (result && result.user) {
+            console.log("[Google OAuth Redirect] User returned successfully:", result.user.email);
+            const firebaseUser = result.user;
+            const safeEmail = (firebaseUser.email || '').toLowerCase().trim();
+            const safeName = firebaseUser.displayName || safeEmail.split('@')[0] || "Google User";
+            const safeId = firebaseUser.uid || ('g_' + Math.random().toString(36).substr(2, 9));
+            
+            const pendingRef = localStorage.getItem('arez_pending_referral') || undefined;
+            localStorage.removeItem('arez_pending_referral');
+
+            handleGoogleAuthSuccess({
+              email: safeEmail,
+              name: safeName,
+              id: safeId
+            }, pendingRef);
+          }
+        })
+        .catch((err) => {
+          console.warn("[Google OAuth Redirect Result Error]:", err);
+        });
+    }
+  }, []);
+
   // Check URL hash for direct redirect authentication parameters on mount/update
   useEffect(() => {
     const hash = window.location.hash || '';
@@ -1099,14 +1127,22 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
         throw new Error("Firebase Authentication service is not initialized correctly.");
       }
 
-      // Save referral code in local storage before login
+      // Refresh activity timestamp and store referral
+      localStorage.setItem('arez_last_activity_time', Date.now().toString());
       if (referral && referral.trim()) {
         localStorage.setItem('arez_pending_referral', referral.trim());
       } else {
         localStorage.removeItem('arez_pending_referral');
       }
 
-      console.log("[Google Auth] Initiating Firebase signInWithPopup...");
+      // Explicitly set browserLocalPersistence so auth token survives redirects & external browser restarts
+      try {
+        await setPersistence(auth, browserLocalPersistence);
+      } catch (pErr) {
+        console.warn("[Google Auth] Could not set browserLocalPersistence:", pErr);
+      }
+
+      console.log("[Google Auth] Initiating Google sign-in with local persistence...");
       let firebaseUser = null;
 
       try {

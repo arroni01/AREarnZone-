@@ -1501,9 +1501,7 @@ const App: React.FC = () => {
 
     // Ensure hash location immediately transitions to Dashboard (/) upon successful login
     if (typeof window !== 'undefined') {
-      if (window.location.hash && window.location.hash !== '#/' && window.location.hash !== '#') {
-        window.location.hash = '#/';
-      }
+      window.location.hash = '#/';
     }
 
     try {
