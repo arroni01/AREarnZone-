@@ -823,9 +823,9 @@ const App: React.FC = () => {
       if (firebaseUser && firebaseUser.email) {
         console.log("[Firebase Auth] Auth state changed: user is logged in:", firebaseUser.email);
         
-        // Prevent auto-restore if 5+ minutes of inactivity occurred
+        // Prevent auto-restore ONLY if user is NOT currently logged in AND 5+ minutes of inactivity occurred
         const lastActiveStr = localStorage.getItem('arez_last_activity_time');
-        if (lastActiveStr) {
+        if (lastActiveStr && !currentUser) {
           const lastActiveTime = parseInt(lastActiveStr, 10);
           if (!isNaN(lastActiveTime) && (Date.now() - lastActiveTime >= INACTIVITY_TIMEOUT_MS)) {
             console.log("[Firebase Auth] Inactivity limit reached (>5m). Suppressing auto-restore and signing out.");
@@ -834,13 +834,41 @@ const App: React.FC = () => {
           }
         }
 
-        const existing = users.find(u => u.email.toLowerCase().trim() === firebaseUser.email!.toLowerCase().trim());
+        const safeEmail = firebaseUser.email.toLowerCase().trim();
+        const existing = users.find(u => u.email.toLowerCase().trim() === safeEmail);
+
         if (existing) {
-          if (!currentUser || currentUser.email.toLowerCase().trim() !== firebaseUser.email.toLowerCase().trim()) {
-            console.log("[Firebase Auth] Automatically restoring Google session for:", existing.email);
-            setCurrentUser(existing);
-            notify(`Connected: ${existing.name}`);
+          if (!currentUser || currentUser.email.toLowerCase().trim() !== safeEmail) {
+            console.log("[Firebase Auth] Automatically restoring Google session for existing user:", existing.email);
+            handleLogin(existing);
           }
+        } else if (!currentUser) {
+          console.log("[Firebase Auth] Registering & logging in new Google Auth user:", safeEmail);
+          const safeName = firebaseUser.displayName || safeEmail.split('@')[0] || "Google User";
+          const namePrefix = (safeName.replace(/[^a-zA-Z0-9]/g, '') || 'USER').substring(0, 3).toUpperCase();
+          const newUid = 'ARZ-' + Math.random().toString(36).substr(2, 6).toUpperCase() + '-' + Date.now().toString().slice(-4);
+          const newUser: User = {
+            id: firebaseUser.uid || 'g_' + Math.random().toString(36).substr(2, 9),
+            uid: newUid,
+            name: safeName,
+            email: safeEmail,
+            password: 'google_oauth_authorized',
+            balance: 0,
+            todayIncome: 0,
+            referralCode: namePrefix + Math.floor(1000 + Math.random() * 9000),
+            referralCount: 0,
+            status: 'Unverified',
+            role: safeEmail === 'abdurrahman714915@gmail.com' ? 'admin' : 'user',
+            isTelegramVerified: false,
+            hasJoinedTelegramChannel: false,
+            ip: '103.x.x.x',
+            deviceInfo: 'Google OIDC Identity',
+            isSuspended: false,
+            createdAt: new Date().toISOString(),
+            securityToken: 'SEC_G_' + Math.random().toString(36).substr(2, 10),
+            fraudFlags: []
+          };
+          handleLogin(newUser);
         }
       } else {
         console.log("[Firebase Auth] Auth state changed: no active Firebase session");

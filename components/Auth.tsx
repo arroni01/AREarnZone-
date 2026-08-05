@@ -1005,8 +1005,21 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
 
   const handleGoogleAuthSuccess = (googleUser: any, customReferral?: string) => {
     setIsGoogleLoading(true);
-    setTimeout(() => {
-      const isAdmin = googleUser.email.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase();
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('arez_last_activity_time', Date.now().toString());
+      }
+      const safeEmail = (googleUser?.email || '').toLowerCase().trim();
+      const safeName = googleUser?.name || googleUser?.displayName || (safeEmail ? safeEmail.split('@')[0] : "Google User");
+      const safeId = googleUser?.id || googleUser?.uid || ('g_' + Math.random().toString(36).substr(2, 9));
+
+      if (!safeEmail) {
+        setIsGoogleLoading(false);
+        setError("Google authentication failed: Email address not provided.");
+        return;
+      }
+
+      const isAdmin = safeEmail === ADMIN_EMAIL.toLowerCase().trim();
       if (isAdmin) {
         setView('admin-otp');
         setIsGoogleLoading(false);
@@ -1016,42 +1029,43 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       }
 
       // Check if a user with this Google UID or email already exists in Supabase users.
-      const existing = users.find(u => 
-        (googleUser.id && u.id === googleUser.id) || 
-        u.email.toLowerCase().trim() === googleUser.email.toLowerCase().trim()
+      const existing = (users || []).find(u => 
+        (safeId && u.id === safeId) || 
+        (u.email && u.email.toLowerCase().trim() === safeEmail)
       );
 
       if (existing) {
         console.log("[Google Auth] Existing user found. Logging in:", existing.email);
         notify(`স্বাগতম ফিরে আসার জন্য, ${existing.name}! লগইন সফল হয়েছে। (Welcome back, ${existing.name}! Login successful.)`);
         onLogin(existing);
+        setIsGoogleLoading(false);
       } else {
-        console.log("[Google Auth] Successful Google sign-in. Registering new user account:", googleUser.email);
+        console.log("[Google Auth] Successful Google sign-in. Registering new user account:", safeEmail);
         notify("নিবন্ধন সফল হয়েছে! আপনার নতুন অ্যাকাউন্ট তৈরি করা হচ্ছে... (Registration successful! Creating your new account...)");
 
         const finalReferral = customReferral !== undefined ? customReferral : referral;
-        // Double check referral code validity if provided
-        if (finalReferral.trim() !== '') {
-          const inviter = users.find(u => u.referralCode && u.referralCode.toUpperCase() === finalReferral.trim().toUpperCase());
-          if (!inviter) {
-            setError('ভুল রেফার কোড! দয়া করে সঠিক রেফার কোড দিন অথবা খালি রাখুন (Invalid Referral Code)');
-            setIsGoogleLoading(false);
-            return;
+        let validReferral: string | undefined = undefined;
+        if (finalReferral && finalReferral.trim() !== '') {
+          const inviter = (users || []).find(u => u.referralCode && u.referralCode.toUpperCase() === finalReferral.trim().toUpperCase());
+          if (inviter) {
+            validReferral = finalReferral.trim();
+          } else {
+            console.warn("[Google Auth] Provided referral code invalid, continuing registration without referral code.");
           }
         }
 
         const newUid = 'ARZ-' + Math.random().toString(36).substr(2, 6).toUpperCase() + '-' + Date.now().toString().slice(-4);
+        const namePrefix = (safeName.replace(/[^a-zA-Z0-9]/g, '') || 'USER').substring(0, 3).toUpperCase();
         
-        // Ensure user metadata is populated correctly and the unique Firebase google uid is used as the Supabase record ID
         const newUser: User = {
-          id: googleUser.id || 'g_' + Math.random().toString(36).substr(2, 9),
+          id: safeId,
           uid: newUid,
-          name: googleUser.name,
-          email: googleUser.email,
+          name: safeName,
+          email: safeEmail,
           password: 'google_oauth_authorized',
           balance: 0,
           todayIncome: 0,
-          referralCode: (googleUser.name.substring(0, 3).toUpperCase() + Math.floor(1000 + Math.random() * 9000)),
+          referralCode: namePrefix + Math.floor(1000 + Math.random() * 9000),
           referralCount: 0,
           status: 'Unverified',
           role: 'user',
@@ -1064,10 +1078,14 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
           securityToken: 'SEC_G_' + Math.random().toString(36).substr(2, 10),
           fraudFlags: []
         };
-        onLogin(newUser, finalReferral);
+        onLogin(newUser, validReferral);
+        setIsGoogleLoading(false);
       }
+    } catch (err: any) {
+      console.error("[Google Auth Success Processing Error]:", err);
       setIsGoogleLoading(false);
-    }, 1000);
+      setError("Login processing failed. Please try again.");
+    }
   };
 
   const startGoogleLogin = async () => {
