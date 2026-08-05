@@ -1,3 +1,5 @@
+import { saveMonitoringLog } from '../src/utils/supabaseClient';
+
 export interface SystemErrorLog {
   id: string;
   timestamp: string;
@@ -40,19 +42,6 @@ export function trackError(
 ): void {
   try {
     const message = error instanceof Error ? error.message : String(error || 'Unknown Error');
-    const msgLower = message.toLowerCase();
-    const isQuota = msgLower.includes("quota") ||
-                    msgLower.includes("exhausted") ||
-                    msgLower.includes("resource-exhausted") ||
-                    msgLower.includes("limit exceeded") ||
-                    msgLower.includes("code=resource-exhausted");
-
-    if (isQuota) {
-      try {
-        localStorage.setItem('arez_db_quota_exceeded_timestamp', Date.now().toString());
-        window.dispatchEvent(new Event('arez_quota_exceeded_detected'));
-      } catch (e) {}
-    }
 
     const logs = getErrors();
     const newLog: SystemErrorLog = {
@@ -66,9 +55,16 @@ export function trackError(
       status: extra?.status,
     };
 
-    // Prepend new log and keep up to MAX_LOGS
+    // Prepend new log and keep up to MAX_LOGS locally
     const updatedLogs = [newLog, ...logs].slice(0, MAX_LOGS);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLogs));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLogs));
+    } catch (e) {}
+
+    // Permanently sync monitoring log to Supabase Single Source of Truth
+    saveMonitoringLog(newLog).catch(err => {
+      console.warn('[Monitoring Tracker] Failed to write log to Supabase:', err);
+    });
 
     // Dispatch event to notify components about the new error log
     window.dispatchEvent(new CustomEvent('arearnzone_new_audit_log', { detail: newLog }));
