@@ -20,6 +20,8 @@ import {
   auth
 } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { runAuthDiagnostics } from './authDiagnostics';
+import { logFirebaseDebugSequence } from './firebaseDebug';
 
 import Dashboard from './components/Dashboard';
 import Tasks from './components/Tasks';
@@ -809,6 +811,11 @@ const App: React.FC = () => {
     }, 2500);
     return () => clearInterval(timer);
   }, [dbQuotaExceeded]);
+
+  useEffect(() => {
+    runAuthDiagnostics();
+    logFirebaseDebugSequence();
+  }, []);
 
   // Listen to Firebase Auth state changes to automatically restore or synchronize Google sessions smoothly
   useEffect(() => {

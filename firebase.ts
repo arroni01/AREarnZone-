@@ -1,12 +1,4 @@
-import { initializeApp } from "firebase/app";
-import { 
-  getAuth, 
-  initializeAuth, 
-  browserLocalPersistence, 
-  indexedDBLocalPersistence, 
-  inMemoryPersistence 
-} from "firebase/auth";
-import firebaseConfig from "./firebase-applet-config.json";
+import { app, auth, googleProvider } from "./firebaseConfig";
 import {
   isSupabaseConfigured,
   fetchSupabaseCollection,
@@ -16,27 +8,8 @@ import {
   listenToSupabaseDocument
 } from "./supabase";
 
-// Use strict authDomain for Firebase project 'arearnzone'
-const getResolvedFirebaseConfig = () => {
-  const config = { ...firebaseConfig };
-  config.authDomain = "arearnzone.firebaseapp.com";
-  return config;
-};
+export { app, auth, googleProvider };
 
-// Initialize Firebase App & Auth strictly for Authentication
-const app = initializeApp(getResolvedFirebaseConfig());
-
-// Initialize Auth strictly with browserLocalPersistence first to prevent IndexedDB "Database is closing/hidden" crashes on mobile browsers
-let authInstance: ReturnType<typeof getAuth>;
-try {
-  authInstance = initializeAuth(app, {
-    persistence: [browserLocalPersistence, indexedDBLocalPersistence, inMemoryPersistence]
-  });
-} catch (e) {
-  authInstance = getAuth(app);
-}
-
-export const auth = authInstance;
 
 export enum OperationType {
   CREATE = 'create',

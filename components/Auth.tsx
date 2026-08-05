@@ -4,8 +4,8 @@ import { motion } from 'motion/react';
 import { User } from '../types';
 import { getApiUrl } from '../src/utils/apiConfig';
 import { ICONS } from '../constants';
-import { auth } from '../firebase';
-import { GoogleAuthProvider, signInWithPopup, signInWithCredential, setPersistence, browserLocalPersistence, inMemoryPersistence } from 'firebase/auth';
+import { auth, googleProvider } from '../firebase';
+import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
 
 interface AuthProps {
@@ -660,6 +660,23 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     } catch (e) {
       console.warn("[Google Auth] Exception setting redirect URI for help panel:", e);
     }
+
+    // Check if coming back from Google signInWithRedirect
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result && result.user && result.user.email) {
+          console.log("[Google Auth] Redirect login succeeded for:", result.user.email);
+          const googleUserPayload = {
+            email: result.user.email,
+            name: result.user.displayName || result.user.email.split('@')[0] || "Google User",
+            id: result.user.uid
+          };
+          handleGoogleAuthSuccess(googleUserPayload);
+        }
+      })
+      .catch((err: any) => {
+        console.warn("[Google Auth Redirect Result Warning]:", err);
+      });
   }, []);
   
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -1058,11 +1075,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       setError('');
       setIsGoogleLoading(true);
 
-      // Never use preview domain (*.run.app) for Google Authentication.
-      if (typeof window !== 'undefined' && window.location.hostname.endsWith('.run.app')) {
-        console.log("[Google Auth] Preview domain detected (*.run.app). Redirecting to production domain for Google Authentication...");
-        window.location.href = "https://arearnzone-asia-no1-freelance.web.app";
-        return;
+      if (!auth) {
+        console.error("[Google Auth Error]: Firebase Auth instance is invalid.", { auth });
+        throw new Error("Firebase Authentication service is not initialized correctly.");
       }
 
       // Save referral code in local storage before login
@@ -1072,40 +1087,82 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
         localStorage.removeItem('arez_pending_referral');
       }
 
-      console.log("[Google Auth] Initializing GoogleAuthProvider for popup authentication...");
-      const exactClientId = firebaseConfig.oAuthClientId || "1090367277778-tnh08lj1oah2fkc3cn58458os3om1j39.apps.googleusercontent.com";
-      const activeAuthDomain = (auth.app.options as any)?.authDomain || firebaseConfig.authDomain || 'arearnzone.firebaseapp.com';
-      const exactRedirectUri = `https://${activeAuthDomain}/__/auth/handler`;
-      const exactAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${exactClientId}&redirect_uri=${encodeURIComponent(exactRedirectUri)}&response_type=token%20id_token&scope=openid%20profile%20email&prompt=select_account`;
-
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
-
-      console.log("[Google Auth] 1. Exact client_id:", exactClientId);
-      console.log("[Google Auth] 2. Exact redirect_uri:", exactRedirectUri);
-      console.log("[Google Auth] 3. Exact authorization URL:", exactAuthUrl);
-
       console.log("[Google Auth] Initiating Firebase signInWithPopup...");
-      let firebaseUser;
+      let firebaseUser = null;
+
       try {
-        await setPersistence(auth, browserLocalPersistence).catch(() => {});
-        const result = await signInWithPopup(auth, provider);
-        firebaseUser = result.user;
+        const result = await signInWithPopup(auth, googleProvider);
+        if (result && result.user) {
+          firebaseUser = result.user;
+        }
       } catch (popupErr: any) {
-        if (popupErr?.message?.includes('Database is closing') || popupErr?.stack?.includes('_openDb')) {
-          console.warn("[Google Auth] IndexedDB closed unexpectedly. Falling back to inMemoryPersistence and retrying...");
-          await setPersistence(auth, inMemoryPersistence).catch(() => {});
-          const retryResult = await signInWithPopup(auth, provider);
-          firebaseUser = retryResult.user;
-        } else {
-          throw popupErr;
+        console.warn("[Google Auth Popup Error/Block]:", popupErr?.code, popupErr?.message);
+
+        const errCode = popupErr?.code || '';
+
+        if (errCode === 'auth/popup-closed-by-user' || errCode === 'auth/cancelled-popup-request') {
+          setIsGoogleLoading(false);
+          const msg = "Login cancelled. You closed the Google sign-in window. (সাইন-ইন বাতিল করা হয়েছে।)";
+          setError(msg);
+          notify(msg);
+          return;
+        }
+
+        if (errCode === 'auth/unauthorized-domain' || popupErr?.message?.includes('unauthorized-domain')) {
+          setIsGoogleLoading(false);
+          const prodUrl = "https://arearnzone-asia-no1-freelance.web.app" + (referral ? "?ref=" + encodeURIComponent(referral.trim()) : "");
+          const msg = "Domain authorization required. Redirecting to authorized website (arearnzone-asia-no1-freelance.web.app)... (অফিসিয়াল সাইটে রিডাইরেক্ট করা হচ্ছে...)";
+          setError(msg);
+          notify(msg);
+          setTimeout(() => {
+            if (typeof window !== 'undefined') {
+              window.location.href = prodUrl;
+            }
+          }, 1200);
+          return;
+        }
+
+        if (errCode === 'auth/network-request-failed') {
+          setIsGoogleLoading(false);
+          const msg = "Network error during Google sign-in. Please check your internet connection and try again. (নেটওয়ার্ক সমস্যা, আবার চেষ্টা করুন।)";
+          setError(msg);
+          notify(msg);
+          return;
+        }
+
+        // If popup was blocked (e.g. on mobile browsers), try redirect fallback:
+        console.log("[Google Auth] Popup blocked or failed. Attempting signInWithRedirect fallback...");
+        try {
+          await signInWithRedirect(auth, googleProvider);
+          return;
+        } catch (redirectErr: any) {
+          console.error("[Google Auth Redirect Error]:", redirectErr);
+          setIsGoogleLoading(false);
+
+          const rCode = redirectErr?.code || '';
+          if (rCode === 'auth/unauthorized-domain' || rCode === 'auth/operation-not-allowed' || redirectErr?.message?.includes('unauthorized-domain')) {
+            const prodUrl = "https://arearnzone-asia-no1-freelance.web.app" + (referral ? "?ref=" + encodeURIComponent(referral.trim()) : "");
+            const msg = "Domain authorization required. Redirecting to authorized website (arearnzone-asia-no1-freelance.web.app)... (অফিসিয়াল সাইটে রিডাইরেক্ট করা হচ্ছে...)";
+            setError(msg);
+            notify(msg);
+            setTimeout(() => {
+              if (typeof window !== 'undefined') {
+                window.location.href = prodUrl;
+              }
+            }, 1200);
+            return;
+          }
+
+          const msg = redirectErr?.message || "Google Sign-In failed. Please try again. (গুগল সাইন-ইন ব্যর্থ হয়েছে।)";
+          setError(msg);
+          notify(msg);
+          return;
         }
       }
 
       if (!firebaseUser || !firebaseUser.email) {
-        throw new Error("Could not retrieve user info from Google authentication. (গুগল সাইন-ইন থেকে ব্যবহারকারীর ইমেল পাওয়া যায়নি।)");
+        setIsGoogleLoading(false);
+        return;
       }
 
       console.log("[Google Auth] Firebase authentication succeeded for:", firebaseUser.email);
@@ -1121,26 +1178,33 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       handleGoogleAuthSuccess(googleUserPayload);
 
     } catch (err: any) {
-      console.error("[ORIGINAL FIREBASE ERROR]:", err);
-      console.error("error.code:", err?.code);
-      console.error("error.message:", err?.message);
-      console.error("error.stack:", err?.stack);
-      console.error("error.cause:", err?.cause);
-
-      const rawCode = err?.code || "N/A";
-      const rawMessage = err?.message || String(err || "");
-      const rawStack = err?.stack || "N/A";
-      const rawCause = err?.cause ? (typeof err.cause === 'object' ? JSON.stringify(err.cause) : String(err.cause)) : "N/A";
-
-      const originalErrorDetails = `[ORIGINAL FIREBASE ERROR]
-error.code: ${rawCode}
-error.message: ${rawMessage}
-error.stack: ${rawStack}
-error.cause: ${rawCause}`;
-
-      setError(originalErrorDetails);
-      notify(originalErrorDetails);
       setIsGoogleLoading(false);
+
+      const rawCode = err?.code || '';
+      const rawMessage = err?.message || String(err || '');
+
+      if (rawCode === 'auth/popup-closed-by-user' || rawCode === 'auth/cancelled-popup-request' || rawMessage.includes('closed the Google sign-in window')) {
+        console.info("[Google Auth Notice]: Sign-in cancelled by user.");
+        const msg = "Login cancelled. You closed the Google sign-in window before completing login. (সাইন-ইন বাতিল করা হয়েছে।)";
+        setError(msg);
+        notify(msg);
+      } else if (rawCode === 'auth/unauthorized-domain' || rawMessage.includes('unauthorized-domain')) {
+        console.warn("[Google Auth Notice]: Domain is not authorized in Firebase Console:", typeof window !== 'undefined' ? window.location.hostname : '');
+        const currentHost = typeof window !== 'undefined' ? window.location.hostname : '';
+        const msg = `Domain (${currentHost}) is not authorized in Firebase Console. Redirecting to production domain...`;
+        setError(msg);
+        notify(msg);
+        setTimeout(() => {
+          const prodUrl = "https://arearnzone-asia-no1-freelance.web.app" + (referral ? "?ref=" + encodeURIComponent(referral.trim()) : "");
+          window.location.href = prodUrl;
+        }, 1500);
+        return;
+      } else {
+        console.error("[Google Auth Error]:", err);
+        const msg = rawMessage || "Google login failed. Please try again. (গুগল সাইন-ইন ব্যর্থ হয়েছে।)";
+        setError(msg);
+        notify(msg);
+      }
     }
   };
 
@@ -1352,11 +1416,19 @@ error.cause: ${rawCause}`;
                   <p className="text-xs font-bold text-red-600 tracking-tight leading-snug">{error}</p>
                 </div>
                 {/* Actionable guide for unauthorized-domain issues */}
-                {error && (error.includes('unauthorized-domain') || error.includes('অননুমোদিত ডোমেন') || error.includes('Unauthorized Domain')) && (
+                {error && (error.includes('unauthorized-domain') || error.includes('not authorized') || error.includes('অননুমোদিত ডোমেন') || error.includes('Authorized domains')) && (
                   <div className="bg-white/95 p-4 rounded-xl border border-red-200/80 text-[11px] leading-relaxed text-slate-700 space-y-3.5 shadow-sm text-left w-full mt-3">
                     <p className="font-extrabold text-red-700 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
                       🛠️ HOW TO FIX THIS ERROR (এটি সমাধান করার সহজ উপায়):
                     </p>
+                    <a 
+                      href="https://arearnzone-asia-no1-freelance.web.app" 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="flex items-center justify-center gap-2 w-full my-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] py-3 px-4 rounded-xl shadow-md transition-all active:scale-95 text-center uppercase tracking-wide"
+                    >
+                      🚀 Open Official Authorized Site (অফিসিয়াল সাইটে যান)
+                    </a>
                     <p className="text-slate-600 font-medium text-[10.5px]">
                       This error happens because the preview URL is not authorized in your Firebase console. Follow these steps to authorize it:
                     </p>
