@@ -819,7 +819,8 @@ const App: React.FC = () => {
 
   // Listen to Firebase Auth state changes to automatically restore or synchronize Google sessions smoothly
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    let isCancelled = false;
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser && firebaseUser.email) {
         console.log("[Firebase Auth] Auth state changed: user is logged in:", firebaseUser.email);
         
@@ -829,11 +830,25 @@ const App: React.FC = () => {
         lastActivityRef.current = now;
 
         const safeEmail = firebaseUser.email.toLowerCase().trim();
-        const allKnownUsers = users.length > 0 ? users : getStored('arez_users', []);
-        const existing = allKnownUsers.find(u => u.email && u.email.toLowerCase().trim() === safeEmail);
+        let allKnownUsers = users.length > 0 ? users : getStored('arez_users', []);
+        let existing = allKnownUsers.find(u => u.email && u.email.toLowerCase().trim() === safeEmail);
+
+        if (!existing && isFirebaseLoaded) {
+          try {
+            const remoteUsers = await fetchCollection<User>("users");
+            if (!isCancelled && remoteUsers && remoteUsers.length > 0) {
+              allKnownUsers = remoteUsers;
+              existing = allKnownUsers.find(u => u.email && u.email.toLowerCase().trim() === safeEmail);
+            }
+          } catch (e) {
+            console.warn("[Firebase Auth] Error fetching remote users during auth state change:", e);
+          }
+        }
+
+        if (isCancelled) return;
 
         if (existing) {
-          if (!currentUser || currentUser.email.toLowerCase().trim() !== safeEmail) {
+          if (!currentUser || currentUser.email.toLowerCase().trim() !== safeEmail || currentUser.id !== existing.id) {
             console.log("[Firebase Auth] Automatically restoring Google session for existing user:", existing.email);
             handleLogin(existing);
           }
@@ -871,8 +886,12 @@ const App: React.FC = () => {
         console.log("[Firebase Auth] Auth state changed: no active Firebase session");
       }
     });
-    return () => unsubscribe();
-  }, [users, currentUser, INACTIVITY_TIMEOUT_MS]);
+
+    return () => {
+      isCancelled = true;
+      unsubscribe();
+    };
+  }, [users, currentUser, isFirebaseLoaded]);
 
   // AI App Health Recovery background scanning effect
   useEffect(() => {
@@ -1479,6 +1498,14 @@ const App: React.FC = () => {
     localStorage.setItem('arez_last_activity_time', now.toString());
     setSessionExpiredNotice(null);
     sessionStorage.removeItem('arez_social_shown');
+
+    // Ensure hash location immediately transitions to Dashboard (/) upon successful login
+    if (typeof window !== 'undefined') {
+      if (window.location.hash && window.location.hash !== '#/' && window.location.hash !== '#') {
+        window.location.hash = '#/';
+      }
+    }
+
     try {
       sessionStorage.setItem('arez_show_welcome_splash', 'true');
     } catch {}

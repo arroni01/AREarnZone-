@@ -1021,8 +1021,16 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
 
       const isAdmin = safeEmail === ADMIN_EMAIL.toLowerCase().trim();
 
-      // Check if a user with this Google UID or email already exists in Supabase users.
-      const existing = (users || []).find(u => 
+      // Check if a user with this Google UID or email already exists in users array or local cache
+      let localStoredUsers: User[] = [];
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStoredUsers = JSON.parse(localStorage.getItem('arez_users') || '[]');
+        }
+      } catch {}
+      const knownUsers = (users && users.length > 0) ? users : localStoredUsers;
+
+      const existing = knownUsers.find(u => 
         (safeId && u.id === safeId) || 
         (u.email && u.email.toLowerCase().trim() === safeEmail)
       );
