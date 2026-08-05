@@ -823,19 +823,14 @@ const App: React.FC = () => {
       if (firebaseUser && firebaseUser.email) {
         console.log("[Firebase Auth] Auth state changed: user is logged in:", firebaseUser.email);
         
-        // Prevent auto-restore ONLY if user is NOT currently logged in AND 5+ minutes of inactivity occurred
-        const lastActiveStr = localStorage.getItem('arez_last_activity_time');
-        if (lastActiveStr && !currentUser) {
-          const lastActiveTime = parseInt(lastActiveStr, 10);
-          if (!isNaN(lastActiveTime) && (Date.now() - lastActiveTime >= INACTIVITY_TIMEOUT_MS)) {
-            console.log("[Firebase Auth] Inactivity limit reached (>5m). Suppressing auto-restore and signing out.");
-            signOut(auth).catch(() => {});
-            return;
-          }
-        }
+        // Refresh activity timestamp when user authenticates
+        const now = Date.now();
+        localStorage.setItem('arez_last_activity_time', now.toString());
+        lastActivityRef.current = now;
 
         const safeEmail = firebaseUser.email.toLowerCase().trim();
-        const existing = users.find(u => u.email.toLowerCase().trim() === safeEmail);
+        const allKnownUsers = users.length > 0 ? users : getStored('arez_users', []);
+        const existing = allKnownUsers.find(u => u.email && u.email.toLowerCase().trim() === safeEmail);
 
         if (existing) {
           if (!currentUser || currentUser.email.toLowerCase().trim() !== safeEmail) {
@@ -844,6 +839,7 @@ const App: React.FC = () => {
           }
         } else if (!currentUser) {
           console.log("[Firebase Auth] Registering & logging in new Google Auth user:", safeEmail);
+          const pendingRef = localStorage.getItem('arez_pending_referral') || undefined;
           const safeName = firebaseUser.displayName || safeEmail.split('@')[0] || "Google User";
           const namePrefix = (safeName.replace(/[^a-zA-Z0-9]/g, '') || 'USER').substring(0, 3).toUpperCase();
           const newUid = 'ARZ-' + Math.random().toString(36).substr(2, 6).toUpperCase() + '-' + Date.now().toString().slice(-4);
@@ -868,7 +864,8 @@ const App: React.FC = () => {
             securityToken: 'SEC_G_' + Math.random().toString(36).substr(2, 10),
             fraudFlags: []
           };
-          handleLogin(newUser);
+          handleLogin(newUser, pendingRef);
+          if (pendingRef) localStorage.removeItem('arez_pending_referral');
         }
       } else {
         console.log("[Firebase Auth] Auth state changed: no active Firebase session");
@@ -1427,8 +1424,10 @@ const App: React.FC = () => {
       notify("Access Denied: Account suspended.");
       return;
     }
-    const existingIdx = users.findIndex(u => u.email.toLowerCase().trim() === user.email.toLowerCase().trim());
-    const isAdminEmail = user.email.toLowerCase().trim() === 'abdurrahman714915@gmail.com';
+    const allKnownUsers = users.length > 0 ? users : getStored('arez_users', []);
+    const userEmail = user.email.toLowerCase().trim();
+    const existingIdx = allKnownUsers.findIndex(u => u.email && u.email.toLowerCase().trim() === userEmail);
+    const isAdminEmail = userEmail === 'abdurrahman714915@gmail.com';
     const finalUser = { ...user, role: isAdminEmail ? 'admin' : (user.role || 'user') };
 
     if (existingIdx === -1) {
@@ -1458,9 +1457,15 @@ const App: React.FC = () => {
           return next;
       });
       setCurrentUser(newUser);
+      try {
+        localStorage.setItem('arez_current_user', JSON.stringify(newUser));
+      } catch {}
     } else {
-      const syncedUser = { ...users[existingIdx], ...finalUser };
+      const syncedUser = { ...allKnownUsers[existingIdx], ...finalUser };
       setCurrentUser(syncedUser);
+      try {
+        localStorage.setItem('arez_current_user', JSON.stringify(syncedUser));
+      } catch {}
       setUsers(prev => prev.map(u => u.id === syncedUser.id ? syncedUser : u));
       if (isFirebaseLoaded) {
         saveDocument("users", syncedUser.id, syncedUser).catch(err => {

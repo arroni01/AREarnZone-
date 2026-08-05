@@ -1020,13 +1020,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       }
 
       const isAdmin = safeEmail === ADMIN_EMAIL.toLowerCase().trim();
-      if (isAdmin) {
-        setView('admin-otp');
-        setIsGoogleLoading(false);
-        setOtp(['', '', '', '', '', '']);
-        notify("Admin Verification Required.");
-        return;
-      }
 
       // Check if a user with this Google UID or email already exists in Supabase users.
       const existing = (users || []).find(u => 
@@ -1037,7 +1030,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       if (existing) {
         console.log("[Google Auth] Existing user found. Logging in:", existing.email);
         notify(`স্বাগতম ফিরে আসার জন্য, ${existing.name}! লগইন সফল হয়েছে। (Welcome back, ${existing.name}! Login successful.)`);
-        onLogin(existing);
+        onLogin({ ...existing, role: isAdmin ? 'admin' : (existing.role || 'user') });
         setIsGoogleLoading(false);
       } else {
         console.log("[Google Auth] Successful Google sign-in. Registering new user account:", safeEmail);
@@ -1118,38 +1111,30 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
 
         const errCode = popupErr?.code || '';
 
-        if (errCode === 'auth/popup-closed-by-user' || errCode === 'auth/cancelled-popup-request') {
-          setIsGoogleLoading(false);
-          const msg = "Login cancelled. You closed the Google sign-in window. (সাইন-ইন বাতিল করা হয়েছে।)";
-          setError(msg);
-          notify(msg);
-          return;
-        }
-
         if (errCode === 'auth/unauthorized-domain' || popupErr?.message?.includes('unauthorized-domain')) {
-          setIsGoogleLoading(false);
-          const prodUrl = "https://arearnzone-asia-no1-freelance.web.app" + (referral ? "?ref=" + encodeURIComponent(referral.trim()) : "");
-          const msg = "Domain authorization required. Redirecting to authorized website (arearnzone-asia-no1-freelance.web.app)... (অফিসিয়াল সাইটে রিডাইরেক্ট করা হচ্ছে...)";
-          setError(msg);
-          notify(msg);
-          setTimeout(() => {
-            if (typeof window !== 'undefined') {
+          if (typeof window !== 'undefined' && window.location.hostname !== 'arearnzone-asia-no1-freelance.web.app') {
+            setIsGoogleLoading(false);
+            const prodUrl = "https://arearnzone-asia-no1-freelance.web.app" + (referral ? "?ref=" + encodeURIComponent(referral.trim()) : "");
+            const msg = "Domain authorization required. Redirecting to authorized website (arearnzone-asia-no1-freelance.web.app)...";
+            setError(msg);
+            notify(msg);
+            setTimeout(() => {
               window.location.href = prodUrl;
-            }
-          }, 1200);
-          return;
+            }, 1200);
+            return;
+          }
         }
 
         if (errCode === 'auth/network-request-failed') {
           setIsGoogleLoading(false);
-          const msg = "Network error during Google sign-in. Please check your internet connection and try again. (নেটওয়ার্ক সমস্যা, আবার চেষ্টা করুন।)";
+          const msg = "Network error during Google sign-in. Please check your internet connection and try again.";
           setError(msg);
           notify(msg);
           return;
         }
 
-        // If popup was blocked (e.g. on mobile browsers), try redirect fallback:
-        console.log("[Google Auth] Popup blocked or failed. Attempting signInWithRedirect fallback...");
+        // If popup was blocked or closed (common on mobile browsers), fallback to signInWithRedirect automatically:
+        console.log("[Google Auth] Fallback to signInWithRedirect...");
         try {
           await signInWithRedirect(auth, googleProvider);
           return;
@@ -1158,20 +1143,20 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
           setIsGoogleLoading(false);
 
           const rCode = redirectErr?.code || '';
-          if (rCode === 'auth/unauthorized-domain' || rCode === 'auth/operation-not-allowed' || redirectErr?.message?.includes('unauthorized-domain')) {
-            const prodUrl = "https://arearnzone-asia-no1-freelance.web.app" + (referral ? "?ref=" + encodeURIComponent(referral.trim()) : "");
-            const msg = "Domain authorization required. Redirecting to authorized website (arearnzone-asia-no1-freelance.web.app)... (অফিসিয়াল সাইটে রিডাইরেক্ট করা হচ্ছে...)";
-            setError(msg);
-            notify(msg);
-            setTimeout(() => {
-              if (typeof window !== 'undefined') {
+          if (rCode === 'auth/unauthorized-domain' || redirectErr?.message?.includes('unauthorized-domain')) {
+            if (typeof window !== 'undefined' && window.location.hostname !== 'arearnzone-asia-no1-freelance.web.app') {
+              const prodUrl = "https://arearnzone-asia-no1-freelance.web.app" + (referral ? "?ref=" + encodeURIComponent(referral.trim()) : "");
+              const msg = "Redirecting to official domain...";
+              setError(msg);
+              notify(msg);
+              setTimeout(() => {
                 window.location.href = prodUrl;
-              }
-            }, 1200);
-            return;
+              }, 1200);
+              return;
+            }
           }
 
-          const msg = redirectErr?.message || "Google Sign-In failed. Please try again. (গুগল সাইন-ইন ব্যর্থ হয়েছে।)";
+          const msg = redirectErr?.message || "Google Sign-In failed. Please try again.";
           setError(msg);
           notify(msg);
           return;
