@@ -817,9 +817,18 @@ const App: React.FC = () => {
     logFirebaseDebugSequence();
   }, []);
 
+  const currentUserRef = React.useRef(currentUser);
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
+  const usersRef = React.useRef(users);
+  useEffect(() => {
+    usersRef.current = users;
+  }, [users]);
+
   // Listen to Firebase Auth state changes to automatically restore or synchronize Google sessions smoothly
   useEffect(() => {
-    let isCancelled = false;
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser && firebaseUser.email) {
         console.log("[Firebase Auth] Auth state changed: user is logged in:", firebaseUser.email);
@@ -830,13 +839,13 @@ const App: React.FC = () => {
         lastActivityRef.current = now;
 
         const safeEmail = firebaseUser.email.toLowerCase().trim();
-        let allKnownUsers = users.length > 0 ? users : getStored('arez_users', []);
+        let allKnownUsers = usersRef.current.length > 0 ? usersRef.current : getStored('arez_users', []);
         let existing = allKnownUsers.find(u => u.email && u.email.toLowerCase().trim() === safeEmail);
 
         if (!existing && isFirebaseLoaded) {
           try {
             const remoteUsers = await fetchCollection<User>("users");
-            if (!isCancelled && remoteUsers && remoteUsers.length > 0) {
+            if (remoteUsers && remoteUsers.length > 0) {
               allKnownUsers = remoteUsers;
               existing = allKnownUsers.find(u => u.email && u.email.toLowerCase().trim() === safeEmail);
             }
@@ -845,14 +854,13 @@ const App: React.FC = () => {
           }
         }
 
-        if (isCancelled) return;
-
+        const currUser = currentUserRef.current;
         if (existing) {
-          if (!currentUser || currentUser.email.toLowerCase().trim() !== safeEmail || currentUser.id !== existing.id) {
+          if (!currUser || currUser.email.toLowerCase().trim() !== safeEmail || currUser.id !== existing.id) {
             console.log("[Firebase Auth] Automatically restoring Google session for existing user:", existing.email);
             handleLogin(existing);
           }
-        } else if (!currentUser) {
+        } else if (!currUser) {
           console.log("[Firebase Auth] Registering & logging in new Google Auth user:", safeEmail);
           const pendingRef = localStorage.getItem('arez_pending_referral') || undefined;
           const safeName = firebaseUser.displayName || safeEmail.split('@')[0] || "Google User";
@@ -887,11 +895,8 @@ const App: React.FC = () => {
       }
     });
 
-    return () => {
-      isCancelled = true;
-      unsubscribe();
-    };
-  }, [users, currentUser, isFirebaseLoaded]);
+    return () => unsubscribe();
+  }, [isFirebaseLoaded]);
 
   // AI App Health Recovery background scanning effect
   useEffect(() => {
@@ -1211,11 +1216,6 @@ const App: React.FC = () => {
       }
     });
   }, [computedPaymentMethods, isFirebaseLoaded, gatewayLogs]);
-
-  const currentUserRef = React.useRef(currentUser);
-  useEffect(() => {
-    currentUserRef.current = currentUser;
-  }, [currentUser]);
 
   // Sync current user when their record in the global users array is modified (e.g. by an admin)
   useEffect(() => {
