@@ -17,7 +17,7 @@ app.use(
 
 // Explicit Preflight OPTIONS Handler
 app.options("*", (c) => {
-  return c.text("", 204, {
+  return c.body(null, 204, {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept, Origin",

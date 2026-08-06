@@ -26,6 +26,9 @@ import {
   CPANetwork,
   CPAConversion,
   CPATransaction,
+  ReferralTarget,
+  TargetHistory,
+  GatewayLog,
 } from "../types";
 import { ICONS } from "../constants";
 import { getApiUrl } from "../src/utils/apiConfig";
@@ -177,6 +180,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     | "welcome"
     | "cpa_control"
     | "regression_test"
+    | "ai_health"
   >("cpa_control");
   const [approvalSubTab, setApprovalSubTab] = useState<
     "membership" | "tasks" | "deposit" | "cpa"
@@ -192,10 +196,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [targetFormEndDate, setTargetFormEndDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
   // Existing Targets Filter State
-  const [targetFilterPeriod, setTargetFilterPeriod] = useState<'all' | 'daily' | 'weekly' | 'monthly' | 'custom'>('all');
+  const [targetFilterPeriod, setTargetFilterPeriod] = useState<'all' | 'daily' | 'oneday' | 'weekly' | 'monthly' | 'custom'>('all');
 
   // Target History Filter & Analytics State
-  const [targetHistoryFilterPeriod, setTargetHistoryFilterPeriod] = useState<'all' | 'daily' | 'weekly' | 'monthly' | 'custom'>('all');
+  const [targetHistoryFilterPeriod, setTargetHistoryFilterPeriod] = useState<'all' | 'daily' | 'oneday' | 'weekly' | 'monthly' | 'custom'>('all');
   const [targetHistoryStartDate, setTargetHistoryStartDate] = useState<string>('');
   const [targetHistoryEndDate, setTargetHistoryEndDate] = useState<string>('');
   const [targetHistorySearch, setTargetHistorySearch] = useState<string>('');
@@ -3078,7 +3082,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             onClick={() => setActiveTab("ai_health")}
             label="AI HEALTH CENTER"
             icon={<Activity className="text-emerald-500 animate-pulse" size={14} />}
-            badge={aiMetrics.healthScore < 100 ? "AI" : undefined}
+            badge={aiMetrics.healthScore < 100 ? 1 : undefined}
           />
         )}
         {!isMonitor && (
@@ -4362,7 +4366,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       </p>
                     </div>
                     <button
-                      onClick={handleTestSmtp}
+                      onClick={() => handleTestSmtp()}
                       disabled={isTestingSmtp}
                       className={`px-5 py-3.5 rounded-2xl text-[9px] uppercase font-black tracking-widest transition-all ${isTestingSmtp ? "bg-slate-300 dark:bg-slate-700 text-slate-500 cursor-not-allowed" : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-[0_0_12px_rgba(16,185,129,0.2)]"}`}
                     >
@@ -8281,7 +8285,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               ) : (
                 filteredMonitors.map((u) => {
-                  const perms = u.monitorPermissions || {};
+                  const perms = (u.monitorPermissions || {}) as MonitorPermissions;
 
                   // Color badges depending on enabled permissions
                   const activePermsList = [
@@ -8549,7 +8553,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       userName: sub.userName || "N/A",
                       userId: sub.userId,
                       title: sub.taskTitle || "Task Proof",
-                      status: sub.status,
+                      status: sub.status as any,
                       textProof: sub.textProof || "",
                       screenshots: sub.screenshots || [],
                       reward: sub.reward || 0,
@@ -8572,7 +8576,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       userName: req.userName || "N/A",
                       userId: req.userId,
                       title: `Account Upgrade: ${req.planName}`,
-                      status: req.status,
+                      status: req.status as any,
                       textProof: `Bkash/Nagad Ref: ${req.transactionId} (${req.method})`,
                       screenshots: req.screenshot ? [req.screenshot] : [],
                       reward: req.amount || 0,
@@ -8595,7 +8599,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       userName: req.userName || "N/A",
                       userId: req.userId,
                       title: `Deposit via ${req.method}`,
-                      status: req.status,
+                      status: req.status as any,
                       textProof: `Bkash/Nagad Ref: ${req.transactionId} (${req.method})`,
                       screenshots: req.screenshot ? [req.screenshot] : [],
                       reward: req.amount || 0,
@@ -8618,7 +8622,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       userName: req.userName || "N/A",
                       userId: req.userId,
                       title: `Payout Withdrawal (${req.method})`,
-                      status: req.status,
+                      status: req.status as any,
                       textProof: `Target Acc: ${req.accountNumber}`,
                       reward: req.amount || 0,
                       date: req.approvedAt || req.date,

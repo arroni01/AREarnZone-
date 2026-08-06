@@ -512,13 +512,16 @@ const Referral: React.FC<ReferralProps> = ({
                       <p className="text-[9px] text-slate-400 font-mono font-bold">{rk.date}</p>
                       <button 
                         onClick={() => {
-                          const associatedTarget = targets?.find(t => t.id === rk.completedTargetId) || {
+                          const associatedTarget: ReferralTarget = targets?.find(t => t.id === rk.completedTargetId) || {
                             id: rk.completedTargetId || 'unknown',
                             title: rk.completedTargetTitle || 'Target Completed',
                             description: 'Completed successfully',
                             referralGoal: 0,
                             bonusReward: 200,
-                            periodType: 'monthly' as const
+                            periodType: 'monthly' as const,
+                            targetRole: 'all',
+                            createdAt: new Date().toISOString(),
+                            isActive: true
                           };
                           triggerCelebration(associatedTarget);
                         }}

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { getApiUrl } from './src/utils/apiConfig';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { User, Task, WithdrawRequest, Transaction, PaymentMethod, MembershipRequest, DepositRequest, MembershipPlan, TaskSubmission, WithdrawOption, AppNotification, SocialLink, Language, GlobalConfig, SellCategory, SellItem, StoreOrder, TelegramVerificationRequest, AdViewLog, GatewayLog, CPANetwork, CPAConversion, CPATransaction } from './types';
+import { User, Task, WithdrawRequest, Transaction, PaymentMethod, MembershipRequest, DepositRequest, MembershipPlan, TaskSubmission, WithdrawOption, AppNotification, SocialLink, Language, GlobalConfig, SellCategory, SellItem, StoreOrder, TelegramVerificationRequest, AdViewLog, GatewayLog, CPANetwork, CPAConversion, CPATransaction, ReferralTarget, TargetHistory } from './types';
 import { ICONS } from './constants';
 import { COUNTRIES, translate } from './components/localization';
 import { 

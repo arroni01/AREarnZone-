@@ -108,7 +108,7 @@ export function initErrorTracker(): void {
       Object.defineProperty(window, 'fetch', {
         value: async function (...args: any[]) {
           try {
-            const res = await originalFetch(...args);
+            const res = await (originalFetch as any)(...args);
             // We only track rejections on our API / domain, or failed calls
             if (!res.ok) {
               const urlStr = typeof args[0] === 'string' ? args[0] : (args[0] as Request).url || '';

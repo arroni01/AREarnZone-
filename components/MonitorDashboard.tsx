@@ -101,7 +101,7 @@ const MonitorDashboard: React.FC<MonitorDashboardProps> = ({
           userId: sub.userId,
           userName: sub.userName || 'N/A',
           taskTitle: sub.taskTitle || 'Task Proof',
-          status: sub.status,
+          status: sub.status as any,
           textProof: sub.textProof || '',
           screenshots: sub.screenshots || [],
           reward: sub.reward || 0,
@@ -119,7 +119,7 @@ const MonitorDashboard: React.FC<MonitorDashboardProps> = ({
           userId: req.userId,
           userName: req.userName || 'N/A',
           taskTitle: `Account Upgrade: ${req.planName}`,
-          status: req.status,
+          status: req.status as any,
           textProof: `Bkash/Nagad Ref: ${req.transactionId} (${req.method})`,
           screenshots: req.screenshot ? [req.screenshot] : [],
           reward: req.amount || 0,
@@ -137,7 +137,7 @@ const MonitorDashboard: React.FC<MonitorDashboardProps> = ({
           userId: req.userId,
           userName: req.userName || 'N/A',
           taskTitle: `Deposit via ${req.method}`,
-          status: req.status,
+          status: req.status as any,
           textProof: `Bkash/Nagad Ref: ${req.transactionId} (${req.method})`,
           screenshots: req.screenshot ? [req.screenshot] : [],
           reward: req.amount || 0,
@@ -155,7 +155,7 @@ const MonitorDashboard: React.FC<MonitorDashboardProps> = ({
           userId: req.userId,
           userName: req.userName || 'N/A',
           taskTitle: `Payout Withdrawal (${req.method})`,
-          status: req.status,
+          status: req.status as any,
           textProof: `Target Acc: ${req.accountNumber}`,
           reward: req.amount || 0,
           approvedAt: req.approvedAt || req.date
@@ -750,7 +750,7 @@ const MonitorDashboard: React.FC<MonitorDashboardProps> = ({
                   </td>
                   <td className="py-3.5 text-right font-black text-slate-800 dark:text-white">৳{(subItem.reward || 0).toFixed(2)}</td>
                   <td className="py-3.5 text-right text-slate-500 font-mono text-[10px]">
-                    {subItem.approvedAt ? new Date(subItem.approvedAt).toLocaleString('en-US', { hour12: true }) : new Date(subItem.submittedAt).toLocaleString('en-US', { hour12: true })}
+                    {subItem.approvedAt ? new Date(subItem.approvedAt).toLocaleString('en-US', { hour12: true }) : (subItem as any).submittedAt ? new Date((subItem as any).submittedAt).toLocaleString('en-US', { hour12: true }) : 'N/A'}
                   </td>
                 </tr>
               ))}

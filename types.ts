@@ -36,6 +36,9 @@ export interface GlobalConfig {
   adLoginDelaySeconds?: number;
   isSeeded?: boolean;
   welcomeSettings?: WelcomeSettings;
+  telegramBotToken?: string;
+  telegramBotUsername?: string;
+  telegramChannelLink?: string;
 }
 
 export interface MonitorPermissions {
@@ -63,7 +66,7 @@ export interface User {
   referralCount: number;
   referredBy?: string;
   status: UserStatus;
-  role: 'user' | 'admin';
+  role: 'user' | 'admin' | 'monitor';
   isTelegramVerified: boolean;
   hasJoinedTelegramChannel: boolean;
   telegramId?: string;
@@ -84,6 +87,7 @@ export interface User {
   lastActive?: string;
   isIPBlocked?: boolean;
   rankHistory?: RankUpgradeRecord[];
+  countryCode?: string;
 }
 
 export interface RankUpgradeRecord {

@@ -1143,7 +1143,9 @@ const AdManagerOverlay: React.FC<AdManagerOverlayProps> = ({
           <div className="flex items-center gap-2 shrink-0 text-slate-500">
             <ArrowLeft size={12} className="opacity-40" />
             <ArrowRight size={12} className="opacity-40" />
-            <RotateCcw size={11} className="hover:text-[#10b981] transition-all cursor-pointer" onClick={triggerNextAdFallback} title="Load next sequence ad" />
+            <button type="button" onClick={triggerNextAdFallback} title="Load next sequence ad" className="hover:text-[#10b981] transition-all cursor-pointer">
+              <RotateCcw size={11} />
+            </button>
           </div>
         </div>
 

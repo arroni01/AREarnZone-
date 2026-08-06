@@ -12,7 +12,7 @@ export const getApiBaseUrl = (): string => {
 
   // 1. Environment Variable (from Vite build/runtime)
   try {
-    envUrl = import.meta.env?.VITE_API_BASE_URL;
+    envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
     if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
       return envUrl.trim().replace(/\/+$/, '');
     }

@@ -45,11 +45,11 @@ interface CPAControlCenterProps {
 
 export const CPAControlCenter: React.FC<CPAControlCenterProps> = ({
   cpaNetworks = [],
-  setCpaNetworks = () => {},
+  setCpaNetworks = (_val?: any) => {},
   cpaConversions = [],
-  setCpaConversions = () => {},
+  setCpaConversions = (_val?: any) => {},
   cpaTransactions = [],
-  setCpaTransactions = () => {},
+  setCpaTransactions = (_val?: any) => {},
   tasks = [],
   setTasks = () => {},
   users = [],
