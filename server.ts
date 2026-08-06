@@ -712,10 +712,14 @@ app.get("/api/telegram/check-join", async (c) => {
 export default app;
 
 // Node.js local runner for development and container execution (port 3000)
-if (process.env.NODE_ENV !== "production" || process.env.RUN_NODE_SERVER !== "false") {
-  const PORT = 3000;
-  async function startServer() {
-    if (process.env.NODE_ENV !== "production") {
+const PORT = 3000;
+
+async function startServer() {
+  const distIndexPath = path.join(process.cwd(), "dist", "index.html");
+  const isProdMode = process.env.NODE_ENV === "production" && fs.existsSync(distIndexPath);
+
+  if (!isProdMode) {
+    try {
       const vitePkg = "vite";
       const { createServer: createViteServer } = await import(vitePkg);
       const vite = await createViteServer({
@@ -738,34 +742,41 @@ if (process.env.NODE_ENV !== "production" || process.env.RUN_NODE_SERVER !== "fa
       server.listen(PORT, "0.0.0.0", () => {
         console.log(`Hono + Vite Dev Server running on http://0.0.0.0:${PORT}`);
       });
-    } else {
-      const distPath = path.join(process.cwd(), "dist");
-      if (fs.existsSync(distPath)) {
-        app.get("*", async (c, next) => {
-          const url = new URL(c.req.url);
-          if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/auth/")) {
-            return await next();
-          }
-          const filePath = path.join(distPath, url.pathname.replace(/^\//, ""));
-          if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-            const fileContent = fs.readFileSync(filePath);
-            return c.body(fileContent);
-          }
-          const indexHtml = fs.readFileSync(path.join(distPath, "index.html"), "utf-8");
-          return c.html(indexHtml);
-        });
-      }
-
-      serve({
-        fetch: app.fetch,
-        port: PORT,
-        hostname: "0.0.0.0"
-      }, () => {
-        console.log(`Hono Server running on http://0.0.0.0:${PORT}`);
-      });
+      return;
+    } catch (err) {
+      console.warn("Vite dev server mode notice:", err);
     }
   }
 
-  startServer().catch(console.error);
+  // Fallback or Production static file serving
+  const distPath = path.join(process.cwd(), "dist");
+  if (fs.existsSync(distPath)) {
+    app.get("*", async (c, next) => {
+      const url = new URL(c.req.url);
+      if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/auth/")) {
+        return await next();
+      }
+      const filePath = path.join(distPath, url.pathname.replace(/^\//, ""));
+      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+        const fileContent = fs.readFileSync(filePath);
+        return c.body(fileContent);
+      }
+      if (fs.existsSync(distIndexPath)) {
+        const indexHtml = fs.readFileSync(distIndexPath, "utf-8");
+        return c.html(indexHtml);
+      }
+      return await next();
+    });
+  }
+
+  serve({
+    fetch: app.fetch,
+    port: PORT,
+    hostname: "0.0.0.0"
+  }, () => {
+    console.log(`Hono Server running on http://0.0.0.0:${PORT}`);
+  });
 }
+
+startServer().catch(console.error);
 

@@ -8,18 +8,39 @@ const app = new Hono();
 app.use(
   "*",
   cors({
-    origin: (origin) => origin || "*",
-    credentials: true,
-    allowHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+    origin: "*",
+    allowHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    exposeHeaders: ["Content-Length", "X-Kuma-Revision"],
     maxAge: 86400,
   })
 );
 
 // Explicit Preflight OPTIONS Handler
 app.options("*", (c) => {
-  return c.text("", 204);
+  return c.text("", 204, {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept, Origin",
+    "Access-Control-Max-Age": "86400",
+  });
+});
+
+// Root & Health check endpoints
+app.get("/", (c) => {
+  return c.json({
+    status: "ok",
+    service: "AREarnZone Cloudflare Worker API",
+    version: "1.0.0",
+    message: "Cloudflare Worker is running and ready for production requests.",
+  });
+});
+
+app.get("/api/health", (c) => {
+  return c.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    cors: "enabled",
+  });
 });
 
 // In-Worker Ephemeral / KV Storage state

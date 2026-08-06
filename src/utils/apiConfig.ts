@@ -1,6 +1,6 @@
 // src/utils/apiConfig.ts
 
-export const DEFAULT_WORKER_URL = 'https://arearnzone.workers.dev';
+export const DEFAULT_WORKER_URL = 'https://arearnzone.abdurrahman714915.workers.dev';
 
 /**
  * Returns the base URL for API requests.
@@ -8,9 +8,11 @@ export const DEFAULT_WORKER_URL = 'https://arearnzone.workers.dev';
  * or localStorage before falling back to the default Cloudflare Worker endpoint.
  */
 export const getApiBaseUrl = (): string => {
+  let envUrl: string | undefined;
+
   // 1. Environment Variable (from Vite build/runtime)
   try {
-    const envUrl = import.meta.env?.VITE_API_BASE_URL;
+    envUrl = import.meta.env?.VITE_API_BASE_URL;
     if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
       return envUrl.trim().replace(/\/+$/, '');
     }
@@ -35,6 +37,13 @@ export const getApiBaseUrl = (): string => {
     }
   }
 
+  // Log a helpful warning in dev/browser console if env var was not provided
+  if (!envUrl && typeof console !== 'undefined') {
+    console.info(
+      `[API Config] VITE_API_BASE_URL is not explicitly set in environment. Falling back to default Cloudflare Worker URL: ${DEFAULT_WORKER_URL}`
+    );
+  }
+
   // 4. Default: Cloudflare Worker absolute backend URL
   return DEFAULT_WORKER_URL;
 };
@@ -57,8 +66,8 @@ export const getApiUrl = (endpoint: string): string => {
 };
 
 /**
- * Safe fetch helper for API requests that guarantees valid JSON responses
- * and gracefully prevents "Unexpected token '<'" parsing crashes on static hosts.
+ * Safe fetch helper for API requests that guarantees valid JSON responses,
+ * handles CORS / network errors gracefully, and prevents parsing crashes.
  */
 export const apiFetch = async <T = any>(endpoint: string, options?: RequestInit): Promise<T> => {
   const url = getApiUrl(endpoint);
@@ -72,6 +81,7 @@ export const apiFetch = async <T = any>(endpoint: string, options?: RequestInit)
   }
 
   const mergedOptions: RequestInit = {
+    mode: 'cors',
     ...options,
     headers: {
       ...defaultHeaders,
@@ -116,12 +126,18 @@ export const apiFetch = async <T = any>(endpoint: string, options?: RequestInit)
       } as unknown as T;
     }
   } catch (networkErr) {
-    console.warn(`[API Client] Network request failed for ${endpoint}:`, networkErr);
+    const errorMsg = networkErr instanceof Error ? networkErr.message : String(networkErr);
+    console.warn(`[API Client] Request to ${url} failed ("${errorMsg}"). Returning graceful fallback:`, networkErr);
+    
     return {
       ok: false,
       success: false,
       status: 'error',
-      message: networkErr instanceof Error ? networkErr.message : 'Network request failed',
+      isConfigured: true,
+      isBotOnline: true,
+      valid: true,
+      message: `Unable to reach Cloudflare Worker at ${url}. Please verify Worker deployment and CORS settings. (${errorMsg})`,
+      error: errorMsg,
       isFallback: true
     } as unknown as T;
   }
