@@ -30,4 +30,6 @@ bun.lockb
 
 # Credentials and secrets
 .env
+*service-account*.json
+*credentials*.json
 
