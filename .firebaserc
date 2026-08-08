@@ -1,5 +1,18 @@
 {
   "projects": {
     "default": "arearnzone"
+  },
+  "targets": {
+    "arearnzone": {
+      "hosting": {
+        "arearnzone": [
+          "arearnzone"
+        ],
+        "arearnzone-asia-no1-freelance": [
+          "arearnzone-asia-no1-freelance"
+        ]
+      }
+    }
   }
 }
+

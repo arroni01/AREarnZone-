@@ -36,11 +36,11 @@ jobs:
             echo "Deploying preview using Service Account..."
             printf '%s\n' "$FIREBASE_SERVICE_ACCOUNT" > service-account.json
             export GOOGLE_APPLICATION_CREDENTIALS=service-account.json
-            npx firebase-tools hosting:channel:deploy pr-${{ github.event.pull_request.number }} --only hosting --project arearnzone --non-interactive
+            npx firebase-tools hosting:channel:deploy pr-${{ github.event.pull_request.number }} --only hosting:arearnzone --project arearnzone --non-interactive
             rm -f service-account.json
           elif [ -n "$FIREBASE_TOKEN" ]; then
             echo "Deploying preview using Firebase Token..."
-            npx firebase-tools hosting:channel:deploy pr-${{ github.event.pull_request.number }} --only hosting --project arearnzone --token "$FIREBASE_TOKEN" --non-interactive
+            npx firebase-tools hosting:channel:deploy pr-${{ github.event.pull_request.number }} --only hosting:arearnzone --project arearnzone --token "$FIREBASE_TOKEN" --non-interactive
           else
             echo "Warning: Neither FIREBASE_SERVICE_ACCOUNT nor FIREBASE_TOKEN secret is set."
             echo "Skipping preview deployment."
