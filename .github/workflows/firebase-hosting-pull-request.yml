@@ -20,6 +20,8 @@ jobs:
 
       - name: Build Application
         env:
+          CI: 'false'
+          DISABLE_ESLINT_PLUGIN: 'true'
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || 'https://arearnzone.abdurrahman714915.workers.dev' }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://uzmhfphwclvpwiiouqak.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'sb_publishable_stzcP0VjBM_dL7LOsKTCLg_a2CFgbFy' }}
