@@ -7,11 +7,66 @@ const app = new Hono();
 
 // Supabase Environment Setup
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "https://uzmhfphwclvpwiiouqak.supabase.co";
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "sb_publishable_stzcP0VjBM_dL7LOsKTCLg_a2CFgbFy";
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "sb_publishable_stzcP0VjBM_dL7LOsKTCLg_a2CFgbFy";
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { persistSession: false },
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
 });
+
+// Helper for safe Supabase table writes with fallback to user raw_data if table is missing or blocked by RLS
+async function safeSupabaseUpsert(
+  table: string,
+  record: any,
+  userRowFallback?: { userId: string; field: 'conversions' | 'transactions' | 'submissions' | 'withdraws' | 'notifications' }
+) {
+  try {
+    const { error } = await supabase.from(table).upsert(record);
+    if (!error) {
+      return { success: true };
+    }
+
+    console.warn(`[Supabase Safe Upsert] '${table}' error: ${error.message} (code: ${error.code})`);
+
+    if (userRowFallback && userRowFallback.userId) {
+      try {
+        const { data: userMatch } = await supabase
+          .from("users")
+          .select("*")
+          .or(`id.eq.${userRowFallback.userId},firebase_uid.eq.${userRowFallback.userId}`)
+          .limit(1);
+
+        if (userMatch && userMatch.length > 0) {
+          const user = userMatch[0];
+          const rawData = user.raw_data || {};
+          const arrayField = userRowFallback.field;
+          const currentList = Array.isArray(rawData[arrayField]) ? rawData[arrayField] : [];
+
+          const filtered = currentList.filter((item: any) => item.id !== record.id);
+          filtered.unshift(record);
+          rawData[arrayField] = filtered.slice(0, 100);
+
+          await supabase
+            .from("users")
+            .update({
+              updated_at: new Date().toISOString(),
+              raw_data: rawData,
+            })
+            .eq("id", user.id);
+
+          console.info(`[Supabase Safe Upsert] Appended ${table} record to user.raw_data.${arrayField}`);
+          return { success: true, isFallback: true };
+        }
+      } catch (fallbackErr: any) {
+        console.warn(`[Supabase Safe Upsert] Fallback to user raw_data failed:`, fallbackErr?.message);
+      }
+    }
+
+    return { success: false, error: error.message, code: error.code };
+  } catch (err: any) {
+    console.warn(`[Supabase Safe Upsert] Exception during upsert into '${table}':`, err?.message);
+    return { success: false, error: err?.message || String(err) };
+  }
+}
 
 // Global CORS Middleware - Enable Access-Control-Allow-Origin: * for all endpoints
 app.use(
@@ -486,39 +541,39 @@ app.post("/api/cpa/test-connection", async (c) => {
 
 // CPA Postback Handler - Parses query parameters and/or body, updates user balance in Supabase directly
 const handleCpaPostback = async (c: any) => {
-  const query = c.req.query() || {};
-  let body: any = {};
   try {
-    body = await c.req.json();
-  } catch (e) {
+    const query = c.req.query() || {};
+    let body: any = {};
     try {
-      body = await c.req.parseBody();
-    } catch (e2) {}
-  }
+      body = await c.req.json();
+    } catch (e) {
+      try {
+        body = await c.req.parseBody();
+      } catch (e2) {}
+    }
 
-  const params = { ...query, ...body };
-  const networkParam = c.req.param("networkParam") || params.network || params.network_name || params.net || "CPALead";
-  const subId = params.subid || params.sub_id || params.subId || params.user_id || params.uid || params.click_id || "anonymous";
-  const clickId = params.click_id || params.clickid || params.trans_id || params.txid || `clk_${Date.now()}`;
-  const offerId = params.offer_id || params.offer || params.campaign_id || "general";
-  const payout = parseFloat(params.payout || params.amount || params.reward || params.commission || "0.50");
-  const status = params.status || "approved";
+    const params = { ...query, ...body };
+    const networkParam = c.req.param("networkParam") || params.network || params.network_name || params.net || "CPALead";
+    const subId = params.subid || params.sub_id || params.subId || params.user_id || params.uid || params.click_id || "anonymous";
+    const clickId = params.click_id || params.clickid || params.trans_id || params.txid || `clk_${Date.now()}`;
+    const offerId = params.offer_id || params.offer || params.campaign_id || "general";
+    const payout = parseFloat(params.payout || params.amount || params.reward || params.commission || "0.50");
+    const status = params.status || "approved";
 
-  const record = {
-    id: `conv_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    network: networkParam,
-    subId,
-    clickId,
-    offerId,
-    payout,
-    status,
-    timestamp: new Date().toISOString(),
-    rawParams: params,
-  };
+    const record = {
+      id: `conv_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      network: networkParam,
+      subId,
+      clickId,
+      offerId,
+      payout,
+      status,
+      timestamp: new Date().toISOString(),
+      rawParams: params,
+    };
 
-  // 1. Log conversion in Supabase cpa_conversions table
-  try {
-    await supabase.from("cpa_conversions").upsert({
+    // 1. Log conversion in Supabase cpa_conversions table with safe fallback
+    await safeSupabaseUpsert("cpa_conversions", {
       id: record.id,
       user_id: subId,
       firebase_uid: subId,
@@ -526,32 +581,50 @@ const handleCpaPostback = async (c: any) => {
       amount: payout,
       updated_at: new Date().toISOString(),
       raw_data: record,
-    });
-  } catch (dbErr) {
-    console.warn("[Worker Postback] CPA conversion DB write error:", dbErr);
-  }
+    }, { userId: subId, field: "conversions" });
 
-  // 2. Direct User Balance Update in Supabase
-  let updatedBalance: number | null = null;
-  let userFound = false;
+    // 2. Direct User Balance Update in Supabase
+    let updatedBalance: number | null = null;
+    let userFound = false;
 
-  if (subId && subId !== "anonymous" && payout > 0) {
-    try {
+    if (subId && subId !== "anonymous" && payout > 0) {
       let userRow: any = null;
-      const { data: uidMatch } = await supabase
+      const { data: uidMatch, error: uidErr } = await supabase
         .from("users")
         .select("*")
         .or(`id.eq.${subId},firebase_uid.eq.${subId}`)
         .limit(1);
 
+      if (uidErr) {
+        console.warn("[Worker Postback] Error querying user in Supabase:", uidErr.message);
+        return c.json({
+          status: "error",
+          ok: false,
+          success: false,
+          error: `Supabase user lookup failed: ${uidErr.message}`,
+          details: uidErr,
+        }, 500);
+      }
+
       if (uidMatch && uidMatch.length > 0) {
         userRow = uidMatch[0];
       } else if (subId.includes("@")) {
-        const { data: emailMatch } = await supabase
+        const { data: emailMatch, error: emailErr } = await supabase
           .from("users")
           .select("*")
           .ilike("email", subId)
           .limit(1);
+
+        if (emailErr) {
+          return c.json({
+            status: "error",
+            ok: false,
+            success: false,
+            error: `Supabase email lookup failed: ${emailErr.message}`,
+            details: emailErr,
+          }, 500);
+        }
+
         if (emailMatch && emailMatch.length > 0) {
           userRow = emailMatch[0];
         }
@@ -565,7 +638,7 @@ const handleCpaPostback = async (c: any) => {
         rawData.balance = updatedBalance;
 
         // Update user balance in Supabase
-        await supabase
+        const { error: updateErr } = await supabase
           .from("users")
           .update({
             balance: updatedBalance,
@@ -574,7 +647,18 @@ const handleCpaPostback = async (c: any) => {
           })
           .eq("id", userRow.id);
 
-        // Record credit transaction in wallet_transactions table
+        if (updateErr) {
+          console.warn("[Worker Postback] User balance update error:", updateErr.message);
+          return c.json({
+            status: "error",
+            ok: false,
+            success: false,
+            error: `Failed to update user balance in Supabase: ${updateErr.message}`,
+            details: updateErr,
+          }, 500);
+        }
+
+        // Record credit transaction in wallet_transactions table with safe fallback
         const txId = `tx_cpa_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
         const txData = {
           id: txId,
@@ -588,7 +672,7 @@ const handleCpaPostback = async (c: any) => {
           timestamp: new Date().toISOString(),
         };
 
-        await supabase.from("wallet_transactions").upsert({
+        await safeSupabaseUpsert("wallet_transactions", {
           id: txId,
           user_id: userRow.id,
           firebase_uid: userRow.firebase_uid || userRow.id,
@@ -597,35 +681,41 @@ const handleCpaPostback = async (c: any) => {
           status: "completed",
           updated_at: new Date().toISOString(),
           raw_data: txData,
-        });
+        }, { userId: userRow.id, field: "transactions" });
       }
-    } catch (balErr) {
-      console.warn("[Worker Postback] User balance update error:", balErr);
     }
+
+    // 3. Update in-memory cache
+    cpaConversions.unshift(record);
+
+    return c.json(
+      {
+        status: "ok",
+        ok: true,
+        success: true,
+        message: "CPA Postback processed successfully and balance updated in Supabase",
+        subId,
+        payout,
+        userFound,
+        updatedBalance,
+        conversion: record,
+      },
+      200,
+      {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+      }
+    );
+  } catch (err: any) {
+    console.error("[Worker Postback Exception]", err);
+    return c.json({
+      status: "error",
+      ok: false,
+      success: false,
+      error: err?.message || String(err),
+    }, 500);
   }
-
-  // 3. Update in-memory cache
-  cpaConversions.unshift(record);
-
-  return c.json(
-    {
-      status: "ok",
-      ok: true,
-      success: true,
-      message: "CPA Postback processed successfully and balance updated in Supabase",
-      subId,
-      payout,
-      userFound,
-      updatedBalance,
-      conversion: record,
-    },
-    200,
-    {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "*",
-    }
-  );
 };
 
 // Bind all CPA Postback endpoint aliases

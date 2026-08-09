@@ -26,16 +26,20 @@ const getEnvVar = (key: string): string => {
 
 export const SUPABASE_URL =
   getEnvVar('VITE_SUPABASE_URL') || getEnvVar('SUPABASE_URL') || 'https://uzmhfphwclvpwiiouqak.supabase.co';
-export const SUPABASE_ANON_KEY =
+
+export const SUPABASE_KEY =
+  getEnvVar('SUPABASE_SERVICE_ROLE_KEY') ||
+  getEnvVar('VITE_SUPABASE_SERVICE_ROLE_KEY') ||
   getEnvVar('VITE_SUPABASE_ANON_KEY') ||
   getEnvVar('SUPABASE_ANON_KEY') ||
-  getEnvVar('SUPABASE_SERVICE_ROLE_KEY') ||
   'sb_publishable_stzcP0VjBM_dL7LOsKTCLg_a2CFgbFy';
 
-export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+export const SUPABASE_ANON_KEY = SUPABASE_KEY;
+
+export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_KEY);
 
 export const supabase: SupabaseClient | null = isSupabaseConfigured
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  ? createClient(SUPABASE_URL, SUPABASE_KEY, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,

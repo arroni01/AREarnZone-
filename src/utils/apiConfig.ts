@@ -110,21 +110,47 @@ export const apiFetch = async <T = any>(endpoint: string, options?: RequestInit)
       } as unknown as T;
     }
 
+    let parsed: any;
     try {
-      return JSON.parse(text) as T;
+      parsed = JSON.parse(text);
     } catch (parseErr) {
       console.warn(`[API Client] Error parsing JSON for ${endpoint}:`, parseErr);
       return {
         ok: false,
         success: false,
         status: 'error',
+        statusCode: response.status,
         isConfigured: false,
         isBotOnline: false,
         valid: false,
-        message: `Failed to parse response from ${endpoint}`,
+        message: `Failed to parse response from ${endpoint} (HTTP ${response.status})`,
         error: String(parseErr)
       } as unknown as T;
     }
+
+    if (!response.ok) {
+      console.warn(`[API Client] Endpoint ${endpoint} returned HTTP ${response.status}:`, parsed);
+      if (typeof parsed === 'object' && parsed !== null) {
+        return {
+          ok: false,
+          success: false,
+          status: 'error',
+          statusCode: response.status,
+          ...parsed,
+          error: parsed.error || parsed.message || `HTTP ${response.status} Error`,
+        } as unknown as T;
+      }
+      return {
+        ok: false,
+        success: false,
+        status: 'error',
+        statusCode: response.status,
+        message: `HTTP ${response.status} Error`,
+        error: `HTTP ${response.status} Error`,
+      } as unknown as T;
+    }
+
+    return parsed as T;
   } catch (networkErr) {
     const errorMsg = networkErr instanceof Error ? networkErr.message : String(networkErr);
     console.warn(`[API Client] Request to ${url} failed ("${errorMsg}"):`, networkErr);

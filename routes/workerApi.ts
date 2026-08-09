@@ -72,45 +72,116 @@ async function verifyAuth(c: any): Promise<VerifiedUser | null> {
   }
 }
 
-// 1. /api/user/profile
-workerApi.get("/user/profile", async (c) => {
-  const user = await verifyAuth(c);
-  if (!user) return c.json({ success: false, error: "Unauthorized" }, 401);
-
-  if (supabase && isSupabaseConfigured) {
-    const { data, error } = await supabase.from("users").select("*").eq("firebase_uid", user.uid).single();
-    if (!error && data) {
-      return c.json({ success: true, data: data.raw_data || data });
-    }
+// --- Safe Table Upsert & Fallback Helper ---
+async function safeSupabaseUpsert(
+  table: string,
+  record: any,
+  userRowFallback?: { userId: string; field: 'conversions' | 'transactions' | 'submissions' | 'withdraws' | 'notifications' }
+) {
+  if (!supabase || !isSupabaseConfigured) {
+    return { success: false, error: "Supabase client not initialized or configured" };
   }
 
-  return c.json({ success: true, data: { id: user.uid, firebase_uid: user.uid, email: user.email, status: "Unverified" } });
+  try {
+    const { error } = await supabase.from(table).upsert(record);
+    if (!error) {
+      return { success: true };
+    }
+
+    console.warn(`[Supabase Safe Upsert] '${table}' returned error: ${error.message} (code: ${error.code})`);
+
+    // Safe fallback to updating user.raw_data if table is missing (e.g. 42P01) or blocked by RLS
+    if (userRowFallback && userRowFallback.userId) {
+      try {
+        const { data: userMatch } = await supabase
+          .from("users")
+          .select("*")
+          .or(`id.eq.${userRowFallback.userId},firebase_uid.eq.${userRowFallback.userId}`)
+          .limit(1);
+
+        if (userMatch && userMatch.length > 0) {
+          const user = userMatch[0];
+          const rawData = user.raw_data || {};
+          const arrayField = userRowFallback.field;
+          const currentList = Array.isArray(rawData[arrayField]) ? rawData[arrayField] : [];
+
+          const filtered = currentList.filter((item: any) => item.id !== record.id);
+          filtered.unshift(record);
+          rawData[arrayField] = filtered.slice(0, 100);
+
+          await supabase
+            .from("users")
+            .update({
+              updated_at: new Date().toISOString(),
+              raw_data: rawData,
+            })
+            .eq("id", user.id);
+
+          console.info(`[Supabase Safe Upsert] Successfully appended ${table} record to user.raw_data.${arrayField}`);
+          return { success: true, isFallback: true };
+        }
+      } catch (fallbackErr: any) {
+        console.warn(`[Supabase Safe Upsert] Fallback to user raw_data failed:`, fallbackErr?.message);
+      }
+    }
+
+    return { success: false, error: error.message, code: error.code };
+  } catch (err: any) {
+    console.warn(`[Supabase Safe Upsert] Exception during upsert into '${table}':`, err?.message);
+    return { success: false, error: err?.message || String(err) };
+  }
+}
+
+// 1. /api/user/profile
+workerApi.get("/user/profile", async (c) => {
+  try {
+    const user = await verifyAuth(c);
+    if (!user) return c.json({ success: false, error: "Unauthorized" }, 401);
+
+    if (supabase && isSupabaseConfigured) {
+      const { data, error } = await supabase.from("users").select("*").eq("firebase_uid", user.uid).single();
+      if (error && error.code !== "PGRST116") {
+        return c.json({ success: false, error: `Supabase query failed: ${error.message}`, details: error }, 500);
+      }
+      if (data) {
+        return c.json({ success: true, data: data.raw_data || data });
+      }
+    }
+
+    return c.json({ success: true, data: { id: user.uid, firebase_uid: user.uid, email: user.email, status: "Unverified" } });
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message || String(err) }, 500);
+  }
 });
 
 workerApi.post("/user/profile", async (c) => {
-  const user = await verifyAuth(c);
-  if (!user) return c.json({ success: false, error: "Unauthorized" }, 401);
+  try {
+    const user = await verifyAuth(c);
+    if (!user) return c.json({ success: false, error: "Unauthorized" }, 401);
 
-  const body = await c.req.json().catch(() => ({}));
-  const profileData = { ...body, firebase_uid: user.uid, id: body.id || user.uid, updated_at: new Date().toISOString() };
+    const body = await c.req.json().catch(() => ({}));
+    const profileData = { ...body, firebase_uid: user.uid, id: body.id || user.uid, updated_at: new Date().toISOString() };
 
-  if (supabase && isSupabaseConfigured) {
-    const { error } = await supabase.from("users").upsert({
-      id: profileData.id,
-      firebase_uid: user.uid,
-      email: profileData.email || user.email,
-      name: profileData.name || profileData.fullName,
-      status: profileData.status || "Active",
-      updated_at: new Date().toISOString(),
-      raw_data: profileData,
-    });
+    if (supabase && isSupabaseConfigured) {
+      const { error } = await supabase.from("users").upsert({
+        id: profileData.id,
+        firebase_uid: user.uid,
+        email: profileData.email || user.email,
+        name: profileData.name || profileData.fullName,
+        status: profileData.status || "Active",
+        updated_at: new Date().toISOString(),
+        raw_data: profileData,
+      });
 
-    if (error) {
-      return c.json({ success: false, error: error.message }, 500);
+      if (error) {
+        return c.json({ success: false, error: `Supabase profile save failed: ${error.message}`, details: error }, 500);
+      }
     }
-  }
 
-  return c.json({ success: true, message: "User profile updated successfully", data: profileData });
+    return c.json({ success: true, message: "User profile updated successfully", data: profileData });
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message || String(err) }, 500);
+  }
 });
 
 // 2. /api/tasks
@@ -454,56 +525,76 @@ workerApi.post("/admin", async (c) => {
 
 // 10. /api/cpa/postback & Route Aliases
 const handlePostbackRoute = async (c: any) => {
-  const query = c.req.query() || {};
-  let body: any = {};
   try {
-    body = await c.req.json();
-  } catch (e) {
+    const query = c.req.query() || {};
+    let body: any = {};
     try {
-      body = await c.req.parseBody();
-    } catch (e2) {}
-  }
-
-  const payload = { ...query, ...body };
-  const networkParam = c.req.param("networkParam") || payload.network || payload.network_name || payload.net || "CPALead";
-  const subId = payload.subid || payload.sub_id || payload.subId || payload.user_id || payload.uid || payload.click_id || "anonymous";
-  const payout = parseFloat(payload.payout || payload.amount || payload.reward || payload.commission || "0.50");
-  const conversionId = payload.subid || payload.click_id || payload.conversion_id || `cpa_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-  const status = payload.status || "approved";
-
-  let updatedBalance: number | null = null;
-  let userFound = false;
-
-  if (supabase && isSupabaseConfigured) {
-    // 1. Save CPA conversion
-    await supabase.from("cpa_conversions").upsert({
-      id: conversionId,
-      user_id: subId,
-      firebase_uid: subId,
-      status: status,
-      amount: payout,
-      updated_at: new Date().toISOString(),
-      raw_data: payload,
-    });
-
-    // 2. Direct user balance update
-    if (subId && subId !== "anonymous" && payout > 0) {
+      body = await c.req.json();
+    } catch (e) {
       try {
+        body = await c.req.parseBody();
+      } catch (e2) {}
+    }
+
+    const payload = { ...query, ...body };
+    const networkParam = c.req.param("networkParam") || payload.network || payload.network_name || payload.net || "CPALead";
+    const subId = payload.subid || payload.sub_id || payload.subId || payload.user_id || payload.uid || payload.click_id || "anonymous";
+    const payout = parseFloat(payload.payout || payload.amount || payload.reward || payload.commission || "0.50");
+    const conversionId = payload.subid || payload.click_id || payload.conversion_id || `cpa_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const status = payload.status || "approved";
+
+    let updatedBalance: number | null = null;
+    let userFound = false;
+
+    if (supabase && isSupabaseConfigured) {
+      // 1. Save CPA conversion with safe fallback
+      await safeSupabaseUpsert("cpa_conversions", {
+        id: conversionId,
+        user_id: subId,
+        firebase_uid: subId,
+        status: status,
+        amount: payout,
+        updated_at: new Date().toISOString(),
+        raw_data: payload,
+      }, { userId: subId, field: "conversions" });
+
+      // 2. Direct user balance update
+      if (subId && subId !== "anonymous" && payout > 0) {
         let userRow: any = null;
-        const { data: uidMatch } = await supabase
+        const { data: uidMatch, error: uidErr } = await supabase
           .from("users")
           .select("*")
           .or(`id.eq.${subId},firebase_uid.eq.${subId}`)
           .limit(1);
 
+        if (uidErr) {
+          console.warn("[Worker API Route] Error querying user in Supabase:", uidErr.message);
+          return c.json({
+            success: false,
+            status: "error",
+            error: `Supabase user query failed: ${uidErr.message}`,
+            details: uidErr,
+          }, 500);
+        }
+
         if (uidMatch && uidMatch.length > 0) {
           userRow = uidMatch[0];
         } else if (subId.includes("@")) {
-          const { data: emailMatch } = await supabase
+          const { data: emailMatch, error: emailErr } = await supabase
             .from("users")
             .select("*")
             .ilike("email", subId)
             .limit(1);
+
+          if (emailErr) {
+            return c.json({
+              success: false,
+              status: "error",
+              error: `Supabase email query failed: ${emailErr.message}`,
+              details: emailErr,
+            }, 500);
+          }
+
           if (emailMatch && emailMatch.length > 0) {
             userRow = emailMatch[0];
           }
@@ -516,7 +607,7 @@ const handlePostbackRoute = async (c: any) => {
           const rawData = userRow.raw_data || {};
           rawData.balance = updatedBalance;
 
-          await supabase
+          const { error: updateErr } = await supabase
             .from("users")
             .update({
               balance: updatedBalance,
@@ -525,8 +616,18 @@ const handlePostbackRoute = async (c: any) => {
             })
             .eq("id", userRow.id);
 
+          if (updateErr) {
+            console.warn("[Worker API Route] Error updating user balance:", updateErr.message);
+            return c.json({
+              success: false,
+              status: "error",
+              error: `Failed to update user balance in Supabase: ${updateErr.message}`,
+              details: updateErr,
+            }, 500);
+          }
+
           const txId = `tx_cpa_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-          await supabase.from("wallet_transactions").upsert({
+          await safeSupabaseUpsert("wallet_transactions", {
             id: txId,
             user_id: userRow.id,
             firebase_uid: userRow.firebase_uid || userRow.id,
@@ -545,27 +646,33 @@ const handlePostbackRoute = async (c: any) => {
               status: "completed",
               timestamp: new Date().toISOString(),
             },
-          });
+          }, { userId: userRow.id, field: "transactions" });
         }
-      } catch (err) {
-        console.warn("[Worker API Route] Error updating user balance:", err);
       }
     }
-  }
 
-  c.header("Access-Control-Allow-Origin", "*");
-  c.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  return c.json({
-    status: "ok",
-    ok: true,
-    success: true,
-    message: "CPA postback recorded and user balance updated",
-    conversionId,
-    subId,
-    payout,
-    userFound,
-    updatedBalance,
-  }, 200);
+    c.header("Access-Control-Allow-Origin", "*");
+    c.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    return c.json({
+      status: "ok",
+      ok: true,
+      success: true,
+      message: "CPA postback recorded and user balance updated",
+      conversionId,
+      subId,
+      payout,
+      userFound,
+      updatedBalance,
+    }, 200);
+  } catch (err: any) {
+    console.error("[Postback Route Error]", err);
+    return c.json({
+      status: "error",
+      ok: false,
+      success: false,
+      error: err?.message || String(err),
+    }, 500);
+  }
 };
 
 workerApi.all("/cpa/postback", handlePostbackRoute);

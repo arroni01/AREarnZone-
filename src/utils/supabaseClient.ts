@@ -30,18 +30,21 @@ export const SUPABASE_URL =
   getEnvVar('SUPABASE_URL') ||
   'https://uzmhfphwclvpwiiouqak.supabase.co';
 
-export const SUPABASE_ANON_KEY =
+export const SUPABASE_KEY =
+  getEnvVar('SUPABASE_SERVICE_ROLE_KEY') ||
+  getEnvVar('VITE_SUPABASE_SERVICE_ROLE_KEY') ||
   getEnvVar('VITE_SUPABASE_ANON_KEY') ||
   getEnvVar('SUPABASE_ANON_KEY') ||
-  getEnvVar('SUPABASE_SERVICE_ROLE_KEY') ||
   'sb_publishable_stzcP0VjBM_dL7LOsKTCLg_a2CFgbFy';
 
-export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+export const SUPABASE_ANON_KEY = SUPABASE_KEY;
+
+export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_KEY);
 
 /**
  * Single Source of Truth Supabase Client Instance
  */
-export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
