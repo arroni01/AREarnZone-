@@ -97,16 +97,16 @@ export const apiFetch = async <T = any>(endpoint: string, options?: RequestInit)
 
     // Check if the response returned an HTML document instead of JSON (e.g., static hosting 404 fallback)
     if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || contentType.includes('text/html')) {
-      console.warn(`[API Client] Received HTML instead of JSON for endpoint: ${endpoint}. Returning safe synthetic backend response.`);
+      console.warn(`[API Client] Received HTML instead of JSON for endpoint: ${endpoint}.`);
       return {
-        ok: true,
-        success: true,
-        status: 'ok',
-        isConfigured: true,
-        isBotOnline: true,
-        valid: true,
-        message: 'Cloudflare Worker Live Connection Active',
-        isFallback: true
+        ok: false,
+        success: false,
+        status: 'error',
+        isConfigured: false,
+        isBotOnline: false,
+        valid: false,
+        message: `API endpoint ${endpoint} returned HTML instead of valid JSON.`,
+        error: 'HTML_RESPONSE_RECEIVED'
       } as unknown as T;
     }
 
@@ -115,30 +115,29 @@ export const apiFetch = async <T = any>(endpoint: string, options?: RequestInit)
     } catch (parseErr) {
       console.warn(`[API Client] Error parsing JSON for ${endpoint}:`, parseErr);
       return {
-        ok: true,
-        success: true,
-        status: 'ok',
-        isConfigured: true,
-        isBotOnline: true,
-        valid: true,
-        message: 'Response received',
-        isFallback: true
+        ok: false,
+        success: false,
+        status: 'error',
+        isConfigured: false,
+        isBotOnline: false,
+        valid: false,
+        message: `Failed to parse response from ${endpoint}`,
+        error: String(parseErr)
       } as unknown as T;
     }
   } catch (networkErr) {
     const errorMsg = networkErr instanceof Error ? networkErr.message : String(networkErr);
-    console.warn(`[API Client] Request to ${url} failed ("${errorMsg}"). Returning graceful fallback:`, networkErr);
+    console.warn(`[API Client] Request to ${url} failed ("${errorMsg}"):`, networkErr);
     
     return {
       ok: false,
       success: false,
       status: 'error',
-      isConfigured: true,
-      isBotOnline: true,
-      valid: true,
-      message: `Unable to reach Cloudflare Worker at ${url}. Please verify Worker deployment and CORS settings. (${errorMsg})`,
+      isConfigured: false,
+      isBotOnline: false,
+      valid: false,
+      message: `Unable to reach Cloudflare Worker at ${url}. (${errorMsg})`,
       error: errorMsg,
-      isFallback: true
     } as unknown as T;
   }
 };
@@ -152,27 +151,29 @@ if (typeof window !== 'undefined' && typeof Response !== 'undefined' && Response
       const text = await clone.text();
       const trimmed = text.trim();
       if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || trimmed.startsWith('<?xml')) {
-        console.warn('[API Safety Guard] Prevented "Unexpected token <" HTML parse crash. Returning live fallback JSON.');
+        console.warn('[API Safety Guard] Prevented HTML parse crash. Returning error status.');
         return {
-          ok: true,
-          status: 'ok',
-          success: true,
-          isConfigured: true,
-          isBotOnline: true,
-          valid: true,
-          message: 'Cloudflare Worker Live Connection Active'
+          ok: false,
+          status: 'error',
+          success: false,
+          isConfigured: false,
+          isBotOnline: false,
+          valid: false,
+          message: 'Endpoint returned HTML instead of valid JSON',
+          error: 'HTML_RESPONSE_RECEIVED'
         };
       }
       return JSON.parse(text);
     } catch (err) {
       return originalJson.call(this).catch(() => ({
-        ok: true,
-        status: 'ok',
-        success: true,
-        isConfigured: true,
-        isBotOnline: true,
-        valid: true,
-        message: 'Cloudflare Worker Live Connection Active'
+        ok: false,
+        status: 'error',
+        success: false,
+        isConfigured: false,
+        isBotOnline: false,
+        valid: false,
+        message: 'Failed to parse JSON response',
+        error: String(err)
       }));
     }
   };

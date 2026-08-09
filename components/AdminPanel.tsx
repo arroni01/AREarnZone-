@@ -4139,11 +4139,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       {emailCounters.smtpStatus.map((smtp, idx) => {
                         const isCurrentActive =
                           emailCounters.activeSmtp === smtp.user;
-                        const isDepleted = smtp.count >= smtp.limit;
-                        const usagePercent = Math.min(
-                          100,
-                          (smtp.count / smtp.limit) * 100,
-                        );
+                        const count = Number(smtp.count) || 0;
+                        const limit = Number(smtp.limit) > 0 ? Number(smtp.limit) : 500;
+                        const isDepleted = count >= limit;
+                        const rawPercent = (count / limit) * 100;
+                        const usagePercent = isNaN(rawPercent) || !isFinite(rawPercent)
+                          ? 0
+                          : Math.min(100, Math.max(0, rawPercent));
 
                         return (
                           <div
@@ -4185,7 +4187,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                   Quota Usage:
                                 </span>
                                 <span>
-                                  {smtp.count} / {smtp.limit} (
+                                  {count} / {limit} (
                                   {Math.round(usagePercent)}%)
                                 </span>
                               </div>

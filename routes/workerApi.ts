@@ -452,27 +452,128 @@ workerApi.post("/admin", async (c) => {
   return c.json({ success: true, message: "Admin setting updated", data: body });
 });
 
-// 10. /api/cpa/postback
-workerApi.post("/cpa/postback", async (c) => {
-  const query = c.req.query();
-  const body = await c.req.json().catch(() => ({}));
-  const payload = { ...query, ...body };
+// 10. /api/cpa/postback & Route Aliases
+const handlePostbackRoute = async (c: any) => {
+  const query = c.req.query() || {};
+  let body: any = {};
+  try {
+    body = await c.req.json();
+  } catch (e) {
+    try {
+      body = await c.req.parseBody();
+    } catch (e2) {}
+  }
 
-  const conversionId = payload.subid || payload.conversion_id || `cpa_${Date.now()}`;
+  const payload = { ...query, ...body };
+  const networkParam = c.req.param("networkParam") || payload.network || payload.network_name || payload.net || "CPALead";
+  const subId = payload.subid || payload.sub_id || payload.subId || payload.user_id || payload.uid || payload.click_id || "anonymous";
+  const payout = parseFloat(payload.payout || payload.amount || payload.reward || payload.commission || "0.50");
+  const conversionId = payload.subid || payload.click_id || payload.conversion_id || `cpa_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  const status = payload.status || "approved";
+
+  let updatedBalance: number | null = null;
+  let userFound = false;
 
   if (supabase && isSupabaseConfigured) {
+    // 1. Save CPA conversion
     await supabase.from("cpa_conversions").upsert({
       id: conversionId,
-      user_id: payload.uid || payload.subid || "unknown",
-      firebase_uid: payload.uid || payload.subid || "unknown",
-      status: payload.status || "approved",
+      user_id: subId,
+      firebase_uid: subId,
+      status: status,
+      amount: payout,
       updated_at: new Date().toISOString(),
       raw_data: payload,
     });
+
+    // 2. Direct user balance update
+    if (subId && subId !== "anonymous" && payout > 0) {
+      try {
+        let userRow: any = null;
+        const { data: uidMatch } = await supabase
+          .from("users")
+          .select("*")
+          .or(`id.eq.${subId},firebase_uid.eq.${subId}`)
+          .limit(1);
+
+        if (uidMatch && uidMatch.length > 0) {
+          userRow = uidMatch[0];
+        } else if (subId.includes("@")) {
+          const { data: emailMatch } = await supabase
+            .from("users")
+            .select("*")
+            .ilike("email", subId)
+            .limit(1);
+          if (emailMatch && emailMatch.length > 0) {
+            userRow = emailMatch[0];
+          }
+        }
+
+        if (userRow) {
+          userFound = true;
+          const currentBalance = Number(userRow.balance || userRow.raw_data?.balance || 0);
+          updatedBalance = currentBalance + payout;
+          const rawData = userRow.raw_data || {};
+          rawData.balance = updatedBalance;
+
+          await supabase
+            .from("users")
+            .update({
+              balance: updatedBalance,
+              updated_at: new Date().toISOString(),
+              raw_data: rawData,
+            })
+            .eq("id", userRow.id);
+
+          const txId = `tx_cpa_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+          await supabase.from("wallet_transactions").upsert({
+            id: txId,
+            user_id: userRow.id,
+            firebase_uid: userRow.firebase_uid || userRow.id,
+            type: "credit",
+            amount: payout,
+            status: "completed",
+            updated_at: new Date().toISOString(),
+            raw_data: {
+              id: txId,
+              userId: userRow.id,
+              firebase_uid: userRow.firebase_uid || userRow.id,
+              type: "credit",
+              category: "cpa_reward",
+              amount: payout,
+              title: `CPA Postback Reward (${networkParam})`,
+              status: "completed",
+              timestamp: new Date().toISOString(),
+            },
+          });
+        }
+      } catch (err) {
+        console.warn("[Worker API Route] Error updating user balance:", err);
+      }
+    }
   }
 
-  return c.json({ success: true, message: "CPA postback recorded", conversionId });
-});
+  c.header("Access-Control-Allow-Origin", "*");
+  c.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  return c.json({
+    status: "ok",
+    ok: true,
+    success: true,
+    message: "CPA postback recorded and user balance updated",
+    conversionId,
+    subId,
+    payout,
+    userFound,
+    updatedBalance,
+  }, 200);
+};
+
+workerApi.all("/cpa/postback", handlePostbackRoute);
+workerApi.all("/cpa/postback/:networkParam", handlePostbackRoute);
+workerApi.all("/postback", handlePostbackRoute);
+workerApi.all("/postback/:networkParam", handlePostbackRoute);
+workerApi.all("/cpa/callback", handlePostbackRoute);
+workerApi.all("/cpa/callback/:networkParam", handlePostbackRoute);
 
 // 11. /api/settings
 workerApi.get("/settings", async (c) => {
