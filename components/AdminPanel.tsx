@@ -1652,12 +1652,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleResetCounters = async () => {
     try {
+      await fetch(getApiUrl("/api/admin/smtp/reset-counts"), {
+        method: "POST",
+      }).catch(() => {});
+
       const res = await fetch(getApiUrl("/api/admin/email-counters/reset"), {
         method: "POST",
       });
-      const data = await res.json();
-      if (res.ok) {
-        notify("Email limits manually reset!");
+      const data = await res.json().catch(() => ({}));
+      if (res.ok || data.success) {
+        notify("SMTP daily quotas and email counters manually reset!");
         fetchEmailCounters();
       } else {
         notify(data.error || "Failed to reset counters.");

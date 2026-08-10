@@ -30,12 +30,18 @@ export const SUPABASE_URL =
   getEnvVar('SUPABASE_URL') ||
   'https://uzmhfphwclvpwiiouqak.supabase.co';
 
+export const SUPABASE_SERVICE_ROLE_KEY =
+  getEnvVar('SUPABASE_SERVICE_ROLE_KEY') ||
+  getEnvVar('VITE_SUPABASE_SERVICE_ROLE_KEY') ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6bWhmfGh3Y2x2cHdpaW91cWFrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTE3NzgxNCwiZXhwIjoyMDgwNzUzODE0fQ.iANv2qozykC4MR6fzP3cP5RWNvFx1KBOayZk-wfegtk';
+
 export const SUPABASE_KEY =
   getEnvVar('SUPABASE_SERVICE_ROLE_KEY') ||
   getEnvVar('VITE_SUPABASE_SERVICE_ROLE_KEY') ||
+  SUPABASE_SERVICE_ROLE_KEY ||
   getEnvVar('VITE_SUPABASE_ANON_KEY') ||
   getEnvVar('SUPABASE_ANON_KEY') ||
-  'sb_publishable_stzcP0VjBM_dL7LOsKTCLg_a2CFgbFy';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6bWhmfGh3Y2x2cHdpaW91cWFrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTE3NzgxNCwiZXhwIjoyMDgwNzUzODE0fQ.iANv2qozykC4MR6fzP3cP5RWNvFx1KBOayZk-wfegtk';
 
 export const SUPABASE_ANON_KEY = SUPABASE_KEY;
 

@@ -227,7 +227,7 @@ export const RegressionTestDashboard: React.FC<RegressionTestDashboardProps> = (
               prodReport?.overallStatus === "PASS" ? "text-emerald-500" : prodReport?.overallStatus === "WARN" ? "text-amber-500" : "text-rose-500"
             }`}>
               {prodReport?.overallStatus === "PASS" ? <CheckCircle2 className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
-              {prodReport?.overallStatus ? `${prodReport.summary.passCount}/${prodReport.summary.total} CONNECTED` : "VERIFYING"}
+              {prodReport?.overallStatus ? `${prodReport.summary?.passCount ?? (prodReport.diagnostics ? prodReport.diagnostics.filter(d => d.status === "PASS").length : 0)}/${prodReport.summary?.total ?? (prodReport.diagnostics ? prodReport.diagnostics.length : 0)} CONNECTED` : "VERIFYING"}
             </p>
           </div>
           <span className="p-3 bg-teal-500/10 rounded-2xl text-teal-500">
@@ -289,7 +289,7 @@ export const RegressionTestDashboard: React.FC<RegressionTestDashboardProps> = (
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6">
-            {prodReport.diagnostics.map((diag) => (
+            {(prodReport?.diagnostics || []).map((diag) => (
               <div
                 key={diag.id}
                 className={`rounded-2xl border p-5 md:p-6 transition-all space-y-4 ${
@@ -411,7 +411,7 @@ export const RegressionTestDashboard: React.FC<RegressionTestDashboardProps> = (
           </div>
         ) : (
           <div className="space-y-3">
-            {report.results.map((res) => (
+            {(report?.results || []).map((res) => (
               <div
                 key={res.id}
                 className={`p-4 md:p-5 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${

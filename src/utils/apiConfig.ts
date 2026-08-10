@@ -4,8 +4,8 @@ export const DEFAULT_WORKER_URL = 'https://arearnzone.abdurrahman714915.workers.
 
 /**
  * Returns the base URL for API requests.
- * Checks for VITE_API_BASE_URL from environment variables, window overrides,
- * or localStorage before falling back to the default Cloudflare Worker endpoint.
+ * Uses environment variable VITE_API_BASE_URL, window overrides, cached settings,
+ * or defaults to window origin / live Cloudflare Worker URL.
  */
 export const getApiBaseUrl = (): string => {
   let envUrl: string | undefined;
@@ -22,7 +22,10 @@ export const getApiBaseUrl = (): string => {
 
   // 2. Window object override (dynamic client configuration)
   if (typeof window !== 'undefined' && (window as any).VITE_API_BASE_URL) {
-    return String((window as any).VITE_API_BASE_URL).trim().replace(/\/+$/, '');
+    const winUrl = String((window as any).VITE_API_BASE_URL).trim().replace(/\/+$/, '');
+    if (winUrl) {
+      return winUrl;
+    }
   }
 
   // 3. LocalStorage override (for user-configured Cloudflare Worker endpoint)
@@ -37,14 +40,11 @@ export const getApiBaseUrl = (): string => {
     }
   }
 
-  // Log a helpful warning in dev/browser console if env var was not provided
-  if (!envUrl && typeof console !== 'undefined') {
-    console.info(
-      `[API Config] VITE_API_BASE_URL is not explicitly set in environment. Falling back to default Cloudflare Worker URL: ${DEFAULT_WORKER_URL}`
-    );
+  // 4. Default to current browser origin if available, or fallback to Cloudflare Worker URL
+  if (typeof window !== 'undefined' && window.location.origin) {
+    return window.location.origin;
   }
 
-  // 4. Default: Cloudflare Worker absolute backend URL
   return DEFAULT_WORKER_URL;
 };
 
@@ -65,12 +65,53 @@ export const getApiUrl = (endpoint: string): string => {
   return `${baseUrl}${cleanEndpoint}`;
 };
 
+export interface ApiLogEntry {
+  id: string;
+  url: string;
+  endpoint: string;
+  method: string;
+  statusCode: number | string;
+  ok: boolean;
+  responseBody: any;
+  rawText?: string;
+  error?: string;
+  timestamp: string;
+  latencyMs: number;
+}
+
+type ApiLogListener = (logs: ApiLogEntry[]) => void;
+const apiLogs: ApiLogEntry[] = [];
+const apiLogListeners: Set<ApiLogListener> = new Set();
+
+export const subscribeApiLogs = (listener: ApiLogListener) => {
+  apiLogListeners.add(listener);
+  listener([...apiLogs]);
+  return () => {
+    apiLogListeners.delete(listener);
+  };
+};
+
+export const getApiLogs = (): ApiLogEntry[] => [...apiLogs];
+
+export const clearApiLogs = () => {
+  apiLogs.length = 0;
+  apiLogListeners.forEach((fn) => fn([]));
+};
+
+const recordApiLog = (entry: ApiLogEntry) => {
+  apiLogs.unshift(entry);
+  if (apiLogs.length > 100) apiLogs.length = 100;
+  apiLogListeners.forEach((fn) => fn([...apiLogs]));
+};
+
 /**
  * Safe fetch helper for API requests that guarantees valid JSON responses,
  * handles CORS / network errors gracefully, and prevents parsing crashes.
  */
 export const apiFetch = async <T = any>(endpoint: string, options?: RequestInit): Promise<T> => {
   const url = getApiUrl(endpoint);
+  const method = (options?.method || 'GET').toUpperCase();
+  const startTime = Date.now();
   
   const defaultHeaders: Record<string, string> = {
     'Accept': 'application/json',
@@ -91,6 +132,7 @@ export const apiFetch = async <T = any>(endpoint: string, options?: RequestInit)
 
   try {
     const response = await fetch(url, mergedOptions);
+    const latencyMs = Date.now() - startTime;
     const contentType = response.headers.get('content-type') || '';
     const text = await response.text();
     const trimmed = text.trim();
@@ -98,7 +140,7 @@ export const apiFetch = async <T = any>(endpoint: string, options?: RequestInit)
     // Check if the response returned an HTML document instead of JSON (e.g., static hosting 404 fallback)
     if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || contentType.includes('text/html')) {
       console.warn(`[API Client] Received HTML instead of JSON for endpoint: ${endpoint}.`);
-      return {
+      const resObj = {
         ok: false,
         success: false,
         status: 'error',
@@ -107,7 +149,21 @@ export const apiFetch = async <T = any>(endpoint: string, options?: RequestInit)
         valid: false,
         message: `API endpoint ${endpoint} returned HTML instead of valid JSON.`,
         error: 'HTML_RESPONSE_RECEIVED'
-      } as unknown as T;
+      };
+      recordApiLog({
+        id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        url,
+        endpoint,
+        method,
+        statusCode: response.status || 404,
+        ok: false,
+        responseBody: resObj,
+        rawText: text.substring(0, 500),
+        error: 'HTML_RESPONSE_RECEIVED',
+        timestamp: new Date().toLocaleTimeString(),
+        latencyMs,
+      });
+      return resObj as unknown as T;
     }
 
     let parsed: any;
@@ -115,7 +171,7 @@ export const apiFetch = async <T = any>(endpoint: string, options?: RequestInit)
       parsed = JSON.parse(text);
     } catch (parseErr) {
       console.warn(`[API Client] Error parsing JSON for ${endpoint}:`, parseErr);
-      return {
+      const resObj = {
         ok: false,
         success: false,
         status: 'error',
@@ -125,37 +181,78 @@ export const apiFetch = async <T = any>(endpoint: string, options?: RequestInit)
         valid: false,
         message: `Failed to parse response from ${endpoint} (HTTP ${response.status})`,
         error: String(parseErr)
-      } as unknown as T;
+      };
+      recordApiLog({
+        id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        url,
+        endpoint,
+        method,
+        statusCode: response.status,
+        ok: false,
+        responseBody: resObj,
+        rawText: text.substring(0, 500),
+        error: String(parseErr),
+        timestamp: new Date().toLocaleTimeString(),
+        latencyMs,
+      });
+      return resObj as unknown as T;
     }
 
     if (!response.ok) {
       console.warn(`[API Client] Endpoint ${endpoint} returned HTTP ${response.status}:`, parsed);
-      if (typeof parsed === 'object' && parsed !== null) {
-        return {
-          ok: false,
-          success: false,
-          status: 'error',
-          statusCode: response.status,
-          ...parsed,
-          error: parsed.error || parsed.message || `HTTP ${response.status} Error`,
-        } as unknown as T;
-      }
-      return {
+      const resObj = typeof parsed === 'object' && parsed !== null ? {
+        ok: false,
+        success: false,
+        status: 'error',
+        statusCode: response.status,
+        ...parsed,
+        error: parsed.error || parsed.message || `HTTP ${response.status} Error`,
+      } : {
         ok: false,
         success: false,
         status: 'error',
         statusCode: response.status,
         message: `HTTP ${response.status} Error`,
         error: `HTTP ${response.status} Error`,
-      } as unknown as T;
+      };
+
+      recordApiLog({
+        id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        url,
+        endpoint,
+        method,
+        statusCode: response.status,
+        ok: false,
+        responseBody: resObj,
+        rawText: text,
+        error: resObj.error,
+        timestamp: new Date().toLocaleTimeString(),
+        latencyMs,
+      });
+
+      return resObj as unknown as T;
     }
+
+    recordApiLog({
+      id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      url,
+      endpoint,
+      method,
+      statusCode: response.status,
+      ok: true,
+      responseBody: parsed,
+      rawText: text,
+      timestamp: new Date().toLocaleTimeString(),
+      latencyMs,
+    });
 
     return parsed as T;
   } catch (networkErr) {
+    const latencyMs = Date.now() - startTime;
     const errorMsg = networkErr instanceof Error ? networkErr.message : String(networkErr);
     console.warn(`[API Client] Request to ${url} failed ("${errorMsg}"):`, networkErr);
     
-    return {
+    const resObj = {
       ok: false,
       success: false,
       status: 'error',
@@ -164,7 +261,22 @@ export const apiFetch = async <T = any>(endpoint: string, options?: RequestInit)
       valid: false,
       message: `Unable to reach Cloudflare Worker at ${url}. (${errorMsg})`,
       error: errorMsg,
-    } as unknown as T;
+    };
+
+    recordApiLog({
+      id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      url,
+      endpoint,
+      method,
+      statusCode: 'ERR_NETWORK',
+      ok: false,
+      responseBody: resObj,
+      error: errorMsg,
+      timestamp: new Date().toLocaleTimeString(),
+      latencyMs,
+    });
+
+    return resObj as unknown as T;
   }
 };
 

@@ -46,6 +46,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { getAIRecoveryConfig, runAIHealthScanAndRecovery } from './utils/aiRecoveryEngine';
 import { WelcomeSplashScreen } from './components/WelcomeSplashScreen';
 import { AppLoadingScreen } from './components/AppLoadingScreen';
+import { DebugOverlay } from './components/DebugOverlay';
 
 // Global Translations Dictionary (Expanded)
 const TRANSLATIONS = {
@@ -2158,6 +2159,8 @@ const AppContent: React.FC<{
         </div>
       )}
 
+      {/* Visual Debugger Overlay for Live API Interception & Health Check */}
+      <DebugOverlay />
     </div>
   );
 };

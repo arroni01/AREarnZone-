@@ -140,19 +140,228 @@ interface SMTPConfig {
   active?: boolean;
 }
 
+interface SmtpAccountRecord {
+  id: string;
+  email: string;
+  app_password: string;
+  daily_limit: number;
+  sent_today: number;
+  status: 'active' | 'limit_reached' | 'disabled';
+  last_used_at?: string | null;
+  last_reset_at?: string | null;
+}
+
 let smtpList: SMTPConfig[] = [
   {
     id: "default-gmail",
     host: "smtp.gmail.com",
     port: 465,
     secure: true,
-    user: process.env.SMTP_USER || "support@arearnzone.com",
-    pass: process.env.SMTP_PASS || "",
+    user: process.env.SMTP_USER || process.env.GMAIL_APP_USER || "support@arearnzone.com",
+    pass: process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || "",
     fromName: "AREarnZone HQ",
     fromEmail: process.env.SMTP_USER || "support@arearnzone.com",
     active: true
   }
 ];
+
+async function checkAndResetDailyQuotasServer() {
+  const now = new Date();
+  const resetThresholdMs = 24 * 60 * 60 * 1000;
+
+  try {
+    const { data: accounts, error } = await supabase.from("smtp_accounts").select("*");
+    if (!error && accounts && accounts.length > 0) {
+      let needsReset = false;
+      const nowIso = now.toISOString();
+
+      for (const acc of accounts) {
+        const lastReset = acc.last_reset_at ? new Date(acc.last_reset_at).getTime() : 0;
+        if (!acc.last_reset_at || (now.getTime() - lastReset) >= resetThresholdMs) {
+          needsReset = true;
+          break;
+        }
+      }
+
+      if (needsReset) {
+        console.info("[SMTP Rotation Server] 24h reset window reached. Clearing sent_today counts...");
+        for (const acc of accounts) {
+          const newStatus = acc.status === "limit_reached" ? "active" : acc.status;
+          await supabase.from("smtp_accounts").update({
+            sent_today: 0,
+            status: newStatus,
+            last_reset_at: nowIso,
+            updated_at: nowIso,
+          }).eq("id", acc.id);
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn("[SMTP Rotation Server] Quota reset check warning:", err?.message || err);
+  }
+}
+
+async function getAvailableSmtpAccountsServer(): Promise<SmtpAccountRecord[]> {
+  await checkAndResetDailyQuotasServer();
+
+  try {
+    const { data, error } = await supabase
+      .from("smtp_accounts")
+      .select("*")
+      .eq("status", "active")
+      .order("last_used_at", { ascending: true, nullsFirst: true });
+
+    if (!error && data && data.length > 0) {
+      const valid = data.filter((acc: any) => (acc.sent_today || 0) < (acc.daily_limit || 450));
+      if (valid.length > 0) {
+        return valid.map((acc: any) => ({
+          id: acc.id,
+          email: acc.email || acc.user || "",
+          app_password: acc.app_password || acc.pass || "",
+          daily_limit: Number(acc.daily_limit || 450),
+          sent_today: Number(acc.sent_today || 0),
+          status: acc.status || "active",
+          last_used_at: acc.last_used_at || null,
+          last_reset_at: acc.last_reset_at || null,
+        }));
+      }
+    }
+  } catch (err: any) {
+    console.warn("[SMTP Rotation Server] Error fetching smtp_accounts:", err?.message);
+  }
+
+  // Fallback to in-memory list or env vars
+  const fallbackList: SmtpAccountRecord[] = [];
+  for (const s of smtpList) {
+    if (s.active && s.user && s.pass) {
+      fallbackList.push({
+        id: s.id,
+        email: s.user,
+        app_password: s.pass,
+        daily_limit: 450,
+        sent_today: 0,
+        status: "active",
+        last_used_at: null,
+        last_reset_at: new Date().toISOString(),
+      });
+    }
+  }
+
+  if (fallbackList.length > 0) return fallbackList;
+
+  const envUser = process.env.SMTP_USER || process.env.GMAIL_APP_USER || "support@arearnzone.com";
+  const envPass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || "";
+  if (envPass) {
+    return [{
+      id: "env-default",
+      email: envUser,
+      app_password: envPass,
+      daily_limit: 450,
+      sent_today: 0,
+      status: "active",
+      last_used_at: null,
+      last_reset_at: new Date().toISOString(),
+    }];
+  }
+
+  return [];
+}
+
+async function recordSmtpSuccessServer(account: SmtpAccountRecord) {
+  const nowIso = new Date().toISOString();
+  const updatedSent = (account.sent_today || 0) + 1;
+  const isLimitReached = updatedSent >= (account.daily_limit || 450);
+  const updatedStatus = isLimitReached ? "limit_reached" : "active";
+
+  emailStats.count++;
+
+  try {
+    await supabase.from("smtp_accounts").upsert({
+      id: account.id || `smtp_${Date.now()}`,
+      email: account.email,
+      app_password: account.app_password,
+      daily_limit: account.daily_limit || 450,
+      sent_today: updatedSent,
+      status: updatedStatus,
+      last_used_at: nowIso,
+      updated_at: nowIso,
+    });
+  } catch (err: any) {
+    console.warn("[SMTP Rotation Server] Error recording success:", err?.message);
+  }
+}
+
+async function recordSmtpFailureServer(account: SmtpAccountRecord, errorMsg: string) {
+  const nowIso = new Date().toISOString();
+  console.warn(`[SMTP Failover Server] Account ${account.email} failed: ${errorMsg}. Setting status to limit_reached.`);
+
+  try {
+    await supabase.from("smtp_accounts").upsert({
+      id: account.id || `smtp_${Date.now()}`,
+      email: account.email,
+      app_password: account.app_password,
+      daily_limit: account.daily_limit || 450,
+      sent_today: account.sent_today || 0,
+      status: "limit_reached",
+      updated_at: nowIso,
+    });
+  } catch (err: any) {
+    console.warn("[SMTP Rotation Server] Error recording failure:", err?.message);
+  }
+}
+
+async function sendEmailWithRotationServer(
+  recipient: string,
+  subject: string,
+  htmlContent: string,
+  textContent: string
+) {
+  const candidateAccounts = await getAvailableSmtpAccountsServer();
+
+  if (!candidateAccounts || candidateAccounts.length === 0) {
+    throw new Error("No active SMTP accounts with available daily quota found.");
+  }
+
+  let lastError = "No available SMTP accounts";
+
+  for (const acc of candidateAccounts) {
+    try {
+      console.info(`[SMTP Rotation Server] Sending email to ${recipient} via ${acc.email}...`);
+
+      const transporter = nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 465,
+        secure: true,
+        auth: {
+          user: acc.email,
+          pass: acc.app_password,
+        },
+      });
+
+      await transporter.sendMail({
+        from: `"AREarnZone HQ" <${acc.email}>`,
+        to: recipient,
+        subject,
+        text: textContent,
+        html: htmlContent,
+      });
+
+      await recordSmtpSuccessServer(acc);
+
+      return {
+        success: true,
+        usedAccount: acc.email,
+        accountId: acc.id,
+      };
+    } catch (err: any) {
+      lastError = err?.message || String(err);
+      console.warn(`[SMTP Failover Server] Account ${acc.email} failed: ${lastError}. Failing over to next account...`);
+      await recordSmtpFailureServer(acc, lastError);
+    }
+  }
+
+  throw new Error(`All active SMTP accounts failed. Last error: ${lastError}`);
+}
 
 function getActiveTransporter() {
   const activeConfig = smtpList.find((s) => s.active) || smtpList[0];
@@ -177,10 +386,10 @@ function getActiveTransporter() {
 // 1. AUTHENTICATION & EMAIL APIS
 // ==========================================
 
-app.post("/api/auth/send-otp", async (c) => {
+const handleSendVerificationCodeServer = async (c: any) => {
   try {
-    const body = await c.req.json();
-    const { email } = body;
+    const body = await c.req.json().catch(() => ({}));
+    const email = (body.email || body.recipient || body.to || "").trim();
     if (!email || typeof email !== "string" || !email.includes("@")) {
       return c.json({ error: "Invalid email address" }, 400);
     }
@@ -189,32 +398,31 @@ app.post("/api/auth/send-otp", async (c) => {
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
     otpStorage.set(email.toLowerCase(), { code, expiresAt });
 
-    const active = getActiveTransporter();
-    if (active) {
-      const mailOptions = {
-        from: `"${active.config.fromName || "AREarnZone"}" <${active.config.user}>`,
-        to: email,
-        subject: `Your AREarnZone Verification Code: ${code}`,
-        text: `Your verification code is ${code}. It expires in 10 minutes.`,
-        html: `<div style="font-family: sans-serif; padding: 20px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
-          <h2 style="color: #38bdf8;">AREarnZone Verification Code</h2>
-          <p>Your one-time pass code is:</p>
-          <div style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #f59e0b; padding: 10px 0;">${code}</div>
-          <p style="color: #94a3b8;">This code expires in 10 minutes.</p>
-        </div>`
-      };
-      await active.transporter.sendMail(mailOptions);
-      emailStats.count++;
-    } else {
-      console.log(`[SANDBOX SMTP] OTP for ${email}: ${code}`);
-    }
+    const subject = `Your AREarnZone Verification Code: ${code}`;
+    const textContent = `Your verification code is ${code}. It expires in 10 minutes.`;
+    const htmlContent = `<div style="font-family: sans-serif; padding: 20px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
+      <h2 style="color: #38bdf8;">AREarnZone Verification Code</h2>
+      <p>Your one-time pass code is:</p>
+      <div style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #f59e0b; padding: 10px 0;">${code}</div>
+      <p style="color: #94a3b8;">This code expires in 10 minutes.</p>
+    </div>`;
 
-    return c.json({ success: true, message: "OTP sent successfully", isSandbox: !active });
+    const result = await sendEmailWithRotationServer(email, subject, htmlContent, textContent);
+
+    return c.json({
+      success: true,
+      message: "OTP sent successfully",
+      usedAccount: result.usedAccount,
+      expiresInMinutes: 10,
+    });
   } catch (err: any) {
     console.error("Error sending OTP:", err);
     return c.json({ error: err.message || "Failed to send OTP" }, 500);
   }
-});
+};
+
+app.post("/api/auth/send-otp", handleSendVerificationCodeServer);
+app.post("/api/send-verification-code", handleSendVerificationCodeServer);
 
 app.post("/api/auth/verify-otp", async (c) => {
   try {
@@ -300,16 +508,169 @@ app.get("/api/auth/google/url", (c) => {
 // 3. ADMIN & SMTP CONFIG APIS
 // ==========================================
 
-app.get("/api/admin/email-counters", (c) => {
+app.get("/api/admin/smtp", async (c) => {
+  await checkAndResetDailyQuotasServer();
+  try {
+    const { data, error } = await supabase.from("smtp_accounts").select("*").order("created_at", { ascending: false });
+    if (!error && data && data.length > 0) {
+      return c.json({ success: true, accounts: data });
+    }
+  } catch (err: any) {
+    console.warn("[Server API] Error reading smtp_accounts:", err?.message);
+  }
+  const fallbackAccounts = await getAvailableSmtpAccountsServer();
+  return c.json({ success: true, accounts: fallbackAccounts });
+});
+
+app.post("/api/admin/smtp", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const email = (body.email || body.user || "").trim();
+    const app_password = (body.app_password || body.pass || "").trim().replace(/\s+/g, "");
+    const daily_limit = Number(body.daily_limit || body.limit || 450);
+    const status = body.status || "active";
+    const id = body.id || `smtp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+    if (!email || !app_password) {
+      return c.json({ success: false, error: "Gmail address and App Password are required" }, 400);
+    }
+
+    const record = {
+      id,
+      email,
+      app_password,
+      daily_limit,
+      sent_today: Number(body.sent_today || 0),
+      status,
+      last_used_at: body.last_used_at || null,
+      last_reset_at: body.last_reset_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    let supabaseSuccess = false;
+    try {
+      const { error } = await supabase.from("smtp_accounts").upsert(record);
+      if (!error) supabaseSuccess = true;
+    } catch (err: any) {
+      console.warn("[Server API] Error upserting to smtp_accounts:", err?.message);
+    }
+
+    return c.json({
+      success: true,
+      message: "Gmail SMTP account saved successfully",
+      account: record,
+      supabaseSuccess,
+    });
+  } catch (err: any) {
+    return c.json({ success: false, error: err?.message || String(err) }, 500);
+  }
+});
+
+const handleDeleteSmtpServer = async (c: any) => {
+  try {
+    const paramId = c.req.param("id");
+    let target = paramId;
+    if (!target) {
+      const body = await c.req.json().catch(() => ({}));
+      target = body.id || body.user || body.email;
+    }
+
+    if (!target) {
+      return c.json({ success: false, error: "SMTP account ID or email required" }, 400);
+    }
+
+    try {
+      await supabase.from("smtp_accounts").delete().or(`id.eq.${target},email.eq.${target}`);
+    } catch (err: any) {
+      console.warn("[Server API] Error deleting from smtp_accounts:", err?.message);
+    }
+
+    return c.json({ success: true, message: "SMTP account deleted successfully" });
+  } catch (err: any) {
+    return c.json({ success: false, error: err?.message || String(err) }, 500);
+  }
+};
+
+app.delete("/api/admin/smtp/:id", handleDeleteSmtpServer);
+app.post("/api/admin/delete-smtp", handleDeleteSmtpServer);
+
+const handleResetSmtpCountsServer = async (c: any) => {
+  try {
+    const nowIso = new Date().toISOString();
+    try {
+      const { data: accounts } = await supabase.from("smtp_accounts").select("id, status");
+      if (accounts) {
+        for (const acc of accounts) {
+          const newStatus = acc.status === "limit_reached" ? "active" : acc.status;
+          await supabase.from("smtp_accounts").update({
+            sent_today: 0,
+            status: newStatus,
+            last_reset_at: nowIso,
+            updated_at: nowIso,
+          }).eq("id", acc.id);
+        }
+      }
+    } catch (err: any) {
+      console.warn("[Server API] Error resetting smtp_accounts:", err?.message);
+    }
+
+    emailStats.count = 0;
+
+    return c.json({
+      success: true,
+      message: "Daily sent counts and quotas reset successfully for all SMTP accounts",
+      timestamp: nowIso,
+    });
+  } catch (err: any) {
+    return c.json({ success: false, error: err?.message || String(err) }, 500);
+  }
+};
+
+app.post("/api/admin/smtp/reset-counts", handleResetSmtpCountsServer);
+app.post("/api/admin/reset-smtp-counts", handleResetSmtpCountsServer);
+
+app.get("/api/admin/email-counters", async (c) => {
+  await checkAndResetDailyQuotasServer();
+  const accounts = await getAvailableSmtpAccountsServer();
+
+  let allAccounts: SmtpAccountRecord[] = [];
+  try {
+    const { data } = await supabase.from("smtp_accounts").select("*").order("created_at", { ascending: false });
+    if (data && data.length > 0) {
+      allAccounts = data.map((acc: any) => ({
+        id: acc.id,
+        email: acc.email || acc.user || "",
+        app_password: acc.app_password || acc.pass || "",
+        daily_limit: Number(acc.daily_limit || 450),
+        sent_today: Number(acc.sent_today || 0),
+        status: acc.status || "active",
+        last_used_at: acc.last_used_at || null,
+        last_reset_at: acc.last_reset_at || null,
+      }));
+    }
+  } catch (e) {}
+
+  if (allAccounts.length === 0) {
+    allAccounts = accounts;
+  }
+
+  const totalSent = allAccounts.reduce((sum, acc) => sum + (acc.sent_today || 0), 0);
+  const firstActive = accounts[0]?.email || allAccounts.find((a) => a.status === "active")?.email || null;
+
   return c.json({
-    todayDate: emailStats.date,
-    emailsSentToday: emailStats.count,
-    smtpStatus: smtpList.map((s) => ({
-      id: s.id,
-      user: s.user,
-      host: s.host,
-      active: s.active
-    }))
+    gmailCount: totalSent,
+    date: new Date().toLocaleDateString(),
+    smtpStatus: allAccounts.map((acc) => ({
+      id: acc.id,
+      user: acc.email,
+      email: acc.email,
+      limit: acc.daily_limit,
+      count: acc.sent_today,
+      sent_today: acc.sent_today,
+      status: acc.status,
+      last_used_at: acc.last_used_at,
+    })),
+    activeSmtp: firstActive,
   });
 });
 
