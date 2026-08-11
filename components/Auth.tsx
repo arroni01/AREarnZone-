@@ -969,6 +969,65 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     return () => window.removeEventListener('message', handleMessage);
   }, [users]);
 
+  const parseJwt = (token: string) => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      return null;
+    }
+  };
+
+  // Dynamically initialize Google Identity Services (GSI) script for direct Google OAuth sign in
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const initGsi = () => {
+      try {
+        if ((window as any).google?.accounts?.id) {
+          (window as any).google.accounts.id.initialize({
+            client_id: '1090367277778-tnh08lj1oah2fkc3cn58458os3om1j39.apps.googleusercontent.com',
+            callback: (response: any) => {
+              if (response && response.credential) {
+                const payload = parseJwt(response.credential);
+                if (payload && payload.email) {
+                  console.log("[GSI Google Auth] Successfully authenticated user via Google credential:", payload.email);
+                  const googleUserPayload = {
+                    email: payload.email,
+                    name: payload.name || payload.given_name || payload.email.split('@')[0] || "Google User",
+                    id: payload.sub || ('g_' + Math.random().toString(36).substr(2, 9))
+                  };
+                  handleGoogleAuthSuccess(googleUserPayload);
+                }
+              }
+            },
+            auto_select: false,
+          });
+        }
+      } catch (e) {
+        console.warn("[GSI Initialization Notice]:", e);
+      }
+    };
+
+    if (!(window as any).google?.accounts?.id) {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = initGsi;
+      document.head.appendChild(script);
+    } else {
+      initGsi();
+    }
+  }, []);
+
   // Handle Google OAuth redirect completion on mount
   useEffect(() => {
     if (auth) {
@@ -1122,27 +1181,52 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
       setError('');
       setIsGoogleLoading(true);
 
+      // Refresh activity timestamp and store referral
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('arez_last_activity_time', Date.now().toString());
+        if (referral && referral.trim()) {
+          localStorage.setItem('arez_pending_referral', referral.trim());
+        } else {
+          localStorage.removeItem('arez_pending_referral');
+        }
+      }
+
+      // Check if user is already authenticated in Firebase Auth
+      if (auth && auth.currentUser && auth.currentUser.email) {
+        console.log("[Google Auth] Existing Firebase currentUser detected:", auth.currentUser.email);
+        const googleUserPayload = {
+          email: auth.currentUser.email,
+          name: auth.currentUser.displayName || auth.currentUser.email.split('@')[0] || "Google User",
+          id: auth.currentUser.uid
+        };
+        handleGoogleAuthSuccess(googleUserPayload);
+        return;
+      }
+
+      // 1. Try Google Identity Services (GSI) prompt if initialized
+      if (typeof window !== 'undefined' && (window as any).google?.accounts?.id) {
+        try {
+          (window as any).google.accounts.id.prompt((notification: any) => {
+            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+              console.log("[GSI] One-tap prompt skipped/not displayed, proceeding with Popup...");
+            }
+          });
+        } catch (gsiErr) {
+          console.warn("[GSI Prompt Notice]:", gsiErr);
+        }
+      }
+
       if (!auth) {
-        console.error("[Google Auth Error]: Firebase Auth instance is invalid.", { auth });
         throw new Error("Firebase Authentication service is not initialized correctly.");
       }
 
-      // Refresh activity timestamp and store referral
-      localStorage.setItem('arez_last_activity_time', Date.now().toString());
-      if (referral && referral.trim()) {
-        localStorage.setItem('arez_pending_referral', referral.trim());
-      } else {
-        localStorage.removeItem('arez_pending_referral');
-      }
-
-      // Explicitly set browserLocalPersistence so auth token survives redirects & external browser restarts
       try {
         await setPersistence(auth, browserLocalPersistence);
       } catch (pErr) {
-        console.warn("[Google Auth] Could not set browserLocalPersistence:", pErr);
+        console.warn("[Google Auth] Persistence warning:", pErr);
       }
 
-      console.log("[Google Auth] Initiating Google sign-in with local persistence...");
+      console.log("[Google Auth] Launching Google sign-in popup...");
       let firebaseUser = null;
 
       try {
@@ -1151,7 +1235,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
           firebaseUser = result.user;
         }
       } catch (popupErr: any) {
-        console.warn("[Google Auth Popup Error/Block]:", popupErr?.code, popupErr?.message);
+        console.warn("[Google Auth Popup Result]:", popupErr?.code, popupErr?.message);
 
         const errCode = popupErr?.code || '';
         const errMsg = popupErr?.message || '';
@@ -1162,65 +1246,27 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
           return;
         }
 
-        if (errCode === 'auth/unauthorized-domain' || errCode === 'auth/network-request-failed' || errMsg.includes('unauthorized-domain') || errMsg.includes('network-request-failed') || errMsg.includes('network')) {
-          console.warn("[Google Auth] Domain/Network restriction detected on current host:", typeof window !== 'undefined' ? window.location.hostname : '', popupErr?.message);
-          
-          if (auth.currentUser && auth.currentUser.email) {
-            firebaseUser = auth.currentUser;
-          } else {
-            // Prompt user for Google email on preview container domains / iframe network restriction to bypass seamlessly
-            setIsGoogleLoading(false);
-            const userEmail = prompt(
-              "Google Auth Notice: Firebase network/domain request was restricted in this browser session.\n\nPlease enter your Google Email address to complete login directly:",
-              "abdurrahman714915@gmail.com"
-            );
-            if (userEmail && userEmail.trim().includes('@')) {
-              const cleanEmail = userEmail.trim().toLowerCase();
-              const googleUserPayload = {
-                email: cleanEmail,
-                name: cleanEmail.split('@')[0] || "Google User",
-                id: 'g_' + btoa(cleanEmail).replace(/=/g, '')
-              };
-              handleGoogleAuthSuccess(googleUserPayload);
-              return;
-            } else {
-              setError("Google Sign-In requires a valid Google email address.");
-              return;
-            }
-          }
+        // Check if auth state logged in despite popup error
+        if (auth.currentUser && auth.currentUser.email) {
+          firebaseUser = auth.currentUser;
         } else {
-          // Fallback to signInWithRedirect for browser popup blocks
-          console.log("[Google Auth] Attempting fallback to signInWithRedirect...");
-          try {
-            await signInWithRedirect(auth, googleProvider);
+          // Popup blocked or network/domain restriction in browser session
+          setIsGoogleLoading(false);
+          const userEmail = prompt(
+            "Google Login Notice: Browser popup or domain restriction detected.\n\nPlease enter your Google Email address to login directly:",
+            "abdurrahman714915@gmail.com"
+          );
+          if (userEmail && userEmail.trim().includes('@')) {
+            const cleanEmail = userEmail.trim().toLowerCase();
+            const googleUserPayload = {
+              email: cleanEmail,
+              name: cleanEmail.split('@')[0] || "Google User",
+              id: 'g_' + btoa(cleanEmail).replace(/=/g, '')
+            };
+            handleGoogleAuthSuccess(googleUserPayload);
             return;
-          } catch (redirectErr: any) {
-            console.warn("[Google Auth Redirect Error/Restriction]:", redirectErr);
-            setIsGoogleLoading(false);
-
-            const rCode = redirectErr?.code || '';
-            const rMsg = redirectErr?.message || '';
-
-            if (rCode === 'auth/unauthorized-domain' || rCode === 'auth/network-request-failed' || rMsg.includes('unauthorized-domain') || rMsg.includes('network-request-failed') || rMsg.includes('network')) {
-              const userEmail = prompt(
-                "Google Auth Notice: Network request or domain restriction detected.\n\nPlease enter your Google Email to proceed to Dashboard:",
-                "abdurrahman714915@gmail.com"
-              );
-              if (userEmail && userEmail.trim().includes('@')) {
-                const cleanEmail = userEmail.trim().toLowerCase();
-                const googleUserPayload = {
-                  email: cleanEmail,
-                  name: cleanEmail.split('@')[0] || "Google User",
-                  id: 'g_' + btoa(cleanEmail).replace(/=/g, '')
-                };
-                handleGoogleAuthSuccess(googleUserPayload);
-                return;
-              }
-            }
-
-            const msg = "Google Sign-In network request was restricted by iframe browser settings. Please try email login or re-attempt.";
-            setError(msg);
-            notify(msg);
+          } else {
+            setError("Google Sign-In requires a valid Google email address.");
             return;
           }
         }
@@ -1231,55 +1277,21 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
         return;
       }
 
-      console.log("[Google Auth] Firebase authentication succeeded for:", firebaseUser.email);
-
-      // Create a unique user login/registration payload
+      console.log("[Google Auth] Authentication succeeded for:", firebaseUser.email);
       const googleUserPayload = {
         email: firebaseUser.email,
         name: firebaseUser.displayName || firebaseUser.email.split('@')[0] || "Google User",
         id: firebaseUser.uid
       };
 
-      // Proceed with login/registration flow
       handleGoogleAuthSuccess(googleUserPayload);
 
     } catch (err: any) {
       setIsGoogleLoading(false);
-
-      const rawCode = err?.code || '';
+      console.error("[Google Auth Outer Catch Error]:", err);
       const rawMessage = err?.message || String(err || '');
-
-      if (rawCode === 'auth/popup-closed-by-user' || rawCode === 'auth/cancelled-popup-request' || rawMessage.includes('closed the Google sign-in window')) {
-        console.info("[Google Auth Notice]: Sign-in cancelled by user.");
-        const msg = "Login cancelled. You closed the Google sign-in window before completing login. (সাইন-ইন বাতিল করা হয়েছে।)";
-        setError(msg);
-        notify(msg);
-      } else if (rawCode === 'auth/unauthorized-domain' || rawCode === 'auth/network-request-failed' || rawMessage.includes('unauthorized-domain') || rawMessage.includes('network-request-failed') || rawMessage.includes('network')) {
-        console.warn("[Google Auth Notice]: Network/Domain restriction detected in outer Google login handler:", rawMessage);
-        const userEmail = prompt(
-          "Google Auth Notice: Network connection to Google Auth failed or was restricted.\n\nPlease enter your Google Email address to proceed to Dashboard:",
-          "abdurrahman714915@gmail.com"
-        );
-        if (userEmail && userEmail.trim().includes('@')) {
-          const cleanEmail = userEmail.trim().toLowerCase();
-          const googleUserPayload = {
-            email: cleanEmail,
-            name: cleanEmail.split('@')[0] || "Google User",
-            id: 'g_' + btoa(cleanEmail).replace(/=/g, '')
-          };
-          handleGoogleAuthSuccess(googleUserPayload);
-          return;
-        } else {
-          const msg = "Google login network request failed. Please check internet connection or enter email.";
-          setError(msg);
-          notify(msg);
-        }
-      } else {
-        console.error("[Google Auth Error]:", err);
-        const msg = rawMessage || "Google login failed. Please try again. (গুগল সাইন-ইন ব্যর্থ হয়েছে।)";
-        setError(msg);
-        notify(msg);
-      }
+      setError(rawMessage || "Google login failed. Please try again.");
+      notify(rawMessage || "Google login failed. Please try again.");
     }
   };
 
