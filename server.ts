@@ -44,6 +44,20 @@ app.get("/manifest.json", serveManifest);
 app.get("/manifest.webmanifest", serveManifest);
 app.get("/site.webmanifest", serveManifest);
 
+// Serves Service Worker with correct MIME type and Service-Worker-Allowed header
+app.get("/sw.js", (c) => {
+  const swPath = path.join(process.cwd(), "public", "sw.js");
+  if (fs.existsSync(swPath)) {
+    const content = fs.readFileSync(swPath, "utf-8");
+    return c.text(content, 200, {
+      "Content-Type": "application/javascript; charset=utf-8",
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "Service-Worker-Allowed": "/"
+    });
+  }
+  return c.text("// Service worker script unavailable", 404);
+});
+
 // In-Memory Storage & File Persistence Helpers
 interface OTPRecord {
   code: string;

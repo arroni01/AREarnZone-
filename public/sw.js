@@ -26,11 +26,21 @@ const ASSETS_TO_CACHE = [
 // Install Event - Pre-cache icons & assets immediately
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
+    caches.open(CACHE_NAME).then(async (cache) => {
       console.log('[Service Worker] Pre-caching offline assets v7');
-      return cache.addAll(ASSETS_TO_CACHE).catch(err => {
-        console.warn('[Service Worker] Caching warning:', err);
-      });
+      await Promise.all(
+        ASSETS_TO_CACHE.map((url) =>
+          fetch(url)
+            .then((response) => {
+              if (response && response.ok) {
+                return cache.put(url, response);
+              }
+            })
+            .catch((err) => {
+              console.warn('[Service Worker] Asset cache skip:', url, err);
+            })
+        )
+      );
     })
   );
   self.skipWaiting();
