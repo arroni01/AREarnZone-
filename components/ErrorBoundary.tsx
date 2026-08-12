@@ -74,33 +74,51 @@ export class ErrorBoundary extends React.Component<Props, State> {
             <div className="space-y-3">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-500/10 text-red-400 rounded-full border border-red-500/20 text-[9px] font-black uppercase tracking-widest">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
-                System Error Intercepted
+                System Notice
               </div>
-              <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-100">
+              <h2 className="text-2xl sm:text-3xl font-black uppercase italic tracking-tighter text-slate-100">
                 ECOSYSTEM RECOVERY
               </h2>
               <p className="text-[11px] text-slate-400 font-bold leading-relaxed max-w-sm mx-auto uppercase">
-                A rendering or runtime exception has occurred. Our self-healing safety barrier successfully intercepted the crash to protect your balance and data.
+                A temporary rendering exception occurred. Our self-healing safety barrier successfully protected your balance and data.
               </p>
             </div>
 
-            {/* Interactive Error Details Accordion */}
-            {this.state.error && (
-              <div className="bg-slate-950/80 rounded-2xl border border-white/5 p-4 text-left font-mono text-[10px] space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
-                <div className="flex items-center justify-between text-red-400 font-extrabold pb-1.5 border-b border-white/5">
-                  <span className="uppercase tracking-wider">EXCEPTION DETECTED</span>
-                  <span className="text-[8px] bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20">CRITICAL</span>
-                </div>
-                <div className="text-slate-300 font-bold break-all">
-                  {this.state.error.toString()}
-                </div>
-                {this.state.errorInfo && (
-                  <div className="text-slate-500 text-[9px] whitespace-pre-wrap leading-normal font-medium mt-1">
-                    {this.state.errorInfo.componentStack}
+            {/* Interactive Error Details Accordion (Visible ONLY for Administrators) */}
+            {(() => {
+              let isAdmin = false;
+              try {
+                const storedUser = localStorage.getItem('arez_current_user');
+                if (storedUser) {
+                  const parsed = JSON.parse(storedUser);
+                  if (parsed && parsed.role === 'admin') isAdmin = true;
+                }
+              } catch (e) {}
+
+              if (isAdmin && this.state.error) {
+                return (
+                  <div className="bg-slate-950/80 rounded-2xl border border-white/5 p-4 text-left font-mono text-[10px] space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
+                    <div className="flex items-center justify-between text-red-400 font-extrabold pb-1.5 border-b border-white/5">
+                      <span className="uppercase tracking-wider">ADMIN DIAGNOSTIC LOG</span>
+                      <span className="text-[8px] bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20">CRITICAL</span>
+                    </div>
+                    <div className="text-slate-300 font-bold break-all">
+                      {this.state.error.toString()}
+                    </div>
+                    {this.state.errorInfo && (
+                      <div className="text-slate-500 text-[9px] whitespace-pre-wrap leading-normal font-medium mt-1">
+                        {this.state.errorInfo.componentStack}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            )}
+                );
+              }
+              return (
+                <div className="p-4 bg-slate-950/60 rounded-2xl border border-white/5 text-slate-400 text-xs font-semibold leading-relaxed">
+                  সার্ভারে সাময়িক সমস্যা দেখা দিয়েছে। অ্যাপটি পুনরায় চালু করতে নিচের "Reboot Application" বোতামে ক্লিক করুন।
+                </div>
+              );
+            })()}
 
             {/* Recovery Action Buttons */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">

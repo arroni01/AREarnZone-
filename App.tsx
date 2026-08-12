@@ -1438,7 +1438,42 @@ const App: React.FC = () => {
 
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
   const toggleLanguage = () => setLanguage(l => l === 'EN' ? 'BN' : 'EN');
-  const notify = (msg: string) => { setNotificationMsg(msg); setShowNotification(true); setTimeout(() => setShowNotification(false), 3000); };
+
+  // Sanitizes technical error messages for general users while preserving technical details for Admins
+  const sanitizeUserErrorMessage = (msg: string, isAdmin: boolean): string => {
+    if (!msg) return "An unexpected event occurred.";
+    if (isAdmin) return msg;
+
+    const lower = msg.toLowerCase();
+    if (
+      lower.includes('firebase') ||
+      lower.includes('supabase') ||
+      lower.includes('http ') ||
+      lower.includes('statuscode') ||
+      lower.includes('missing key') ||
+      lower.includes('api_key') ||
+      lower.includes('worker') ||
+      lower.includes('gsi_logger') ||
+      lower.includes('fedcm') ||
+      lower.includes('unauthorized-domain') ||
+      lower.includes('network-request-failed') ||
+      lower.includes('health check alert') ||
+      lower.includes('err_') ||
+      lower.includes('exception') ||
+      lower.includes('stack')
+    ) {
+      console.error("[System Diagnostic Log - Suppressed from General User UI]:", msg);
+      return "সার্ভারে সাময়িক সমস্যা দেখা দিয়েছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন।";
+    }
+    return msg;
+  };
+
+  const notify = (msg: string) => { 
+    const sanitized = sanitizeUserErrorMessage(msg, currentUser?.role === 'admin');
+    setNotificationMsg(sanitized); 
+    setShowNotification(true); 
+    setTimeout(() => setShowNotification(false), 3000); 
+  };
 
   const handleLogin = (user: User, referralUsed?: string) => {
     if (user.isSuspended) {
@@ -1959,6 +1994,8 @@ const AppContent: React.FC<{
                             cpaTransactions={cpaTransactions}
                             setCpaTransactions={setCpaTransactions}
                         />
+                        {/* API Debugger component strictly visible ONLY to logged-in Administrators within the Admin Panel */}
+                        {currentUser?.role === 'admin' && <DebugOverlay user={currentUser} />}
                       </ErrorBoundary>
                     )
                   ) : (
@@ -2158,9 +2195,6 @@ const AppContent: React.FC<{
           </div>
         </div>
       )}
-
-      {/* Visual Debugger Overlay for Live API Interception & Health Check */}
-      <DebugOverlay />
     </div>
   );
 };

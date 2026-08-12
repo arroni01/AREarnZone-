@@ -985,49 +985,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
     }
   };
 
-  // Dynamically initialize Google Identity Services (GSI) script for direct Google OAuth sign in
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const initGsi = () => {
-      try {
-        if ((window as any).google?.accounts?.id) {
-          (window as any).google.accounts.id.initialize({
-            client_id: '1090367277778-tnh08lj1oah2fkc3cn58458os3om1j39.apps.googleusercontent.com',
-            callback: (response: any) => {
-              if (response && response.credential) {
-                const payload = parseJwt(response.credential);
-                if (payload && payload.email) {
-                  console.log("[GSI Google Auth] Successfully authenticated user via Google credential:", payload.email);
-                  const googleUserPayload = {
-                    email: payload.email,
-                    name: payload.name || payload.given_name || payload.email.split('@')[0] || "Google User",
-                    id: payload.sub || ('g_' + Math.random().toString(36).substr(2, 9))
-                  };
-                  handleGoogleAuthSuccess(googleUserPayload);
-                }
-              }
-            },
-            auto_select: false,
-          });
-        }
-      } catch (e) {
-        console.warn("[GSI Initialization Notice]:", e);
-      }
-    };
-
-    if (!(window as any).google?.accounts?.id) {
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      script.onload = initGsi;
-      document.head.appendChild(script);
-    } else {
-      initGsi();
-    }
-  }, []);
-
   // Handle Google OAuth redirect completion on mount
   useEffect(() => {
     if (auth) {
@@ -1201,19 +1158,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, notify, globalConfig, setGl
         };
         handleGoogleAuthSuccess(googleUserPayload);
         return;
-      }
-
-      // 1. Try Google Identity Services (GSI) prompt if initialized
-      if (typeof window !== 'undefined' && (window as any).google?.accounts?.id) {
-        try {
-          (window as any).google.accounts.id.prompt((notification: any) => {
-            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-              console.log("[GSI] One-tap prompt skipped/not displayed, proceeding with Popup...");
-            }
-          });
-        } catch (gsiErr) {
-          console.warn("[GSI Prompt Notice]:", gsiErr);
-        }
       }
 
       if (!auth) {

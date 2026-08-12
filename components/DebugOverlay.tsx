@@ -40,7 +40,19 @@ interface HealthCheckData {
   message?: string;
 }
 
-export const DebugOverlay: React.FC = () => {
+interface DebugOverlayProps {
+  user?: { role?: string; [key: string]: any } | null;
+  currentUser?: { role?: string; [key: string]: any } | null;
+}
+
+export const DebugOverlay: React.FC<DebugOverlayProps> = ({ user, currentUser }) => {
+  const activeUser = user || currentUser;
+
+  // STRICT SECURITY RULE: Hide API Debugger completely if user is not an Admin
+  if (!activeUser || activeUser.role !== 'admin') {
+    return null;
+  }
+
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [logs, setLogs] = useState<ApiLogEntry[]>([]);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
@@ -63,29 +75,8 @@ export const DebugOverlay: React.FC = () => {
     try {
       const res = await apiFetch<HealthCheckData>("/api/health-check");
       setHealthData(res);
-
-      if (res) {
-        const missing = res.keysMissing || [];
-        const isFail = missing.length > 0 || !res.supabaseConnected || !res.smtpReady;
-        
-        // Dispatch toast notification for system status
-        let toastMsg = "";
-        if (missing.length > 0) {
-          toastMsg = `⚠️ Health Check Alert: Missing keys (${missing.join(", ")})`;
-        } else if (!res.supabaseConnected) {
-          toastMsg = `⚠️ Health Check Alert: Supabase database connection failed!`;
-        } else if (!res.smtpReady) {
-          toastMsg = `⚠️ Health Check Notice: Gmail App Password not configured.`;
-        } else {
-          toastMsg = `✅ System Diagnostic Passed: All backend keys & DB connected.`;
-        }
-
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(
-            new CustomEvent("arez_notify", { detail: { message: toastMsg } })
-          );
-        }
-      }
+      // Health check result is recorded in state/logs and displayed inside the Admin Debug Panel only.
+      // Technical warning toasts are suppressed for normal users.
     } catch (err: any) {
       console.warn("[Debug Panel] Health check failed:", err);
       setHealthData({
