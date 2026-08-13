@@ -1336,7 +1336,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   const [tgBotToken, setTgBotToken] = useState("");
-  const [tgBotUsername, setTgBotUsername] = useState("@AREarnZone_bot");
+  const [tgBotUsername, setTgBotUsername] = useState("AREarnZone_bot");
   const [tgChannelLink, setTgChannelLink] = useState("https://t.me/arearnzone");
   const [isSavingTgBot, setIsSavingTgBot] = useState(false);
   const [tgBotStatusMsg, setTgBotStatusMsg] = useState<string | null>(null);

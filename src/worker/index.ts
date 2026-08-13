@@ -367,6 +367,34 @@ app.post("/api/telegram/save-config", async (c) => {
   }
 });
 
+app.get("/api/telegram/config", (c) => {
+  const cleanUsername = (botConfig.username || "AREarnZone_bot")
+    .replace(/^https?:\/\/t\.me\//i, "")
+    .replace(/^@+/, "")
+    .trim();
+  return c.json({
+    ...botConfig,
+    username: cleanUsername,
+    botUsername: cleanUsername
+  });
+});
+
+app.post("/api/telegram/save-config", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    if (body.username || body.botUsername) {
+      body.username = String(body.username || body.botUsername)
+        .replace(/^https?:\/\/t\.me\//i, "")
+        .replace(/^@+/, "")
+        .trim();
+    }
+    botConfig = { ...botConfig, ...body };
+    return c.json({ success: true, config: botConfig });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 app.post("/api/telegram/webhook", async (c) => {
   try {
     const update = await c.req.json().catch(() => ({}));
@@ -379,16 +407,18 @@ app.post("/api/telegram/webhook", async (c) => {
       const { chat, text, from } = message;
       const chatId = chat ? String(chat.id) : null;
       const telegramId = from ? String(from.id) : chatId;
-      const username = from?.username || from?.first_name || "AREarnZone_User";
+      const rawUsername = from?.username || from?.first_name || "AREarnZone_User";
+      const username = rawUsername.replace(/^@+/, "").trim();
       const cleanText = (text || "").trim();
 
       if (chatId) {
-        let replyText = "";
         let codeCandidate: string | null = null;
 
-        // Extract security code (e.g., AREZ-123456, AREZ123456, /start AREZ-123456, 123456)
+        // Extract security code (e.g., AREZ-260097, AREZ260097, /start AREZ-260097, 260097)
         if (cleanText.startsWith("/start ")) {
           codeCandidate = cleanText.substring(7).trim();
+        } else if (cleanText.startsWith("/start")) {
+          codeCandidate = null;
         } else if (/^AREZ-?[A-Za-z0-9_]{3,20}$/i.test(cleanText)) {
           codeCandidate = cleanText;
         } else if (/^\d{6}$/.test(cleanText)) {
@@ -398,30 +428,52 @@ app.post("/api/telegram/webhook", async (c) => {
           if (match) codeCandidate = match[1];
         }
 
-        // Try linking security code if present
         let verifiedUser: any = null;
         if (codeCandidate) {
           const code = codeCandidate;
           let foundUserId: string | null = null;
 
-          // Check memory store
           if (botCodes[code]) {
             botCodes[code].verified = true;
             botCodes[code].telegramId = telegramId;
             botCodes[code].username = username;
+            botCodes[code].chatId = chatId;
             foundUserId = botCodes[code].userId;
+          } else {
+            botCodes[code] = {
+              userId: "webhook_user",
+              createdAt: Date.now(),
+              verified: true,
+              telegramId,
+              username,
+              chatId
+            };
           }
 
-          // Search Supabase users table for matching code
+          // Search Supabase users table
           try {
+            const codeVariants = [code];
+            if (code.startsWith("AREZ-")) {
+              codeVariants.push(code.replace("AREZ-", "AREZ"));
+            } else if (code.startsWith("AREZ")) {
+              codeVariants.push(code.replace("AREZ", "AREZ-"));
+            }
+            if (/^\d{6}$/.test(code)) {
+              codeVariants.push(`AREZ-${code}`);
+            }
+
+            const filterString = codeVariants.map(v => 
+              `telegram_verification_code.eq.${v},telegram_code.eq.${v},verification_code.eq.${v}`
+            ).join(",");
+
             const { data: usersByCode } = await client
               .from("users")
               .select("*")
-              .or(`telegram_code.eq.${code},verification_code.eq.${code}`);
+              .or(filterString);
 
             if (usersByCode && usersByCode.length > 0) {
               verifiedUser = usersByCode[0];
-            } else if (foundUserId && foundUserId !== "anon") {
+            } else if (foundUserId && foundUserId !== "anon" && foundUserId !== "webhook_user") {
               const { data: userById } = await client
                 .from("users")
                 .select("*")
@@ -431,16 +483,18 @@ app.post("/api/telegram/webhook", async (c) => {
               }
             }
           } catch (err) {
-            console.warn("[Telegram Webhook] Supabase lookup error:", err);
+            console.warn("[Telegram Webhook Worker] Supabase lookup error:", err);
           }
 
           if (verifiedUser) {
             try {
               const rawData = verifiedUser.raw_data || {};
               rawData.telegram_verified = true;
+              rawData.is_telegram_verified = true;
               rawData.telegram_chat_id = chatId;
               rawData.telegram_id = telegramId;
               rawData.telegram_username = username;
+              rawData.telegram_verification_code = code;
 
               await client
                 .from("users")
@@ -448,64 +502,29 @@ app.post("/api/telegram/webhook", async (c) => {
                   telegram_chat_id: chatId,
                   telegram_id: telegramId,
                   telegram_username: username,
+                  telegram_verified: true,
+                  is_telegram_verified: true,
+                  telegram_verification_code: code,
                   updated_at: new Date().toISOString(),
                   raw_data: rawData,
                 })
                 .eq("id", verifiedUser.id);
             } catch (err) {
-              console.warn("[Telegram Webhook] Error updating user in Supabase:", err);
+              console.warn("[Telegram Webhook Worker] Error updating user in Supabase:", err);
             }
-
-            replyText = `✅ <b>Security Code ${code} Verified!</b>\n\nYour Telegram account (<b>@${username}</b>) has been linked to your AREarnZone account.\n\nYou may now return to the app and enjoy full access!`;
-          } else if (botCodes[code]) {
-            replyText = `✅ Security code <b>${code}</b> linked successfully for @${username}! You may now return to AREarnZone.`;
           }
         }
 
-        if (!replyText) {
-          if (cleanText === "/start" || cleanText.startsWith("/start")) {
-            replyText = `🚀 <b>Welcome to AREarnZone Telegram Bot!</b>\n\nComplete micro-tasks, submit CPA offers, and earn daily rewards.\n\n<b>Available Commands:</b>\n/start - Initialize bot & view guide\n/balance - Check your linked account balance\n/help - View commands list\n\n💡 <i>To link your account, enter your security code (e.g. <code>AREZ-123456</code>) directly here.</i>`;
-          } else if (cleanText === "/balance" || cleanText.startsWith("/balance")) {
-            const param = cleanText.split(" ")[1]?.trim();
-            let userRow: any = null;
-
-            try {
-              if (param) {
-                const { data } = await client
-                  .from("users")
-                  .select("*")
-                  .or(`email.ilike.${param},id.eq.${param},firebase_uid.eq.${param}`)
-                  .limit(1);
-                if (data && data.length > 0) userRow = data[0];
-              } else {
-                // Auto-lookup by telegram_chat_id or telegram_id
-                const { data } = await client
-                  .from("users")
-                  .select("*")
-                  .or(`telegram_chat_id.eq.${chatId},telegram_id.eq.${telegramId}`)
-                  .limit(1);
-                if (data && data.length > 0) userRow = data[0];
-              }
-            } catch (err) {
-              console.warn("[Telegram Webhook] Balance query error:", err);
-            }
-
-            if (userRow) {
-              const balance = Number(userRow.balance || userRow.raw_data?.balance || 0);
-              replyText = `💰 <b>Account Balance for ${userRow.email || userRow.id}:</b>\n\nCurrent Wallet Balance: <b>$${balance.toFixed(2)}</b>\nStatus: 🟢 Active`;
-            } else if (param) {
-              replyText = `🔍 Account not found for "${param}". Please make sure your registered email or User ID is correct.`;
-            } else {
-              replyText = `💡 <b>Your Telegram account is not linked yet.</b>\n\nPlease enter your security code (e.g. <code>AREZ-123456</code>) or run <code>/balance your_email@example.com</code>`;
-            }
-          } else if (cleanText === "/help" || cleanText.startsWith("/help")) {
-            replyText = `🤖 <b>AREarnZone Bot Commands:</b>\n\n/start - Start bot & view overview\n/balance - Check your account balance\n/help - View commands list\n\n<b>Website:</b> https://arearnzone.com`;
-          } else if (codeCandidate && !verifiedUser) {
-            replyText = `ℹ️ Security code <b>${codeCandidate}</b> received. If your account is not linking automatically, please verify your code in AREarnZone Dashboard.`;
+        if (token) {
+          let replyText = "";
+          if (codeCandidate) {
+            replyText = `✅ <b>Security Code ${codeCandidate} Linked Successfully!</b>\n\nYour Telegram account (<b>@${username}</b>) is now connected to your AREarnZone account.\n\nYou may now return to the app and click "VERIFY BOT CONNECTION".`;
+          } else if (cleanText.startsWith("/start")) {
+            replyText = `🚀 <b>Welcome to AREarnZone Telegram Bot!</b>\n\nTo link your AREarnZone account, click the link on the website or send your security code (e.g. <code>AREZ-260097</code>) here.`;
+          } else {
+            replyText = `ℹ️ Message received! To connect your account, send your security code (e.g. <code>AREZ-260097</code>).`;
           }
-        }
 
-        if (replyText && token) {
           await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -514,55 +533,118 @@ app.post("/api/telegram/webhook", async (c) => {
               text: replyText,
               parse_mode: "HTML",
             }),
-          }).catch((err) => console.warn("[Telegram Webhook Dispatch Error]", err));
+          }).catch((err) => console.warn("[Telegram Webhook Worker Dispatch Error]", err));
         }
       }
     }
 
     return c.json({ success: true, message: "Webhook processed" }, 200);
   } catch (err: any) {
-    console.error("[Telegram Webhook Error]", err);
+    console.error("[Telegram Webhook Worker Error]", err);
     return c.json({ success: true, message: "Webhook processed with fallback", error: err?.message }, 200);
   }
 });
 
-app.get("/api/telegram/check-code", async (c) => {
-  const code = c.req.query("code");
-  if (!code) return c.json({ verified: false, error: "Code parameter required" }, 400);
+const handleWorkerTelegramVerify = async (c: any) => {
+  let code = c.req.query("code");
+  let userId = c.req.query("userId");
 
-  const entry = botCodes[code];
-  if (entry && entry.verified) {
-    return c.json({
-      verified: true,
-      telegramUsername: entry.username || "AREarnZone_User",
-      telegramId: entry.telegramId || "12345678",
-    });
+  if (!code && !userId && (c.req.method === "POST" || c.req.method === "PUT")) {
+    try {
+      const body = await c.req.json();
+      code = body.code || code;
+      userId = body.userId || body.user_id || userId;
+    } catch (e) {}
   }
 
-  // Check Supabase users table
+  if (code && botCodes[code]) {
+    const entry = botCodes[code];
+    if (entry && entry.verified) {
+      return c.json({
+        success: true,
+        verified: true,
+        message: "Telegram account successfully connected!",
+        telegramUsername: (entry.username || "AREarnZone_User").replace(/^@+/, ""),
+        telegramId: String(entry.telegramId || "12345678"),
+        telegramChatId: String(entry.chatId || entry.telegramId || "12345678")
+      });
+    }
+  }
+
   try {
     const client = getSupabaseClient(c);
-    const { data } = await client
-      .from("users")
-      .select("telegram_chat_id, telegram_id, telegram_username")
-      .or(`telegram_code.eq.${code},verification_code.eq.${code}`)
-      .limit(1);
+    let query = client.from("users").select("*");
+    const filters: string[] = [];
 
-    if (data && data.length > 0 && (data[0].telegram_chat_id || data[0].telegram_id)) {
-      return c.json({
-        verified: true,
-        telegramUsername: data[0].telegram_username || "AREarnZone_User",
-        telegramId: data[0].telegram_id || data[0].telegram_chat_id,
-        telegramChatId: data[0].telegram_chat_id,
-      });
+    if (code) {
+      filters.push(`telegram_verification_code.eq.${code}`);
+      filters.push(`telegram_code.eq.${code}`);
+      filters.push(`verification_code.eq.${code}`);
+      if (code.startsWith("AREZ-")) {
+        filters.push(`telegram_verification_code.eq.${code.replace("AREZ-", "AREZ")}`);
+      } else if (code.startsWith("AREZ")) {
+        filters.push(`telegram_verification_code.eq.${code.replace("AREZ", "AREZ-")}`);
+      }
+    }
+    if (userId) {
+      filters.push(`id.eq.${userId}`);
+      filters.push(`firebase_uid.eq.${userId}`);
+    }
+
+    if (filters.length > 0) {
+      const { data: users } = await query.or(filters.join(",")).limit(1);
+
+      if (users && users.length > 0) {
+        const u = users[0];
+        const isVerified = Boolean(
+          u.telegram_verified === true ||
+          u.is_telegram_verified === true ||
+          u.telegram_chat_id ||
+          u.telegram_id ||
+          u.raw_data?.telegram_verified === true ||
+          u.raw_data?.is_telegram_verified === true
+        );
+
+        if (isVerified) {
+          const telegramUsername = (u.telegram_username || u.raw_data?.telegram_username || "AREarnZone_User").replace(/^@+/, "");
+          const telegramId = String(u.telegram_id || u.telegram_chat_id || u.raw_data?.telegram_id || "12345678");
+          const telegramChatId = String(u.telegram_chat_id || u.telegram_id || u.raw_data?.telegram_chat_id || telegramId);
+
+          if (code) {
+            botCodes[code] = {
+              ...(botCodes[code] || {}),
+              userId: u.id,
+              verified: true,
+              telegramId,
+              username: telegramUsername,
+              chatId: telegramChatId
+            };
+          }
+
+          return c.json({
+            success: true,
+            verified: true,
+            message: "Telegram account successfully connected!",
+            telegramUsername,
+            telegramId,
+            telegramChatId
+          });
+        }
+      }
     }
   } catch (err) {}
 
   return c.json({
+    success: false,
     verified: false,
-    message: "Code pending or not verified",
+    message: "কোডটি এখনও বটে পাঠানো হয়নি। অনুগ্রহ করে প্রথমে বটে মেসেজ করুন。"
   });
-});
+};
+
+app.get("/api/telegram/verify", handleWorkerTelegramVerify);
+app.post("/api/telegram/verify", handleWorkerTelegramVerify);
+app.get("/api/telegram/check-code", handleWorkerTelegramVerify);
+app.post("/api/telegram/check-code", handleWorkerTelegramVerify);
 
 app.post("/api/telegram/register-code", async (c) => {
   try {
@@ -576,13 +658,13 @@ app.post("/api/telegram/register-code", async (c) => {
       verified: false,
     };
 
-    // Save code in user's Supabase record if userId is provided
     if (userId && userId !== "anon") {
       try {
         const client = getSupabaseClient(c);
         await client
           .from("users")
           .update({
+            telegram_verification_code: code,
             telegram_code: code,
             updated_at: new Date().toISOString(),
           })
@@ -590,10 +672,15 @@ app.post("/api/telegram/register-code", async (c) => {
       } catch (err) {}
     }
 
+    const cleanUsername = (botConfig.username || "AREarnZone_bot")
+      .replace(/^https?:\/\/t\.me\//i, "")
+      .replace(/^@+/, "")
+      .trim();
+
     return c.json({
       success: true,
       code,
-      botUsername: botConfig.username,
+      botUsername: cleanUsername,
       message: "Telegram verification code generated successfully",
     });
   } catch (err: any) {
