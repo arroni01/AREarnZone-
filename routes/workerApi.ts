@@ -1260,9 +1260,9 @@ const handleTelegramWebhook = async (c: any) => {
                 console.warn("[Telegram Webhook] Error updating user in Supabase:", err);
               }
 
-              replyText = `✅ <b>Your account has been successfully linked!</b>\n\nYour Telegram account (<b>@${username}</b>) has been successfully verified and connected to your AREarnZone account.\n\nYou may now return to the app and enjoy full access!`;
+              replyText = `✅ Success! Your AREarnZone account has been linked successfully. You can now return to the website.`;
             } else if (botCodesRegistry[code]) {
-              replyText = `✅ <b>Security Code ${code} Verified!</b>\n\nYour Telegram account (<b>@${username}</b>) has been successfully linked to your AREarnZone account.`;
+              replyText = `✅ Success! Your AREarnZone account has been linked successfully. You can now return to the website.`;
             }
           }
         }

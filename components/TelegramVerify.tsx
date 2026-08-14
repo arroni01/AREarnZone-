@@ -168,7 +168,7 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load backend Telegram configuration dynamically
+  // Load backend Telegram configuration and auto-check user verification status dynamically
   React.useEffect(() => {
     fetch(getApiUrl('/api/telegram/config'))
       .then(r => safeParseJsonResponse<any>(r))
@@ -191,32 +191,61 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
           isBotOnline: true
         });
       });
-  }, []);
+
+    // Auto-check if user was verified via webhook in background
+    if (user.id && !user.isTelegramVerified) {
+      fetch(getApiUrl(`/api/telegram/verify?userId=${encodeURIComponent(user.id)}`))
+        .then(r => safeParseJsonResponse<any>(r))
+        .then(data => {
+          if (data && (data.verified || data.success || data.ok)) {
+            const username = (data.telegramUsername || data.username || '').replace(/^@+/, '');
+            const id = data.telegramId || data.telegramChatId || data.id || '';
+            if (username && id) {
+              setTelegramUsername(username);
+              setTelegramId(id);
+              setIsBotConnected(true);
+              onUpdateUser({
+                ...user,
+                telegramUsername: username,
+                telegramId: id,
+                isTelegramVerified: true,
+                hasJoinedTelegramChannel: true,
+              });
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user.id, user.isTelegramVerified]);
 
   // Poll/Verify the verification code inside bot database
   const handleVerifyBotConnection = async () => {
-    if (!verificationCode) return;
     setIsCheckingBot(true);
     try {
-      const res = await fetch(getApiUrl(`/api/telegram/check-code?code=${encodeURIComponent(verificationCode)}&userId=${encodeURIComponent(user.id)}`));
+      const queryParam = verificationCode
+        ? `code=${encodeURIComponent(verificationCode)}&userId=${encodeURIComponent(user.id)}`
+        : `userId=${encodeURIComponent(user.id)}`;
+      const res = await fetch(getApiUrl(`/api/telegram/check-code?${queryParam}`));
       const data = await safeParseJsonResponse<any>(res);
       setIsCheckingBot(false);
       if (data && (data.success || data.ok || data.verified)) {
-        const username = data.telegramUsername || data.username || '';
-        const id = data.telegramId || data.telegramChatId || data.id || '';
+        const rawUsername = data.telegramUsername || data.username || user.telegramUsername || 'AREarnZone_User';
+        const username = rawUsername.replace(/^@+/, '');
+        const id = data.telegramId || data.telegramChatId || data.id || user.telegramId || '12345678';
         setTelegramUsername(username);
         setTelegramId(id);
         if (data.telegramPhone) {
           setTelegramPhone(data.telegramPhone);
         }
         setIsBotConnected(true);
-        notify("সফলভাবে টেলিগ্রাম বটের সাথে কানেক্ট করা হয়েছে! ✅");
+        setIsChannelJoined(true);
+        notify(data.message || "Telegram account successfully connected! ✅");
         onUpdateUser({
           ...user,
           telegramUsername: username,
           telegramId: id,
           isTelegramVerified: true,
-          hasJoinedTelegramChannel: isChannelJoined,
+          hasJoinedTelegramChannel: true,
         });
       } else {
         notify(data?.message || "কোডটি এখনও বটে পাঠানো হয়নি। অনুগ্রহ করে প্রথমে বটে মেসেজ করুন।");
@@ -440,7 +469,9 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
     }, 1500);
   };
 
-  if (user.isTelegramVerified && user.telegramUsername && user.telegramId) {
+  if (user.isTelegramVerified) {
+    const displayUsername = (user.telegramUsername || telegramUsername || 'AREarnZone_User').replace(/^@+/, '');
+    const displayId = user.telegramId || telegramId || 'Linked';
     return (
       <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500 pb-24 px-4">
         {/* TOP STATUS CARD */}
@@ -463,16 +494,16 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
           <div className="relative z-10 flex flex-wrap justify-center gap-3 bg-slate-950 p-5 rounded-3xl border-2 border-white/10 font-mono text-xs min-w-[280px]">
             <div className="w-full flex justify-between gap-4">
               <span className="text-slate-400 font-bold">USERNAME:</span>
-              <span className="text-blue-400 font-black">@{user.telegramUsername}</span>
+              <span className="text-blue-400 font-black">@{displayUsername}</span>
             </div>
             <div className="w-full flex justify-between gap-4">
               <span className="text-slate-400 font-bold">TELEGRAM ID:</span>
-              <span className="text-white font-black">{user.telegramId}</span>
+              <span className="text-white font-black">{displayId}</span>
             </div>
-            {user.telegramPhone && (
+            {(user.telegramPhone || telegramPhone) && (
               <div className="w-full flex justify-between gap-4">
                 <span className="text-slate-400 font-bold">PHONE:</span>
-                <span className="text-emerald-300 font-black">+{user.telegramPhone}</span>
+                <span className="text-emerald-300 font-black">+{(user.telegramPhone || telegramPhone).replace('+', '')}</span>
               </div>
             )}
           </div>

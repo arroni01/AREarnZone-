@@ -1326,8 +1326,7 @@ app.all("/api/telegram/webhook", async (c) => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               chat_id: chatId,
-              text: `✅ <b>Your account has been successfully linked!</b>\n\nYour Telegram account (<b>@${username}</b>) has been successfully verified and connected to your AREarnZone account.\n\nYou may now return to the app and enjoy full access!`,
-              parse_mode: "HTML",
+              text: `✅ Success! Your AREarnZone account has been linked successfully. You can now return to the website.`,
             })
           }).catch(() => {});
         }
@@ -1350,6 +1349,7 @@ app.get("/api/telegram/check-code", async (c) => {
       ok: true,
       success: true,
       verified: true,
+      message: "Telegram account successfully connected!",
       telegramId: entry.telegramId,
       telegramUsername: entry.username
     }, 200, { "Content-Type": "application/json; charset=utf-8" });
@@ -1373,6 +1373,7 @@ app.get("/api/telegram/check-code", async (c) => {
             ok: true,
             success: true,
             verified: true,
+            message: "Telegram account successfully connected!",
             telegramUsername: u.telegram_username || "@AREarnZone_User",
             telegramId: u.telegram_id || u.telegram_chat_id,
             telegramChatId: u.telegram_chat_id || u.telegram_id,
@@ -1383,6 +1384,105 @@ app.get("/api/telegram/check-code", async (c) => {
   }
 
   return c.json({ ok: false, success: false, verified: false, message: "Code pending or not verified" }, 200, { "Content-Type": "application/json; charset=utf-8" });
+});
+
+app.post("/api/telegram/check-code", async (c) => {
+  let body: any = {};
+  try { body = await c.req.json().catch(() => ({})); } catch (e) {}
+  const code = (c.req.query("code") || body.code || "").trim();
+  const userId = (c.req.query("userId") || body.userId || body.user_id || "").trim();
+  if (!code && !userId) return c.json({ error: "Code or userId required", ok: false, success: false, verified: false }, 400);
+
+  const entry = code && botStorage.codes ? botStorage.codes[code] : null;
+  if (entry && entry.verified) {
+    return c.json({
+      ok: true,
+      success: true,
+      verified: true,
+      message: "Telegram account successfully connected!",
+      telegramId: entry.telegramId,
+      telegramUsername: entry.username
+    }, 200, { "Content-Type": "application/json; charset=utf-8" });
+  }
+
+  if (supabaseServer) {
+    try {
+      let q = supabaseServer.from("users").select("*");
+      if (code && userId) {
+        q = q.or(`telegram_verification_code.eq.${code},telegram_code.eq.${code},verification_code.eq.${code},id.eq.${userId}`);
+      } else if (code) {
+        q = q.or(`telegram_verification_code.eq.${code},telegram_code.eq.${code},verification_code.eq.${code}`);
+      } else {
+        q = q.eq("id", userId);
+      }
+      const { data } = await q.limit(1);
+      if (data && data.length > 0) {
+        const u = data[0];
+        if (u.telegram_verified === true || u.is_telegram_verified === true || u.telegram_chat_id || u.telegram_id) {
+          return c.json({
+            ok: true,
+            success: true,
+            verified: true,
+            message: "Telegram account successfully connected!",
+            telegramUsername: u.telegram_username || "@AREarnZone_User",
+            telegramId: u.telegram_id || u.telegram_chat_id,
+            telegramChatId: u.telegram_chat_id || u.telegram_id,
+          }, 200, { "Content-Type": "application/json; charset=utf-8" });
+        }
+      }
+    } catch (e) {}
+  }
+
+  return c.json({ ok: false, success: false, verified: false, message: "Code pending or not verified" }, 200, { "Content-Type": "application/json; charset=utf-8" });
+});
+
+app.get("/api/telegram/verify", async (c) => {
+  const code = (c.req.query("code") || "").trim();
+  const userId = (c.req.query("userId") || "").trim();
+  if (supabaseServer && userId) {
+    try {
+      const { data } = await supabaseServer.from("users").select("*").or(`id.eq.${userId},firebase_uid.eq.${userId}`).limit(1);
+      if (data && data.length > 0) {
+        const u = data[0];
+        if (u.telegram_verified === true || u.is_telegram_verified === true || u.telegram_chat_id || u.telegram_id) {
+          return c.json({
+            ok: true,
+            success: true,
+            verified: true,
+            message: "Telegram account successfully connected!",
+            telegramUsername: u.telegram_username || "@AREarnZone_User",
+            telegramId: u.telegram_id || u.telegram_chat_id,
+          }, 200, { "Content-Type": "application/json; charset=utf-8" });
+        }
+      }
+    } catch (e) {}
+  }
+  return c.json({ ok: false, success: false, verified: false, message: "Not verified" }, 200, { "Content-Type": "application/json; charset=utf-8" });
+});
+
+app.post("/api/telegram/verify", async (c) => {
+  let body: any = {};
+  try { body = await c.req.json().catch(() => ({})); } catch (e) {}
+  const userId = (c.req.query("userId") || body.userId || body.user_id || "").trim();
+  if (supabaseServer && userId) {
+    try {
+      const { data } = await supabaseServer.from("users").select("*").or(`id.eq.${userId},firebase_uid.eq.${userId}`).limit(1);
+      if (data && data.length > 0) {
+        const u = data[0];
+        if (u.telegram_verified === true || u.is_telegram_verified === true || u.telegram_chat_id || u.telegram_id) {
+          return c.json({
+            ok: true,
+            success: true,
+            verified: true,
+            message: "Telegram account successfully connected!",
+            telegramUsername: u.telegram_username || "@AREarnZone_User",
+            telegramId: u.telegram_id || u.telegram_chat_id,
+          }, 200, { "Content-Type": "application/json; charset=utf-8" });
+        }
+      }
+    } catch (e) {}
+  }
+  return c.json({ ok: false, success: false, verified: false, message: "Not verified" }, 200, { "Content-Type": "application/json; charset=utf-8" });
 });
 
 app.post("/api/telegram/register-code", async (c) => {

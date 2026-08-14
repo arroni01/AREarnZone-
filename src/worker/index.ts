@@ -522,7 +522,7 @@ app.post("/api/admin/telegram/connect", handleSaveTelegramBotWorker);
 app.post("/api/admin/telegram/save-config", handleSaveTelegramBotWorker);
 
 
-app.post("/api/telegram/webhook", async (c) => {
+app.all("/api/telegram/webhook", async (c) => {
   try {
     const update = await c.req.json().catch(() => ({}));
     const token = getEnv(c, "TELEGRAM_BOT_TOKEN") || getEnv(c, "VITE_TELEGRAM_BOT_TOKEN") || botConfig.token;
@@ -534,7 +534,8 @@ app.post("/api/telegram/webhook", async (c) => {
       const { chat, text, from } = message;
       const chatId = chat ? String(chat.id) : null;
       const telegramId = from ? String(from.id) : chatId;
-      const username = from?.username || from?.first_name || "AREarnZone_User";
+      const rawUsername = from?.username || from?.first_name || "AREarnZone_User";
+      const username = rawUsername.replace(/^@+/, "");
       const cleanText = (text || "").trim();
 
       if (chatId) {
@@ -563,7 +564,7 @@ app.post("/api/telegram/webhook", async (c) => {
           if (botCodes[code]) {
             botCodes[code].verified = true;
             botCodes[code].telegramId = telegramId;
-            botCodes[code].username = username;
+            botCodes[code].username = `@${username}`;
             foundUserId = botCodes[code].userId;
           }
 
@@ -617,9 +618,9 @@ app.post("/api/telegram/webhook", async (c) => {
               console.warn("[Telegram Webhook] Error updating user in Supabase:", err);
             }
 
-            replyText = `✅ <b>Your account has been successfully linked!</b>\n\nYour Telegram account (<b>@${username.replace(/^@+/, '')}</b>) has been successfully verified and connected to your AREarnZone account.\n\nYou may now return to the app and enjoy full access!`;
+            replyText = `✅ Success! Your AREarnZone account has been linked successfully. You can now return to the website.`;
           } else if (botCodes[code]) {
-            replyText = `✅ <b>Your account has been successfully linked!</b>\n\nSecurity code <b>${code}</b> linked successfully for @${username.replace(/^@+/, '')}! You may now return to AREarnZone.`;
+            replyText = `✅ Success! Your AREarnZone account has been linked successfully. You can now return to the website.`;
           }
         }
 
@@ -662,7 +663,7 @@ app.post("/api/telegram/webhook", async (c) => {
           } else if (cleanText === "/help" || cleanText.startsWith("/help")) {
             replyText = `🤖 <b>AREarnZone Bot Commands:</b>\n\n/start - Start bot & view overview\n/balance - Check your account balance\n/help - View commands list\n\n<b>Website:</b> https://arearnzone.com`;
           } else if (codeCandidate && !verifiedUser) {
-            replyText = `ℹ️ Security code <b>${codeCandidate}</b> received. If your account is not linking automatically, please verify your code in AREarnZone Dashboard.`;
+            replyText = `✅ Security code <b>${codeCandidate}</b> received! Please click "VERIFY BOT CONNECTION" on the AREarnZone website to complete the process.`;
           }
         }
 
@@ -680,10 +681,16 @@ app.post("/api/telegram/webhook", async (c) => {
       }
     }
 
-    return c.json({ success: true, message: "Webhook processed" }, 200);
+    return c.json({ success: true, ok: true, message: "Webhook processed" }, 200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    });
   } catch (err: any) {
     console.error("[Telegram Webhook Error]", err);
-    return c.json({ success: true, message: "Webhook processed with fallback", error: err?.message }, 200);
+    return c.json({ success: true, ok: true, message: "Webhook processed with fallback", error: err?.message }, 200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    });
   }
 });
 
