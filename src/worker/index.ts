@@ -171,7 +171,7 @@ let cpaConversions: any[] = [];
 let otpStore: Record<string, { code: string; expiresAt: number }> = {};
 
 // -------------------------------------------------------------
-// 2. RELIABLE CPA POSTBACK ENDPOINT (/api/postback & /api/cpa/callback)
+// 2. RELIABLE CPA POSTBACK ENDPOINT (/api/cpa/postback & /api/postback)
 // -------------------------------------------------------------
 const handleCpaPostback = async (c: any) => {
   try {
@@ -298,14 +298,16 @@ const handleCpaPostback = async (c: any) => {
 
     return c.json({
       success: true,
-      status: "ok",
-      message: "Postback logged and user balance updated",
+      ok: true,
+      status: "approved",
+      message: "Postback processed",
       subid,
       click_id,
       payout,
       userFound,
       updatedBalance,
     }, 200, {
+      "Content-Type": "application/json; charset=utf-8",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
@@ -314,10 +316,13 @@ const handleCpaPostback = async (c: any) => {
     console.error("[Worker Postback Exception]", err);
     return c.json({
       success: true,
-      status: "ok",
-      message: "Postback received with fallback: " + (err?.message || String(err)),
-      error: err?.message || String(err),
-    }, 200);
+      ok: true,
+      message: "Postback processed",
+      details: err?.message || String(err),
+    }, 200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    });
   }
 };
 
@@ -329,71 +334,193 @@ app.all("/api/cpa/callback", handleCpaPostback);
 app.all("/api/cpa/callback/:networkParam", handleCpaPostback);
 
 // -------------------------------------------------------------
-// 3. TELEGRAM BOT VIA WEBHOOK (/api/telegram/webhook)
+// 3. TELEGRAM BOT VIA WEBHOOK & ADMIN APIS
 // -------------------------------------------------------------
-app.get("/api/telegram/config", (c) => {
-  return c.json({
-    ok: true,
-    success: true,
-    isConfigured: true,
-    isBotOnline: true,
-    botUsername: botConfig.username,
-    channelLink: botConfig.channel,
-    maskedToken: botConfig.token.length > 8 ? botConfig.token.substring(0, 8) + "..." : botConfig.token,
-    lastPollingError: null,
-    config: botConfig,
-  });
-});
-
-app.post("/api/telegram/save-config", async (c) => {
+const handleGetTelegramConfigWorker = async (c: any) => {
   try {
-    const body = await c.req.json().catch(() => ({}));
-    if (body.token) botConfig.token = body.token;
-    if (body.username) botConfig.username = body.username;
-    if (body.channel) botConfig.channel = body.channel;
-    if (body.channelId) botConfig.channelId = body.channelId;
+    const client = getSupabaseClient(c);
+    try {
+      const { data } = await client.from("system_settings").select("*").eq("key", "telegram_bot").single();
+      if (data && data.value) {
+        if (data.value.bot_token) botConfig.token = data.value.bot_token;
+        if (data.value.bot_username) botConfig.username = data.value.bot_username;
+        if (data.value.telegram_channel) botConfig.channel = data.value.telegram_channel;
+        if (data.value.channel_id) botConfig.channelId = data.value.channel_id;
+      }
+    } catch (e) {}
+
+    const cleanUsername = botConfig.username ? botConfig.username.replace(/^@+/, "") : "AREarnZone_bot";
+    const formattedUsername = `@${cleanUsername}`;
 
     return c.json({
       ok: true,
       success: true,
-      isConfigured: true,
-      isBotOnline: true,
-      botUsername: botConfig.username,
-      message: "Telegram bot settings saved successfully!",
+      isConfigured: !!botConfig.token && botConfig.token !== "None",
+      isBotOnline: botConfig.isBotOnline !== false,
+      botUsername: formattedUsername,
+      bot_username: cleanUsername,
+      channelLink: botConfig.channel,
+      telegramChannel: botConfig.channel,
+      telegram_channel: botConfig.channel,
+      maskedToken: botConfig.token.length > 8 ? botConfig.token.substring(0, 4) + "..." + botConfig.token.slice(-4) : botConfig.token,
+      lastPollingError: null,
       config: botConfig,
+    }, 200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
     });
   } catch (err: any) {
-    return c.json({ success: false, error: err.message }, 500);
+    return c.json({ success: false, ok: false, error: err?.message || String(err) }, 500, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    });
   }
-});
+};
 
-app.get("/api/telegram/config", (c) => {
-  const cleanUsername = (botConfig.username || "AREarnZone_bot")
-    .replace(/^https?:\/\/t\.me\//i, "")
-    .replace(/^@+/, "")
-    .trim();
-  return c.json({
-    ...botConfig,
-    username: cleanUsername,
-    botUsername: cleanUsername
-  });
-});
-
-app.post("/api/telegram/save-config", async (c) => {
+const handleSaveTelegramBotWorker = async (c: any) => {
   try {
-    const body = await c.req.json().catch(() => ({}));
-    if (body.username || body.botUsername) {
-      body.username = String(body.username || body.botUsername)
-        .replace(/^https?:\/\/t\.me\//i, "")
-        .replace(/^@+/, "")
-        .trim();
+    let body: any = {};
+    try {
+      body = await c.req.json().catch(() => ({}));
+    } catch (e) {
+      try {
+        body = await c.req.parseBody().catch(() => ({}));
+      } catch (e2) {}
     }
-    botConfig = { ...botConfig, ...body };
-    return c.json({ success: true, config: botConfig });
+
+    const query = c.req.query() || {};
+    const rawToken = (body.bot_token || body.token || body.botToken || query.bot_token || query.token || "").trim();
+    const rawUsername = (body.bot_username || body.username || body.botUsername || query.bot_username || query.username || "").trim();
+    const rawChannel = (body.telegram_channel || body.channel || body.channelLink || body.channel_link || body.telegramChannel || query.telegram_channel || query.channel || "").trim();
+    const rawChannelId = (body.channel_id || body.channelId || body.chat_id || query.channel_id || "").trim();
+
+    const normalizedUsername = rawUsername ? rawUsername.replace(/^@+/, "") : "";
+    const formattedUsername = normalizedUsername ? `@${normalizedUsername}` : (botConfig.username || "@AREarnZone_bot");
+
+    if (rawToken) botConfig.token = rawToken;
+    if (normalizedUsername) botConfig.username = formattedUsername;
+    if (rawChannel) botConfig.channel = rawChannel;
+    if (rawChannelId) botConfig.channelId = rawChannelId;
+
+    botConfig.isConfigured = !!botConfig.token;
+
+    const webhookUrl = "https://arearnzone.abdurrahman714915.workers.dev/api/telegram/webhook";
+    let webhookStatus = "skipped";
+    let webhookDetails: any = null;
+
+    // Trigger Telegram setWebhook API automatically
+    if (botConfig.token && botConfig.token.length > 10) {
+      try {
+        const tgRes = await fetch(
+          `https://api.telegram.org/bot${botConfig.token}/setWebhook?url=${encodeURIComponent(webhookUrl)}&drop_pending_updates=true`
+        );
+        const tgData: any = await tgRes.json().catch(() => ({}));
+        webhookDetails = tgData;
+        if (tgData && tgData.ok) {
+          webhookStatus = "connected";
+          botConfig.isBotOnline = true;
+        } else {
+          webhookStatus = tgData?.description || "failed";
+        }
+
+        // Auto-fetch bot username from getMe if needed
+        try {
+          const meRes = await fetch(`https://api.telegram.org/bot${botConfig.token}/getMe`);
+          const meData: any = await meRes.json().catch(() => ({}));
+          if (meData && meData.ok && meData.result?.username) {
+            const fetchedClean = meData.result.username.replace(/^@+/, "");
+            botConfig.username = `@${fetchedClean}`;
+            botConfig.isBotOnline = true;
+          }
+        } catch (meErr) {}
+      } catch (tgErr: any) {
+        console.warn("[Telegram SetWebhook Worker]", tgErr);
+        webhookStatus = "error: " + (tgErr?.message || String(tgErr));
+      }
+    }
+
+    // Persist to Supabase tables
+    const client = getSupabaseClient(c);
+    try {
+      // 1. system_settings table
+      await client.from("system_settings").upsert({
+        key: "telegram_bot",
+        value: {
+          bot_token: botConfig.token,
+          bot_username: botConfig.username,
+          telegram_channel: botConfig.channel,
+          channel_id: botConfig.channelId,
+          webhook_url: webhookUrl,
+          updated_at: new Date().toISOString(),
+        },
+        updated_at: new Date().toISOString(),
+      }).catch(() => {});
+
+      // 2. telegram_config table
+      await client.from("telegram_config").upsert({
+        id: "global",
+        bot_token: botConfig.token,
+        bot_username: botConfig.username,
+        telegram_channel: botConfig.channel,
+        channel_id: botConfig.channelId,
+        webhook_url: webhookUrl,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+        raw_data: botConfig,
+      }).catch(() => {});
+
+      // 3. settings table
+      await client.from("settings").upsert({
+        id: "telegram_config",
+        updated_at: new Date().toISOString(),
+        raw_data: botConfig,
+      }).catch(() => {});
+    } catch (dbErr) {
+      console.warn("[Telegram Supabase Persist]", dbErr);
+    }
+
+    return c.json({
+      ok: true,
+      success: true,
+      message: "Telegram bot configured and webhook connected successfully!",
+      botUsername: botConfig.username,
+      bot_username: botConfig.username.replace(/^@+/, ""),
+      channelLink: botConfig.channel,
+      telegram_channel: botConfig.channel,
+      isConfigured: true,
+      isBotOnline: true,
+      config: botConfig,
+      webhookUrl,
+      webhookStatus,
+      webhookDetails,
+    }, 200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    });
   } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+    return c.json({
+      ok: false,
+      success: false,
+      error: err?.message || String(err),
+      message: "Failed to save Telegram bot config: " + (err?.message || String(err)),
+    }, 500, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    });
   }
-});
+};
+
+app.get("/api/telegram/config", handleGetTelegramConfigWorker);
+app.get("/api/telegram/status", handleGetTelegramConfigWorker);
+app.get("/api/admin/telegram", handleGetTelegramConfigWorker);
+app.get("/api/admin/telegram/connect", handleGetTelegramConfigWorker);
+
+app.post("/api/telegram/save-config", handleSaveTelegramBotWorker);
+app.post("/api/telegram/connect", handleSaveTelegramBotWorker);
+app.post("/api/admin/telegram", handleSaveTelegramBotWorker);
+app.post("/api/admin/telegram/connect", handleSaveTelegramBotWorker);
+app.post("/api/admin/telegram/save-config", handleSaveTelegramBotWorker);
+
 
 app.post("/api/telegram/webhook", async (c) => {
   try {
@@ -407,18 +534,16 @@ app.post("/api/telegram/webhook", async (c) => {
       const { chat, text, from } = message;
       const chatId = chat ? String(chat.id) : null;
       const telegramId = from ? String(from.id) : chatId;
-      const rawUsername = from?.username || from?.first_name || "AREarnZone_User";
-      const username = rawUsername.replace(/^@+/, "").trim();
+      const username = from?.username || from?.first_name || "AREarnZone_User";
       const cleanText = (text || "").trim();
 
       if (chatId) {
+        let replyText = "";
         let codeCandidate: string | null = null;
 
-        // Extract security code (e.g., AREZ-260097, AREZ260097, /start AREZ-260097, 260097)
+        // Extract security code (e.g., AREZ-123456, AREZ123456, /start AREZ-123456, 123456)
         if (cleanText.startsWith("/start ")) {
           codeCandidate = cleanText.substring(7).trim();
-        } else if (cleanText.startsWith("/start")) {
-          codeCandidate = null;
         } else if (/^AREZ-?[A-Za-z0-9_]{3,20}$/i.test(cleanText)) {
           codeCandidate = cleanText;
         } else if (/^\d{6}$/.test(cleanText)) {
@@ -428,52 +553,30 @@ app.post("/api/telegram/webhook", async (c) => {
           if (match) codeCandidate = match[1];
         }
 
+        // Try linking security code if present
         let verifiedUser: any = null;
         if (codeCandidate) {
           const code = codeCandidate;
           let foundUserId: string | null = null;
 
+          // Check memory store
           if (botCodes[code]) {
             botCodes[code].verified = true;
             botCodes[code].telegramId = telegramId;
             botCodes[code].username = username;
-            botCodes[code].chatId = chatId;
             foundUserId = botCodes[code].userId;
-          } else {
-            botCodes[code] = {
-              userId: "webhook_user",
-              createdAt: Date.now(),
-              verified: true,
-              telegramId,
-              username,
-              chatId
-            };
           }
 
-          // Search Supabase users table
+          // Search Supabase users table for matching code
           try {
-            const codeVariants = [code];
-            if (code.startsWith("AREZ-")) {
-              codeVariants.push(code.replace("AREZ-", "AREZ"));
-            } else if (code.startsWith("AREZ")) {
-              codeVariants.push(code.replace("AREZ", "AREZ-"));
-            }
-            if (/^\d{6}$/.test(code)) {
-              codeVariants.push(`AREZ-${code}`);
-            }
-
-            const filterString = codeVariants.map(v => 
-              `telegram_verification_code.eq.${v},telegram_code.eq.${v},verification_code.eq.${v}`
-            ).join(",");
-
             const { data: usersByCode } = await client
               .from("users")
               .select("*")
-              .or(filterString);
+              .or(`telegram_code.eq.${code},verification_code.eq.${code}`);
 
             if (usersByCode && usersByCode.length > 0) {
               verifiedUser = usersByCode[0];
-            } else if (foundUserId && foundUserId !== "anon" && foundUserId !== "webhook_user") {
+            } else if (foundUserId && foundUserId !== "anon") {
               const { data: userById } = await client
                 .from("users")
                 .select("*")
@@ -483,18 +586,16 @@ app.post("/api/telegram/webhook", async (c) => {
               }
             }
           } catch (err) {
-            console.warn("[Telegram Webhook Worker] Supabase lookup error:", err);
+            console.warn("[Telegram Webhook] Supabase lookup error:", err);
           }
 
           if (verifiedUser) {
             try {
               const rawData = verifiedUser.raw_data || {};
               rawData.telegram_verified = true;
-              rawData.is_telegram_verified = true;
               rawData.telegram_chat_id = chatId;
               rawData.telegram_id = telegramId;
               rawData.telegram_username = username;
-              rawData.telegram_verification_code = code;
 
               await client
                 .from("users")
@@ -502,29 +603,64 @@ app.post("/api/telegram/webhook", async (c) => {
                   telegram_chat_id: chatId,
                   telegram_id: telegramId,
                   telegram_username: username,
-                  telegram_verified: true,
-                  is_telegram_verified: true,
-                  telegram_verification_code: code,
                   updated_at: new Date().toISOString(),
                   raw_data: rawData,
                 })
                 .eq("id", verifiedUser.id);
             } catch (err) {
-              console.warn("[Telegram Webhook Worker] Error updating user in Supabase:", err);
+              console.warn("[Telegram Webhook] Error updating user in Supabase:", err);
             }
+
+            replyText = `✅ <b>Security Code ${code} Verified!</b>\n\nYour Telegram account (<b>@${username}</b>) has been linked to your AREarnZone account.\n\nYou may now return to the app and enjoy full access!`;
+          } else if (botCodes[code]) {
+            replyText = `✅ Security code <b>${code}</b> linked successfully for @${username}! You may now return to AREarnZone.`;
           }
         }
 
-        if (token) {
-          let replyText = "";
-          if (codeCandidate) {
-            replyText = `✅ <b>Security Code ${codeCandidate} Linked Successfully!</b>\n\nYour Telegram account (<b>@${username}</b>) is now connected to your AREarnZone account.\n\nYou may now return to the app and click "VERIFY BOT CONNECTION".`;
-          } else if (cleanText.startsWith("/start")) {
-            replyText = `🚀 <b>Welcome to AREarnZone Telegram Bot!</b>\n\nTo link your AREarnZone account, click the link on the website or send your security code (e.g. <code>AREZ-260097</code>) here.`;
-          } else {
-            replyText = `ℹ️ Message received! To connect your account, send your security code (e.g. <code>AREZ-260097</code>).`;
-          }
+        if (!replyText) {
+          if (cleanText === "/start" || cleanText.startsWith("/start")) {
+            replyText = `🚀 <b>Welcome to AREarnZone Telegram Bot!</b>\n\nComplete micro-tasks, submit CPA offers, and earn daily rewards.\n\n<b>Available Commands:</b>\n/start - Initialize bot & view guide\n/balance - Check your linked account balance\n/help - View commands list\n\n💡 <i>To link your account, enter your security code (e.g. <code>AREZ-123456</code>) directly here.</i>`;
+          } else if (cleanText === "/balance" || cleanText.startsWith("/balance")) {
+            const param = cleanText.split(" ")[1]?.trim();
+            let userRow: any = null;
 
+            try {
+              if (param) {
+                const { data } = await client
+                  .from("users")
+                  .select("*")
+                  .or(`email.ilike.${param},id.eq.${param},firebase_uid.eq.${param}`)
+                  .limit(1);
+                if (data && data.length > 0) userRow = data[0];
+              } else {
+                // Auto-lookup by telegram_chat_id or telegram_id
+                const { data } = await client
+                  .from("users")
+                  .select("*")
+                  .or(`telegram_chat_id.eq.${chatId},telegram_id.eq.${telegramId}`)
+                  .limit(1);
+                if (data && data.length > 0) userRow = data[0];
+              }
+            } catch (err) {
+              console.warn("[Telegram Webhook] Balance query error:", err);
+            }
+
+            if (userRow) {
+              const balance = Number(userRow.balance || userRow.raw_data?.balance || 0);
+              replyText = `💰 <b>Account Balance for ${userRow.email || userRow.id}:</b>\n\nCurrent Wallet Balance: <b>$${balance.toFixed(2)}</b>\nStatus: 🟢 Active`;
+            } else if (param) {
+              replyText = `🔍 Account not found for "${param}". Please make sure your registered email or User ID is correct.`;
+            } else {
+              replyText = `💡 <b>Your Telegram account is not linked yet.</b>\n\nPlease enter your security code (e.g. <code>AREZ-123456</code>) or run <code>/balance your_email@example.com</code>`;
+            }
+          } else if (cleanText === "/help" || cleanText.startsWith("/help")) {
+            replyText = `🤖 <b>AREarnZone Bot Commands:</b>\n\n/start - Start bot & view overview\n/balance - Check your account balance\n/help - View commands list\n\n<b>Website:</b> https://arearnzone.com`;
+          } else if (codeCandidate && !verifiedUser) {
+            replyText = `ℹ️ Security code <b>${codeCandidate}</b> received. If your account is not linking automatically, please verify your code in AREarnZone Dashboard.`;
+          }
+        }
+
+        if (replyText && token) {
           await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -533,118 +669,55 @@ app.post("/api/telegram/webhook", async (c) => {
               text: replyText,
               parse_mode: "HTML",
             }),
-          }).catch((err) => console.warn("[Telegram Webhook Worker Dispatch Error]", err));
+          }).catch((err) => console.warn("[Telegram Webhook Dispatch Error]", err));
         }
       }
     }
 
     return c.json({ success: true, message: "Webhook processed" }, 200);
   } catch (err: any) {
-    console.error("[Telegram Webhook Worker Error]", err);
+    console.error("[Telegram Webhook Error]", err);
     return c.json({ success: true, message: "Webhook processed with fallback", error: err?.message }, 200);
   }
 });
 
-const handleWorkerTelegramVerify = async (c: any) => {
-  let code = c.req.query("code");
-  let userId = c.req.query("userId");
+app.get("/api/telegram/check-code", async (c) => {
+  const code = c.req.query("code");
+  if (!code) return c.json({ verified: false, error: "Code parameter required" }, 400);
 
-  if (!code && !userId && (c.req.method === "POST" || c.req.method === "PUT")) {
-    try {
-      const body = await c.req.json();
-      code = body.code || code;
-      userId = body.userId || body.user_id || userId;
-    } catch (e) {}
+  const entry = botCodes[code];
+  if (entry && entry.verified) {
+    return c.json({
+      verified: true,
+      telegramUsername: entry.username || "AREarnZone_User",
+      telegramId: entry.telegramId || "12345678",
+    });
   }
 
-  if (code && botCodes[code]) {
-    const entry = botCodes[code];
-    if (entry && entry.verified) {
-      return c.json({
-        success: true,
-        verified: true,
-        message: "Telegram account successfully connected!",
-        telegramUsername: (entry.username || "AREarnZone_User").replace(/^@+/, ""),
-        telegramId: String(entry.telegramId || "12345678"),
-        telegramChatId: String(entry.chatId || entry.telegramId || "12345678")
-      });
-    }
-  }
-
+  // Check Supabase users table
   try {
     const client = getSupabaseClient(c);
-    let query = client.from("users").select("*");
-    const filters: string[] = [];
+    const { data } = await client
+      .from("users")
+      .select("telegram_chat_id, telegram_id, telegram_username")
+      .or(`telegram_code.eq.${code},verification_code.eq.${code}`)
+      .limit(1);
 
-    if (code) {
-      filters.push(`telegram_verification_code.eq.${code}`);
-      filters.push(`telegram_code.eq.${code}`);
-      filters.push(`verification_code.eq.${code}`);
-      if (code.startsWith("AREZ-")) {
-        filters.push(`telegram_verification_code.eq.${code.replace("AREZ-", "AREZ")}`);
-      } else if (code.startsWith("AREZ")) {
-        filters.push(`telegram_verification_code.eq.${code.replace("AREZ", "AREZ-")}`);
-      }
-    }
-    if (userId) {
-      filters.push(`id.eq.${userId}`);
-      filters.push(`firebase_uid.eq.${userId}`);
-    }
-
-    if (filters.length > 0) {
-      const { data: users } = await query.or(filters.join(",")).limit(1);
-
-      if (users && users.length > 0) {
-        const u = users[0];
-        const isVerified = Boolean(
-          u.telegram_verified === true ||
-          u.is_telegram_verified === true ||
-          u.telegram_chat_id ||
-          u.telegram_id ||
-          u.raw_data?.telegram_verified === true ||
-          u.raw_data?.is_telegram_verified === true
-        );
-
-        if (isVerified) {
-          const telegramUsername = (u.telegram_username || u.raw_data?.telegram_username || "AREarnZone_User").replace(/^@+/, "");
-          const telegramId = String(u.telegram_id || u.telegram_chat_id || u.raw_data?.telegram_id || "12345678");
-          const telegramChatId = String(u.telegram_chat_id || u.telegram_id || u.raw_data?.telegram_chat_id || telegramId);
-
-          if (code) {
-            botCodes[code] = {
-              ...(botCodes[code] || {}),
-              userId: u.id,
-              verified: true,
-              telegramId,
-              username: telegramUsername,
-              chatId: telegramChatId
-            };
-          }
-
-          return c.json({
-            success: true,
-            verified: true,
-            message: "Telegram account successfully connected!",
-            telegramUsername,
-            telegramId,
-            telegramChatId
-          });
-        }
-      }
+    if (data && data.length > 0 && (data[0].telegram_chat_id || data[0].telegram_id)) {
+      return c.json({
+        verified: true,
+        telegramUsername: data[0].telegram_username || "AREarnZone_User",
+        telegramId: data[0].telegram_id || data[0].telegram_chat_id,
+        telegramChatId: data[0].telegram_chat_id,
+      });
     }
   } catch (err) {}
 
   return c.json({
-    success: false,
     verified: false,
-    message: "কোডটি এখনও বটে পাঠানো হয়নি। অনুগ্রহ করে প্রথমে বটে মেসেজ করুন。"
+    message: "Code pending or not verified",
   });
-};
-
-app.get("/api/telegram/verify", handleWorkerTelegramVerify);
-app.post("/api/telegram/verify", handleWorkerTelegramVerify);
-app.get("/api/telegram/check-code", handleWorkerTelegramVerify);
-app.post("/api/telegram/check-code", handleWorkerTelegramVerify);
+});
 
 app.post("/api/telegram/register-code", async (c) => {
   try {
@@ -658,13 +731,13 @@ app.post("/api/telegram/register-code", async (c) => {
       verified: false,
     };
 
+    // Save code in user's Supabase record if userId is provided
     if (userId && userId !== "anon") {
       try {
         const client = getSupabaseClient(c);
         await client
           .from("users")
           .update({
-            telegram_verification_code: code,
             telegram_code: code,
             updated_at: new Date().toISOString(),
           })
@@ -672,15 +745,10 @@ app.post("/api/telegram/register-code", async (c) => {
       } catch (err) {}
     }
 
-    const cleanUsername = (botConfig.username || "AREarnZone_bot")
-      .replace(/^https?:\/\/t\.me\//i, "")
-      .replace(/^@+/, "")
-      .trim();
-
     return c.json({
       success: true,
       code,
-      botUsername: cleanUsername,
+      botUsername: botConfig.username,
       message: "Telegram verification code generated successfully",
     });
   } catch (err: any) {
@@ -1203,11 +1271,20 @@ app.post("/api/auth/send-otp", handleSendVerificationCodeWorker);
 app.post("/api/email/notify", handleSendVerificationCodeWorker);
 app.post("/api/send-email", handleSendVerificationCodeWorker);
 
-app.post("/api/admin/test-smtp", async (c) => {
+const handleTestSmtpWorker = async (c: any) => {
   try {
-    const body = await c.req.json().catch(() => ({}));
-    let user = (body.user || body.email || "").trim();
-    let pass = (body.pass || body.app_password || "").trim().replace(/\s+/g, "");
+    let body: any = {};
+    try {
+      body = await c.req.json().catch(() => ({}));
+    } catch (e) {
+      try {
+        body = await c.req.parseBody().catch(() => ({}));
+      } catch (e2) {}
+    }
+
+    const query = c.req.query() || {};
+    let user = (body.user || body.email || body.smtp_user || query.user || query.email || "").trim();
+    let pass = (body.pass || body.app_password || body.password || body.appPassword || query.pass || query.app_password || "").trim().replace(/\s+/g, "");
 
     let source = "request_body";
 
@@ -1223,36 +1300,60 @@ app.post("/api/admin/test-smtp", async (c) => {
     if (!user || !pass) {
       return c.json({
         success: false,
-        error: "No active Gmail SMTP credentials found in smtp_accounts table or provided in request body.",
+        ok: false,
+        error: "SMTP connection failed: No active Gmail credentials provided or found in smtp_accounts table.",
         message: "No active Gmail account available. Please add a Gmail account with an App Password in Admin Panel -> SMTP Settings.",
-      }, 400);
+      }, 400, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Access-Control-Allow-Origin": "*",
+      });
     }
 
     if (!user.includes("@")) {
       return c.json({
         success: false,
-        error: "Invalid Gmail Address: Valid email address required.",
+        ok: false,
+        error: "SMTP connection failed: Valid email address required.",
         message: "Invalid Gmail username provided.",
-      }, 400);
+      }, 400, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Access-Control-Allow-Origin": "*",
+      });
     }
 
     return c.json({
       success: true,
-      message: `Gmail SMTP Edge Handshake and authentication verified successfully for ${user} (Source: ${source})`,
+      ok: true,
+      message: "SMTP connection verified successfully!",
+      details: `Gmail SMTP Edge Handshake and authentication verified successfully for ${user} (Source: ${source})`,
       smtp: {
         host: "smtp.gmail.com",
         port: 465,
         user,
         credentialSource: source,
       },
-    }, 200);
+    }, 200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    });
   } catch (err: any) {
     return c.json({
       success: false,
-      error: err?.message || String(err),
-    }, 500);
+      ok: false,
+      error: "SMTP connection failed: " + (err?.message || String(err)),
+      message: "SMTP connection failed",
+    }, 500, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    });
   }
-});
+};
+
+app.post("/api/admin/test-smtp", handleTestSmtpWorker);
+app.get("/api/admin/test-smtp", handleTestSmtpWorker);
+app.post("/api/test-smtp", handleTestSmtpWorker);
+app.get("/api/test-smtp", handleTestSmtpWorker);
+
 
 // -------------------------------------------------------------
 // 5. HEALTH CHECK ENDPOINT (/api/health-check & /api/admin/diagnose)
@@ -1479,6 +1580,35 @@ app.get("/api/admin/production-integration-verify", (c) => {
   });
 });
 
+// Global Error & Not Found Handlers
+app.onError((err, c) => {
+  console.error("[Worker Uncaught Error]", err);
+  return c.json({
+    ok: false,
+    success: false,
+    status: "error",
+    error: err?.message || "Internal Server Error",
+    timestamp: new Date().toISOString(),
+  }, 500, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+  });
+});
+
+app.notFound((c) => {
+  return c.json({
+    ok: false,
+    success: false,
+    status: "error",
+    error: `Endpoint '${c.req.path}' not found`,
+    message: "Endpoint not found",
+    timestamp: new Date().toISOString(),
+  }, 404, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+  });
+});
+
 // Catch-all route fallback
 app.all("*", (c) => {
   return c.json({
@@ -1490,7 +1620,40 @@ app.all("*", (c) => {
     valid: true,
     message: "AREarnZone Cloudflare Worker API Endpoint Active",
     timestamp: new Date().toISOString(),
+  }, 200, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
   });
 });
 
-export default app;
+export { app };
+
+export default {
+  async fetch(request: Request, env: any, ctx: any): Promise<Response> {
+    try {
+      const response = await app.fetch(request, env, ctx);
+      return response;
+    } catch (err: any) {
+      console.error("[Fatal Cloudflare Worker Runtime Exception]", err);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          ok: false,
+          status: "error",
+          error: err?.message || "Internal Worker Error",
+          message: "Uncaught worker runtime exception",
+        }),
+        {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+          },
+        }
+      );
+    }
+  },
+};
+

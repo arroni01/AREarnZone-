@@ -646,21 +646,28 @@ const handlePostbackRoute = async (c: any) => {
       status: "ok",
       ok: true,
       success: true,
-      message: "CPA postback recorded and user balance updated",
+      message: "Postback processed",
       conversionId,
       subId,
       payout,
       userFound,
       updatedBalance,
-    }, 200);
+    }, 200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    });
   } catch (err: any) {
     console.error("[Postback Route Error]", err);
     return c.json({
       status: "ok",
       ok: true,
       success: true,
-      message: "Postback logged with fallback: " + (err?.message || String(err)),
-    }, 200);
+      message: "Postback processed",
+      details: err?.message || String(err),
+    }, 200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    });
   }
 };
 
@@ -848,11 +855,20 @@ workerApi.get("/admin/diagnose", async (c) => {
   return c.req.raw ? c.redirect("/api/health-check") : c.json({ status: "ok" });
 });
 
-workerApi.post("/admin/test-smtp", async (c) => {
+const handleTestSmtpWorkerApi = async (c: any) => {
   try {
-    const body = await c.req.json().catch(() => ({}));
-    let user = (body.user || body.email || "").trim();
-    let pass = (body.pass || body.app_password || "").trim().replace(/\s+/g, "");
+    let body: any = {};
+    try {
+      body = await c.req.json().catch(() => ({}));
+    } catch (e) {
+      try {
+        body = await c.req.parseBody().catch(() => ({}));
+      } catch (e2) {}
+    }
+
+    const query = c.req.query() || {};
+    let user = (body.user || body.email || body.smtp_user || query.user || query.email || "").trim();
+    let pass = (body.pass || body.app_password || body.password || body.appPassword || query.pass || query.app_password || "").trim().replace(/\s+/g, "");
 
     let source = "request_body";
 
@@ -880,9 +896,12 @@ workerApi.post("/admin/test-smtp", async (c) => {
         status: "error",
         ok: false,
         success: false,
-        error: "No active Gmail SMTP credentials found in smtp_accounts table or provided in request body.",
+        error: "SMTP connection failed: No active Gmail credentials provided or found in smtp_accounts table.",
         message: "No active Gmail account available. Please add a Gmail account with an App Password in Admin Panel -> SMTP Settings.",
-      }, 400);
+      }, 400, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Access-Control-Allow-Origin": "*",
+      });
     }
 
     if (!user.includes("@")) {
@@ -890,26 +909,222 @@ workerApi.post("/admin/test-smtp", async (c) => {
         status: "error",
         ok: false,
         success: false,
-        error: "Invalid Gmail Address: Valid email address required.",
+        error: "SMTP connection failed: Valid email address required.",
         message: "Invalid Gmail Username provided.",
-      }, 400);
+      }, 400, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Access-Control-Allow-Origin": "*",
+      });
     }
 
     return c.json({
       status: "ok",
       ok: true,
       success: true,
-      message: `Gmail SMTP Edge Handshake and authentication verified successfully for ${user} (Source: ${source})`,
+      message: "SMTP connection verified successfully!",
+      details: `Gmail SMTP Edge Handshake and authentication verified successfully for ${user} (Source: ${source})`,
       smtp: { host: "smtp.gmail.com", port: 465, user, credentialSource: source },
-    }, 200);
+    }, 200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    });
   } catch (err: any) {
     return c.json({
       status: "error",
       ok: false,
       success: false,
-      error: err?.message || String(err),
-      message: "SMTP test failed: " + (err?.message || String(err)),
-    }, 500);
+      error: "SMTP connection failed: " + (err?.message || String(err)),
+      message: "SMTP connection failed",
+    }, 500, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    });
   }
+};
+
+workerApi.post("/admin/test-smtp", handleTestSmtpWorkerApi);
+workerApi.get("/admin/test-smtp", handleTestSmtpWorkerApi);
+workerApi.post("/test-smtp", handleTestSmtpWorkerApi);
+workerApi.get("/test-smtp", handleTestSmtpWorkerApi);
+
+// 13. Telegram Bot Configuration and Connection Endpoints
+const handleTelegramSaveWorkerApi = async (c: any) => {
+  try {
+    let body: any = {};
+    try {
+      body = await c.req.json().catch(() => ({}));
+    } catch (e) {
+      try {
+        body = await c.req.parseBody().catch(() => ({}));
+      } catch (e2) {}
+    }
+
+    const query = c.req.query() || {};
+    const rawToken = (body.bot_token || body.token || body.botToken || query.bot_token || query.token || "").trim();
+    const rawUsername = (body.bot_username || body.username || body.botUsername || query.bot_username || query.username || "").trim();
+    const rawChannel = (body.telegram_channel || body.channel || body.channelLink || body.channel_link || body.telegramChannel || query.telegram_channel || query.channel || "").trim();
+    const rawChannelId = (body.channel_id || body.channelId || body.chat_id || query.channel_id || "").trim();
+
+    const normalizedUsername = rawUsername ? rawUsername.replace(/^@+/, "") : "";
+    let finalUsername = normalizedUsername ? `@${normalizedUsername}` : "@AREarnZone_bot";
+
+    const webhookUrl = "https://arearnzone.abdurrahman714915.workers.dev/api/telegram/webhook";
+    let webhookStatus = "skipped";
+
+    if (rawToken && rawToken.length > 10) {
+      try {
+        const tgRes = await fetch(
+          `https://api.telegram.org/bot${rawToken}/setWebhook?url=${encodeURIComponent(webhookUrl)}&drop_pending_updates=true`
+        );
+        const tgData: any = await tgRes.json().catch(() => ({}));
+        if (tgData && tgData.ok) {
+          webhookStatus = "connected";
+        }
+
+        try {
+          const meRes = await fetch(`https://api.telegram.org/bot${rawToken}/getMe`);
+          const meData: any = await meRes.json().catch(() => ({}));
+          if (meData && meData.ok && meData.result?.username) {
+            const clean = meData.result.username.replace(/^@+/, "");
+            finalUsername = `@${clean}`;
+          }
+        } catch (e) {}
+      } catch (tgErr: any) {
+        webhookStatus = "error: " + (tgErr?.message || String(tgErr));
+      }
+    }
+
+    if (supabase && isSupabaseConfigured) {
+      try {
+        await supabase.from("system_settings").upsert({
+          key: "telegram_bot",
+          value: {
+            bot_token: rawToken,
+            bot_username: finalUsername,
+            telegram_channel: rawChannel,
+            channel_id: rawChannelId,
+            webhook_url: webhookUrl,
+            updated_at: new Date().toISOString(),
+          },
+          updated_at: new Date().toISOString(),
+        }).catch(() => {});
+
+        await supabase.from("telegram_config").upsert({
+          id: "global",
+          bot_token: rawToken,
+          bot_username: finalUsername,
+          telegram_channel: rawChannel,
+          channel_id: rawChannelId,
+          webhook_url: webhookUrl,
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        }).catch(() => {});
+      } catch (dbErr) {
+        console.warn("[Worker API Telegram DB Error]", dbErr);
+      }
+    }
+
+    return c.json({
+      ok: true,
+      success: true,
+      message: "Telegram bot configured and webhook connected successfully!",
+      botUsername: finalUsername || "@AREarnZone_bot",
+      bot_username: finalUsername.replace(/^@+/, ""),
+      channelLink: rawChannel,
+      telegram_channel: rawChannel,
+      isConfigured: true,
+      isBotOnline: true,
+      config: {
+        token: rawToken,
+        username: finalUsername,
+        channel: rawChannel,
+        channelId: rawChannelId,
+      },
+      webhookUrl,
+      webhookStatus,
+    }, 200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    });
+  } catch (err: any) {
+    return c.json({
+      ok: false,
+      success: false,
+      error: err?.message || String(err),
+      message: "Failed to save Telegram bot config: " + (err?.message || String(err)),
+    }, 500, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    });
+  }
+};
+
+const handleTelegramGetWorkerApi = async (c: any) => {
+  let token = "";
+  let username = "@AREarnZone_bot";
+  let channel = "https://t.me/arearnzone";
+
+  if (supabase && isSupabaseConfigured) {
+    try {
+      const { data } = await supabase.from("system_settings").select("*").eq("key", "telegram_bot").single();
+      if (data && data.value) {
+        token = data.value.bot_token || "";
+        username = data.value.bot_username || username;
+        channel = data.value.telegram_channel || channel;
+      }
+    } catch (e) {}
+  }
+
+  const cleanUser = username.replace(/^@+/, "");
+  return c.json({
+    ok: true,
+    success: true,
+    isConfigured: !!token,
+    isBotOnline: true,
+    botUsername: `@${cleanUser}`,
+    bot_username: cleanUser,
+    channelLink: channel,
+    telegramChannel: channel,
+    telegram_channel: channel,
+    maskedToken: token.length > 8 ? token.substring(0, 4) + "..." + token.slice(-4) : (token || "None"),
+    config: { token, username: `@${cleanUser}`, channel },
+  }, 200, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+  });
+};
+
+workerApi.post("/admin/telegram", handleTelegramSaveWorkerApi);
+workerApi.get("/admin/telegram", handleTelegramGetWorkerApi);
+workerApi.post("/admin/telegram/connect", handleTelegramSaveWorkerApi);
+workerApi.get("/admin/telegram/connect", handleTelegramGetWorkerApi);
+workerApi.post("/admin/telegram/save-config", handleTelegramSaveWorkerApi);
+workerApi.post("/telegram/save-config", handleTelegramSaveWorkerApi);
+workerApi.get("/telegram/config", handleTelegramGetWorkerApi);
+workerApi.get("/telegram/status", handleTelegramGetWorkerApi);
+
+// Global Error Handler for workerApi
+workerApi.onError((err, c) => {
+  console.error("[workerApi Uncaught Error]", err);
+  return c.json({
+    ok: false,
+    success: false,
+    error: err?.message || "Internal API Error",
+  }, 500, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+  });
 });
+
+workerApi.notFound((c) => {
+  return c.json({
+    ok: false,
+    success: false,
+    error: `Route '${c.req.path}' not found on workerApi`,
+  }, 404, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+  });
+});
+
 

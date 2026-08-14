@@ -31,7 +31,7 @@ import {
   GatewayLog,
 } from "../types";
 import { ICONS } from "../constants";
-import { getApiUrl } from "../src/utils/apiConfig";
+import { getApiUrl, safeParseJsonResponse } from "../src/utils/apiConfig";
 import MonitorDashboard from "./MonitorDashboard";
 import CPAControlCenter from "./CPAControlCenter";
 import RegressionTestDashboard from "./RegressionTestDashboard";
@@ -1336,7 +1336,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   const [tgBotToken, setTgBotToken] = useState("");
-  const [tgBotUsername, setTgBotUsername] = useState("AREarnZone_bot");
+  const [tgBotUsername, setTgBotUsername] = useState("@AREarnZone_bot");
   const [tgChannelLink, setTgChannelLink] = useState("https://t.me/arearnzone");
   const [isSavingTgBot, setIsSavingTgBot] = useState(false);
   const [tgBotStatusMsg, setTgBotStatusMsg] = useState<string | null>(null);
@@ -1596,7 +1596,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     try {
       const res = await fetch(getApiUrl("/api/admin/email-counters"));
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeParseJsonResponse<any>(res);
         setEmailCounters(data);
 
         // Ephemeral recovery for Multi-SMTP rotation pool
@@ -1629,7 +1629,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 // Trigger a refresh after background restoration
                 const refreshedRes = await fetch(getApiUrl("/api/admin/email-counters"));
                 if (refreshedRes.ok) {
-                  const refreshedData = await refreshedRes.json();
+                  const refreshedData = await safeParseJsonResponse<any>(refreshedRes);
                   setEmailCounters(refreshedData);
                 }
               }
@@ -1659,7 +1659,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       const res = await fetch(getApiUrl("/api/admin/email-counters/reset"), {
         method: "POST",
       });
-      const data = await res.json().catch(() => ({}));
+      const data = await safeParseJsonResponse<any>(res);
       if (res.ok || data.success) {
         notify("SMTP daily quotas and email counters manually reset!");
         fetchEmailCounters();
@@ -1676,7 +1676,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     try {
       const res = await fetch(getApiUrl("/api/telegram/config"));
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeParseJsonResponse<any>(res);
         setTgBotUsername(data.botUsername || "@AREarnZone_bot");
         setTgChannelLink(data.channelLink || "https://t.me/arearnzone");
         setTgBotIsOnline(!!data.isBotOnline);
@@ -1701,8 +1701,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 token: cachedBotToken,
+                bot_token: cachedBotToken,
                 username: cachedBotUsername,
+                bot_username: cachedBotUsername,
                 channel: cachedBotChannel,
+                telegram_channel: cachedBotChannel,
                 forceSave: true,
               }),
             });
@@ -1726,8 +1729,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     token: parsed.token,
+                    bot_token: parsed.token,
                     username: parsed.username || parsed.botUsername,
+                    bot_username: parsed.username || parsed.botUsername,
                     channel: parsed.channel || parsed.channelLink,
+                    telegram_channel: parsed.channel || parsed.channelLink,
                     forceSave: true,
                   }),
                 });
@@ -1779,12 +1785,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           token: tgBotToken,
+          bot_token: tgBotToken,
           username: tgBotUsername,
+          bot_username: tgBotUsername,
           channel: tgChannelLink,
+          telegram_channel: tgChannelLink,
           forceSave: force,
         }),
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse<any>(res);
       setIsSavingTgBot(false);
       if (res.ok) {
         setTgBotStatusOk(true);
@@ -1884,7 +1893,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           limit: smtpFormLimit,
         }),
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse<any>(res);
       if (res.ok) {
         notify("SMTP সফলভাবে যোগ/আপডেট করা হয়েছে!");
 
@@ -1937,7 +1946,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user: userEmail }),
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse<any>(res);
       if (res.ok) {
         notify("SMTP সফলভাবে মুছে ফেলা হয়েছে!");
 
@@ -1986,7 +1995,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           pass: typeof specificPass === "string" ? specificPass : undefined,
         }),
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse<any>(res);
       if (res.ok) {
         setSmtpDiagnosticOk(true);
         setSmtpDiagnosticMsg(data.message);
@@ -2029,7 +2038,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ appPassword: cleanupAppPassword }),
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse<any>(res);
       if (!res.ok) {
         notify(data.error || "পাসওয়ার্ড যাচাইকরণ ব্যর্থ হয়েছে।");
         return;

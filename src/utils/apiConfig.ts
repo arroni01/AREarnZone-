@@ -287,7 +287,19 @@ if (typeof window !== 'undefined' && typeof Response !== 'undefined' && Response
     try {
       const clone = this.clone();
       const text = await clone.text();
-      const trimmed = text.trim();
+      const trimmed = (text || '').trim();
+      if (!trimmed) {
+        return {
+          ok: false,
+          status: 'error',
+          success: false,
+          isConfigured: false,
+          isBotOnline: false,
+          valid: false,
+          message: 'Empty response from server',
+          error: 'EMPTY_RESPONSE'
+        };
+      }
       if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || trimmed.startsWith('<?xml')) {
         console.warn('[API Safety Guard] Prevented HTML parse crash. Returning error status.');
         return {
@@ -303,7 +315,15 @@ if (typeof window !== 'undefined' && typeof Response !== 'undefined' && Response
       }
       return JSON.parse(text);
     } catch (err) {
-      return originalJson.call(this).catch(() => ({
+      try {
+        const text = await this.text().catch(() => '');
+        const trimmed = (text || '').trim();
+        if (trimmed && !trimmed.startsWith('<')) {
+          return JSON.parse(trimmed);
+        }
+      } catch (fallbackErr) {}
+
+      return {
         ok: false,
         status: 'error',
         success: false,
@@ -312,7 +332,27 @@ if (typeof window !== 'undefined' && typeof Response !== 'undefined' && Response
         valid: false,
         message: 'Failed to parse JSON response',
         error: String(err)
-      }));
+      };
     }
   };
 }
+
+/**
+ * Safe JSON parser for arbitrary Response objects that never throws SyntaxError
+ */
+export const safeParseJsonResponse = async <T = any>(res: Response, fallback: any = {}): Promise<T> => {
+  try {
+    const text = await res.text().catch(() => '');
+    const trimmed = (text || '').trim();
+    if (!trimmed) {
+      return { ok: false, success: false, error: 'Empty response from server', ...fallback } as T;
+    }
+    if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) {
+      return { ok: false, success: false, error: 'Received HTML response instead of JSON', ...fallback } as T;
+    }
+    return JSON.parse(trimmed);
+  } catch (err: any) {
+    return { ok: false, success: false, error: err?.message || 'Failed to parse JSON', ...fallback } as T;
+  }
+};
+

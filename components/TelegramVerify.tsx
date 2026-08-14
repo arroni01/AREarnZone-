@@ -177,12 +177,10 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
       })
       .then(data => {
         const configured = !!data.isConfigured;
-        const rawName = data.botUsername || data.username || 'AREarnZone_bot';
-        const cleanName = rawName.replace(/^https?:\/\/t\.me\//i, '').replace(/^@+/, '').trim();
         setBotConfig({
           isConfigured: configured,
-          botUsername: cleanName,
-          channelLink: (data.channelLink || 'https://t.me/arearnzone').replace(/t\.me\/@/i, 't.me/'),
+          botUsername: data.botUsername || '@AREarnZone_bot',
+          channelLink: data.channelLink || 'https://t.me/arearnzone',
           isBotOnline: data.isBotOnline !== false
         });
       })
@@ -190,7 +188,7 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
         console.warn("Error loading bot config, using defaults:", err);
         setBotConfig({
           isConfigured: false,
-          botUsername: 'AREarnZone_bot',
+          botUsername: '@AREarnZone_bot',
           channelLink: 'https://t.me/arearnzone',
           isBotOnline: true
         });
@@ -199,33 +197,23 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
 
   // Poll/Verify the verification code inside bot database
   const handleVerifyBotConnection = () => {
-    if (!verificationCode && !user.id) return;
+    if (!verificationCode) return;
     setIsCheckingBot(true);
-    fetch(getApiUrl(`/api/telegram/verify?code=${verificationCode}&userId=${user.id}`))
+    fetch(getApiUrl(`/api/telegram/check-code?code=${verificationCode}`))
       .then(r => {
         if (!r.ok) throw new Error("HTTP error " + r.status);
         return r.json();
       })
       .then(data => {
         setIsCheckingBot(false);
-        if (data.success || data.verified) {
-          const cleanUser = (data.telegramUsername || 'AREarnZone_User').replace(/^@+/, '');
-          const cleanId = String(data.telegramId || '12345678');
-          setTelegramUsername(cleanUser);
-          setTelegramId(cleanId);
+        if (data.success) {
+          setTelegramUsername(data.telegramUsername);
+          setTelegramId(data.telegramId);
           if (data.telegramPhone) {
             setTelegramPhone(data.telegramPhone);
           }
           setIsBotConnected(true);
-          onUpdateUser({
-            ...user,
-            telegramUsername: cleanUser,
-            telegramId: cleanId,
-            telegramChatId: data.telegramChatId || cleanId,
-            isTelegramVerified: true,
-            telegramVerificationCode: verificationCode
-          });
-          notify(data.message || "Telegram account successfully connected! ✅");
+          notify("সফলভাবে টেলিগ্রাম বটের সাথে কানেক্ট করা হয়েছে! ✅");
         } else {
           notify(data.message || "কোডটি এখনও বটে পাঠানো হয়নি। অনুগ্রহ করে প্রথমে বটে মেসেজ করুন।");
         }
@@ -263,16 +251,8 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
       });
   };
 
-  const cleanBotUsername = (botConfig.botUsername || 'AREarnZone_bot')
-    .replace(/^https?:\/\/t\.me\//i, '')
-    .replace(/^@+/, '')
-    .trim();
-
-  const BOT_USERNAME = cleanBotUsername;
-  const CHANNEL_LINK = (botConfig.channelLink || 'https://t.me/arearnzone').replace(/t\.me\/@/i, 't.me/').trim();
-  const botDeepLink = verificationCode 
-    ? `https://t.me/${cleanBotUsername}?start=${verificationCode}` 
-    : `https://t.me/${cleanBotUsername}`;
+  const BOT_USERNAME = botConfig.botUsername;
+  const CHANNEL_LINK = botConfig.channelLink;
 
   // Check if there is already a pending request
   const pendingRequest = telegramRequests.find(req => req.userId === user.id && req.status === 'pending');
@@ -807,27 +787,18 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
                       </div>
                     )}
 
-                    <div className="bg-blue-500/10 p-5 rounded-2xl border border-blue-500/20 space-y-3">
+                    <div className="bg-blue-500/10 p-5 rounded-2xl border border-blue-500/20 space-y-2">
                       <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest block">নির্দেশাবলী এবং নিয়ম (অটোমেটিক ভেরিফিকেশন):</span>
                       <p className="text-[10.5px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed uppercase tracking-tight">
-                        ১। প্রথমে নিচের <span className="text-blue-500 font-bold">"Open Bot & Start Verification"</span> বাটনে ক্লিক করুন অথবা <a href={botDeepLink} target="_blank" rel="noreferrer" className="text-blue-500 font-black underline">https://t.me/{cleanBotUsername}?start={verificationCode}</a> লিংকে গিয়ে বটে <span className="text-blue-500 font-bold">START</span> চাপুন।
+                        ১। প্রথমে নিচের সিকিউরিটি কোডটি কপি করে আমাদের অফিশিয়াল টেলিগ্রাম বটের <a href={`https://t.me/${BOT_USERNAME.replace('@', '')}`} target="_blank" rel="noreferrer" className="text-blue-500 font-black underline">{BOT_USERNAME}</a> চ্যাটে পাঠিয়ে দিন।
                       </p>
                       <p className="text-[10.5px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed uppercase tracking-tight">
-                        ২। কোডটি বটে পাঠানোর পর নিচের <span className="text-blue-500 font-bold">"VERIFY BOT CONNECTION"</span> বাটনে ক্লিক করুন। এটি আপনার আইডি ও ইউজারনেম অটো-ফিল করে দিবে।
+                        ২। কোডটি বটে পাঠানোর পর নিচের <span className="text-blue-500 font-bold">"Verify Bot Connection"</span> বাটনে ক্লিক করুন। এটি আপনার আইডি ও ইউজারনেম অটো-ফিল করে দিবে।
                       </p>
                       <p className="text-[10.5px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed uppercase tracking-tight text-amber-500 font-bold">
                         ৩। বটের সাথে সফলভাবে লিঙ্ক হওয়ার পর, বটের কনফার্মেশন মেসেজের একটি স্ক্রিনশট নিচে আপলোড করে প্রুফ হিসেবে সাবমিট করুন।
                       </p>
                     </div>
-
-                    <a
-                      href={botDeepLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="w-full bg-[#24A1DE] hover:bg-[#1f8ebd] text-white font-black py-4 px-6 rounded-2xl shadow-lg shadow-blue-500/20 hover:scale-[1.01] active:scale-95 transition-all text-xs uppercase tracking-wider flex items-center justify-center gap-2.5 text-center decoration-none no-underline cursor-pointer"
-                    >
-                      <ICONS.Telegram size={20} /> Open Bot & Start Verification (@{cleanBotUsername})
-                    </a>
 
                     <div className="flex flex-col sm:flex-row items-stretch gap-3">
                       <div className="flex-1 flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-950 rounded-2xl border-2 border-blue-500/20">
