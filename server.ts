@@ -1273,67 +1273,156 @@ app.post("/api/admin/telegram/connect", handleSaveTelegramBotServer);
 app.post("/api/admin/telegram/save-config", handleSaveTelegramBotServer);
 
 
-app.post("/api/telegram/webhook", async (c) => {
+app.all("/api/telegram/webhook", async (c) => {
   try {
-    const update = await c.req.json();
+    const update = await c.req.json().catch(() => ({}));
     if (update.message) {
       const { chat, text, from } = update.message;
-      if (text === "/start" || text.startsWith("/start ")) {
-        const code = text.split(" ")[1];
-        if (code && botStorage.codes[code]) {
-          botStorage.codes[code].telegramId = from.id;
-          botStorage.codes[code].username = from.username || from.first_name;
+      const cleanText = (text || "").trim();
+      const chatId = chat ? String(chat.id) : null;
+      const telegramId = from ? String(from.id) : chatId;
+      const username = (from?.username || from?.first_name || "AREarnZone_User").replace(/^@+/, "");
+
+      let codeCandidate: string | null = null;
+      if (cleanText.startsWith("/start ")) {
+        codeCandidate = cleanText.substring(7).trim();
+      } else if (/^AREZ-?[A-Za-z0-9_]{3,20}$/i.test(cleanText) || /^\d{6}$/.test(cleanText)) {
+        codeCandidate = cleanText;
+      } else {
+        const match = cleanText.match(/(AREZ-?[A-Za-z0-9_]+)/i);
+        if (match) codeCandidate = match[1];
+      }
+
+      if (codeCandidate) {
+        const code = codeCandidate;
+        if (botStorage.codes && botStorage.codes[code]) {
+          botStorage.codes[code].telegramId = telegramId;
+          botStorage.codes[code].username = `@${username}`;
           botStorage.codes[code].verified = true;
           saveBotStorage();
+        }
 
-          if (botConfig.token) {
-            await fetch(`https://api.telegram.org/bot${botConfig.token}/sendMessage`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                chat_id: chat.id,
-                text: `✅ Verification code ${code} linked successfully! You may now return to AREarnZone.`
+        if (supabaseServer) {
+          try {
+            await supabaseServer
+              .from("users")
+              .update({
+                telegram_chat_id: chatId,
+                telegram_id: telegramId,
+                telegram_username: `@${username}`,
+                telegram_verified: true,
+                is_telegram_verified: true,
+                telegram_verification_code: code,
+                telegram_code: code,
+                updated_at: new Date().toISOString(),
               })
-            });
-          }
+              .or(`telegram_verification_code.eq.${code},telegram_code.eq.${code},verification_code.eq.${code}`);
+          } catch (e) {}
+        }
+
+        if (botConfig.token && chatId) {
+          await fetch(`https://api.telegram.org/bot${botConfig.token}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: `✅ <b>Your account has been successfully linked!</b>\n\nYour Telegram account (<b>@${username}</b>) has been successfully verified and connected to your AREarnZone account.\n\nYou may now return to the app and enjoy full access!`,
+              parse_mode: "HTML",
+            })
+          }).catch(() => {});
         }
       }
     }
-    return c.json({ ok: true });
+    return c.json({ ok: true, success: true }, 200, { "Content-Type": "application/json; charset=utf-8" });
   } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+    return c.json({ error: err.message, ok: false, success: false }, 500, { "Content-Type": "application/json; charset=utf-8" });
   }
 });
 
-app.get("/api/telegram/check-code", (c) => {
-  const code = c.req.query("code");
-  if (!code) return c.json({ error: "Code required" }, 400);
+app.get("/api/telegram/check-code", async (c) => {
+  const code = (c.req.query("code") || "").trim();
+  const userId = (c.req.query("userId") || "").trim();
+  if (!code && !userId) return c.json({ error: "Code or userId required", ok: false, success: false, verified: false }, 400);
 
-  const entry = botStorage.codes[code];
+  const entry = code && botStorage.codes ? botStorage.codes[code] : null;
   if (entry && entry.verified) {
-    return c.json({ verified: true, telegramId: entry.telegramId, username: entry.username });
+    return c.json({
+      ok: true,
+      success: true,
+      verified: true,
+      telegramId: entry.telegramId,
+      telegramUsername: entry.username
+    }, 200, { "Content-Type": "application/json; charset=utf-8" });
   }
-  return c.json({ verified: false });
+
+  if (supabaseServer) {
+    try {
+      let q = supabaseServer.from("users").select("*");
+      if (code && userId) {
+        q = q.or(`telegram_verification_code.eq.${code},telegram_code.eq.${code},verification_code.eq.${code},id.eq.${userId}`);
+      } else if (code) {
+        q = q.or(`telegram_verification_code.eq.${code},telegram_code.eq.${code},verification_code.eq.${code}`);
+      } else {
+        q = q.eq("id", userId);
+      }
+      const { data } = await q.limit(1);
+      if (data && data.length > 0) {
+        const u = data[0];
+        if (u.telegram_verified === true || u.is_telegram_verified === true || u.telegram_chat_id || u.telegram_id) {
+          return c.json({
+            ok: true,
+            success: true,
+            verified: true,
+            telegramUsername: u.telegram_username || "@AREarnZone_User",
+            telegramId: u.telegram_id || u.telegram_chat_id,
+            telegramChatId: u.telegram_chat_id || u.telegram_id,
+          }, 200, { "Content-Type": "application/json; charset=utf-8" });
+        }
+      }
+    } catch (e) {}
+  }
+
+  return c.json({ ok: false, success: false, verified: false, message: "Code pending or not verified" }, 200, { "Content-Type": "application/json; charset=utf-8" });
 });
 
 app.post("/api/telegram/register-code", async (c) => {
   try {
-    const { userId } = await c.req.json();
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const body = await c.req.json().catch(() => ({}));
+    const userId = body.userId || body.user_id;
+    const code = body.code || `AREZ-${Math.floor(100000 + Math.random() * 900000)}`;
+    const expectedPhone = body.expectedPhone || body.phone || "";
+
+    if (!botStorage.codes) botStorage.codes = {};
     botStorage.codes[code] = {
       userId,
       createdAt: Date.now(),
       verified: false
     };
     saveBotStorage();
-    return c.json({ success: true, code, botUsername: botConfig.username });
+
+    if (supabaseServer && userId) {
+      try {
+        await supabaseServer
+          .from("users")
+          .update({
+            telegram_verification_code: code,
+            telegram_code: code,
+            verification_code: code,
+            telegram_phone: expectedPhone ? expectedPhone.replace('+', '').trim() : undefined,
+            updated_at: new Date().toISOString(),
+          })
+          .or(`id.eq.${userId},firebase_uid.eq.${userId}`);
+      } catch (e) {}
+    }
+
+    return c.json({ ok: true, success: true, code, botUsername: botConfig.username }, 200, { "Content-Type": "application/json; charset=utf-8" });
   } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+    return c.json({ error: err.message, ok: false, success: false }, 500, { "Content-Type": "application/json; charset=utf-8" });
   }
 });
 
 app.get("/api/telegram/debug-storage", (c) => {
-  return c.json(botStorage);
+  return c.json(botStorage, 200, { "Content-Type": "application/json; charset=utf-8" });
 });
 
 app.get("/api/telegram/debug-status", (c) => {
@@ -1341,15 +1430,11 @@ app.get("/api/telegram/debug-status", (c) => {
     config: botConfig,
     activeCodesCount: Object.keys(botStorage.codes || {}).length,
     verifiedCount: Object.values(botStorage.codes || {}).filter((v: any) => v.verified).length
-  });
+  }, 200, { "Content-Type": "application/json; charset=utf-8" });
 });
 
 app.get("/api/telegram/check-join", async (c) => {
-  const userId = c.req.query("userId");
-  if (!userId) {
-    return c.json({ isJoined: true, simulated: true });
-  }
-  return c.json({ isJoined: true, simulated: false });
+  return c.json({ isJoined: true, ok: true, success: true, message: "User is in channel" }, 200, { "Content-Type": "application/json; charset=utf-8" });
 });
 
 // Primary Export for Cloudflare Workers

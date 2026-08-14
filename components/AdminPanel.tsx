@@ -9749,10 +9749,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                       getApiUrl(`/api/telegram/check-join?userId=${req.telegramId}`),
                                     )
                                       .then(async (r) => {
-                                        const data = await r.json();
-                                        if (!r.ok)
+                                        const data = await safeParseJsonResponse<any>(r);
+                                        if (!r.ok || !data?.isJoined)
                                           throw new Error(
-                                            data.error || "Not joined",
+                                            data?.error || "Not joined",
                                           );
                                         return data;
                                       })
@@ -9991,10 +9991,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                   getApiUrl(`/api/telegram/check-join?userId=${req.telegramId}`),
                                 )
                                   .then(async (r) => {
-                                    const data = await r.json();
-                                    if (!r.ok)
+                                    const data = await safeParseJsonResponse<any>(r);
+                                    if (!r.ok || !data?.isJoined)
                                       throw new Error(
-                                        data.error || "Not joined",
+                                        data?.error || "Not joined",
                                       );
                                     return data;
                                   })

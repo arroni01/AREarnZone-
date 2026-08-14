@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { User, TelegramVerificationRequest, Task, TaskSubmission } from '../types';
 import { ICONS } from '../constants';
 import { compressImage } from '../utils/imageCompressor';
-import { getApiUrl } from '../src/utils/apiConfig';
+import { getApiUrl, safeParseJsonResponse } from '../src/utils/apiConfig';
 
 export const isTelegramTask = (task: Task): boolean => {
   if (!task) return false;
@@ -171,16 +171,14 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
   // Load backend Telegram configuration dynamically
   React.useEffect(() => {
     fetch(getApiUrl('/api/telegram/config'))
-      .then(r => {
-        if (!r.ok) throw new Error("HTTP error " + r.status);
-        return r.json();
-      })
+      .then(r => safeParseJsonResponse<any>(r))
       .then(data => {
+        if (!data) return;
         const configured = !!data.isConfigured;
         setBotConfig({
           isConfigured: configured,
           botUsername: data.botUsername || '@AREarnZone_bot',
-          channelLink: data.channelLink || 'https://t.me/arearnzone',
+          channelLink: data.channelLink || data.telegramChannel || 'https://t.me/arearnzone',
           isBotOnline: data.isBotOnline !== false
         });
       })
@@ -196,69 +194,76 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
   }, []);
 
   // Poll/Verify the verification code inside bot database
-  const handleVerifyBotConnection = () => {
+  const handleVerifyBotConnection = async () => {
     if (!verificationCode) return;
     setIsCheckingBot(true);
-    fetch(getApiUrl(`/api/telegram/check-code?code=${verificationCode}`))
-      .then(r => {
-        if (!r.ok) throw new Error("HTTP error " + r.status);
-        return r.json();
-      })
-      .then(data => {
-        setIsCheckingBot(false);
-        if (data.success) {
-          setTelegramUsername(data.telegramUsername);
-          setTelegramId(data.telegramId);
-          if (data.telegramPhone) {
-            setTelegramPhone(data.telegramPhone);
-          }
-          setIsBotConnected(true);
-          notify("সফলভাবে টেলিগ্রাম বটের সাথে কানেক্ট করা হয়েছে! ✅");
-        } else {
-          notify(data.message || "কোডটি এখনও বটে পাঠানো হয়নি। অনুগ্রহ করে প্রথমে বটে মেসেজ করুন।");
+    try {
+      const res = await fetch(getApiUrl(`/api/telegram/check-code?code=${encodeURIComponent(verificationCode)}&userId=${encodeURIComponent(user.id)}`));
+      const data = await safeParseJsonResponse<any>(res);
+      setIsCheckingBot(false);
+      if (data && (data.success || data.ok || data.verified)) {
+        const username = data.telegramUsername || data.username || '';
+        const id = data.telegramId || data.telegramChatId || data.id || '';
+        setTelegramUsername(username);
+        setTelegramId(id);
+        if (data.telegramPhone) {
+          setTelegramPhone(data.telegramPhone);
         }
-      })
-      .catch(err => {
-        setIsCheckingBot(false);
-        console.error("Error verifying bot connection:", err);
-        notify("সংযোগ পরীক্ষা করতে ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।");
-      });
+        setIsBotConnected(true);
+        notify("সফলভাবে টেলিগ্রাম বটের সাথে কানেক্ট করা হয়েছে! ✅");
+        onUpdateUser({
+          ...user,
+          telegramUsername: username,
+          telegramId: id,
+          isTelegramVerified: true,
+          hasJoinedTelegramChannel: isChannelJoined,
+        });
+      } else {
+        notify(data?.message || "কোডটি এখনও বটে পাঠানো হয়নি। অনুগ্রহ করে প্রথমে বটে মেসেজ করুন।");
+      }
+    } catch (err) {
+      setIsCheckingBot(false);
+      console.error("Error verifying bot connection:", err);
+      notify("সংযোগ পরীক্ষা করতে ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।");
+    }
   };
 
-  const handleVerifyChannelMembership = () => {
+  const handleVerifyChannelMembership = async () => {
     if (!telegramId) {
       notify("প্রথমে টেলিগ্রাম বটের সাথে কানেক্ট করুন!");
       return;
     }
     setIsCheckingChannel(true);
-    fetch(getApiUrl(`/api/telegram/check-join?userId=${telegramId}`))
-      .then(async r => {
-        const data = await r.json();
-        if (!r.ok) {
-          throw new Error(data.error || "চ্যানেলে জয়েন করা হয়নি");
-        }
-        return data;
-      })
-      .then(data => {
-        setIsCheckingChannel(false);
+    try {
+      const res = await fetch(getApiUrl(`/api/telegram/check-join?userId=${encodeURIComponent(telegramId)}`));
+      const data = await safeParseJsonResponse<any>(res);
+      setIsCheckingChannel(false);
+      if (data && (data.isJoined || data.success || data.ok)) {
         setIsChannelJoined(true);
         notify(data.message || "অভিনন্দন! আপনি আমাদের টেলিগ্রাম চ্যানেলে জয়েন করেছেন। ✅");
-      })
-      .catch(err => {
-        setIsCheckingChannel(false);
-        console.error("Error verifying channel status:", err);
-        notify(err.message || "আপনি এখনও আমাদের টেলিগ্রাম চ্যানেলে জয়েন করেননি! ❌");
-      });
+        onUpdateUser({
+          ...user,
+          hasJoinedTelegramChannel: true
+        });
+      } else {
+        notify(data?.message || "আপনি এখনও আমাদের টেলিগ্রাম চ্যানেলে জয়েন করেননি! ❌");
+      }
+    } catch (err: any) {
+      setIsCheckingChannel(false);
+      console.error("Error verifying channel status:", err);
+      notify(err?.message || "আপনি এখনও আমাদের টেলিগ্রাম চ্যানেলে জয়েন করেননি! ❌");
+    }
   };
 
   const BOT_USERNAME = botConfig.botUsername;
+  const cleanBotUsername = (botConfig.botUsername || 'AREarnZone_bot').replace(/^@+/, '').trim();
   const CHANNEL_LINK = botConfig.channelLink;
 
   // Check if there is already a pending request
   const pendingRequest = telegramRequests.find(req => req.userId === user.id && req.status === 'pending');
   const rejectedRequest = telegramRequests.find(req => req.userId === user.id && req.status === 'rejected');
 
-  const handleGenerateCode = () => {
+  const handleGenerateCode = async () => {
     if (!telegramPhone || telegramPhone.trim().length < 8) {
       notify("অনুগ্রহ করে আপনার সঠিক টেলিগ্রাম মোবাইল নম্বরটি আগে প্রদান করুন! ❌");
       return;
@@ -267,40 +272,40 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
     const code = 'AREZ-' + Math.floor(100000 + Math.random() * 900000);
     setVerificationCode(code);
 
-    fetch(getApiUrl('/api/telegram/register-code'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        code,
-        expectedPhone: telegramPhone
-      })
-    })
-      .then(res => {
-        if (!res.ok) throw new Error("Failed to register code on server.");
-        return res.json();
-      })
-      .then(() => {
-        setIsBotConnected(false);
-        setTelegramUsername('');
-        setTelegramId('');
-        setIsChannelJoined(false);
-        onUpdateUser({ 
-          ...user, 
-          telegramVerificationCode: code,
-          telegramPhone: telegramPhone.replace('+', '').trim(),
-          telegramUsername: '',
-          telegramId: '',
-          hasJoinedTelegramChannel: false
-        });
-        setStep(2);
-        notify("টোকেন সফলভাবে তৈরি হয়েছে এবং সার্ভারে সেভ করা হয়েছে! ✅");
-      })
-      .catch(err => {
-        console.error(err);
-        notify("সার্ভারে কোড রেজিস্টার করতে ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।");
+    try {
+      const res = await fetch(getApiUrl('/api/telegram/register-code'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          code,
+          userId: user.id,
+          expectedPhone: telegramPhone.replace('+', '').trim()
+        })
       });
+      await safeParseJsonResponse(res);
+
+      setIsBotConnected(false);
+      setTelegramUsername('');
+      setTelegramId('');
+      setIsChannelJoined(false);
+      onUpdateUser({ 
+        ...user, 
+        telegramVerificationCode: code,
+        telegramPhone: telegramPhone.replace('+', '').trim(),
+        telegramUsername: '',
+        telegramId: '',
+        hasJoinedTelegramChannel: false
+      });
+      setStep(2);
+      notify("টোকেন সফলভাবে তৈরি হয়েছে এবং সার্ভারে সেভ করা হয়েছে! ✅");
+    } catch (err) {
+      console.error(err);
+      setIsBotConnected(false);
+      setStep(2);
+      notify("টোকেন তৈরি হয়েছে। বটে মেসেজ পাঠিয়ে যাচাই করুন!");
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -787,10 +792,10 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
                       </div>
                     )}
 
-                    <div className="bg-blue-500/10 p-5 rounded-2xl border border-blue-500/20 space-y-2">
+                    <div className="bg-blue-500/10 p-5 rounded-2xl border border-blue-500/20 space-y-3">
                       <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest block">নির্দেশাবলী এবং নিয়ম (অটোমেটিক ভেরিফিকেশন):</span>
                       <p className="text-[10.5px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed uppercase tracking-tight">
-                        ১। প্রথমে নিচের সিকিউরিটি কোডটি কপি করে আমাদের অফিশিয়াল টেলিগ্রাম বটের <a href={`https://t.me/${BOT_USERNAME.replace('@', '')}`} target="_blank" rel="noreferrer" className="text-blue-500 font-black underline">{BOT_USERNAME}</a> চ্যাটে পাঠিয়ে দিন।
+                        ১। নিচে থাকা <span className="text-blue-500 font-bold">"Open Bot & Link Code"</span> বাটনে ক্লিক করে সরাসরি বটে যান অথবা কোডটি কপি করে <a href={`https://t.me/${cleanBotUsername}?start=${verificationCode}`} target="_blank" rel="noreferrer" className="text-blue-500 font-black underline">@{cleanBotUsername}</a> বটে পাঠান।
                       </p>
                       <p className="text-[10.5px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed uppercase tracking-tight">
                         ২। কোডটি বটে পাঠানোর পর নিচের <span className="text-blue-500 font-bold">"Verify Bot Connection"</span> বাটনে ক্লিক করুন। এটি আপনার আইডি ও ইউজারনেম অটো-ফিল করে দিবে।
@@ -798,6 +803,17 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
                       <p className="text-[10.5px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed uppercase tracking-tight text-amber-500 font-bold">
                         ৩। বটের সাথে সফলভাবে লিঙ্ক হওয়ার পর, বটের কনফার্মেশন মেসেজের একটি স্ক্রিনশট নিচে আপলোড করে প্রুফ হিসেবে সাবমিট করুন।
                       </p>
+
+                      <div className="pt-1">
+                        <a
+                          href={`https://t.me/${cleanBotUsername}?start=${verificationCode}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="w-full bg-[#24A1DE] hover:bg-[#1f8fc6] text-white font-black py-3 px-5 rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md hover:scale-[1.01] active:scale-95 transition-all"
+                        >
+                          <ICONS.Telegram size={16} /> Open Bot & Link Code ({cleanBotUsername})
+                        </a>
+                      </div>
                     </div>
 
                     <div className="flex flex-col sm:flex-row items-stretch gap-3">
