@@ -1260,9 +1260,9 @@ const handleTelegramWebhook = async (c: any) => {
                 console.warn("[Telegram Webhook] Error updating user in Supabase:", err);
               }
 
-              replyText = `✅ Success! Your AREarnZone account has been linked successfully. You can now return to the website.`;
+              replyText = `✅ Success! Your account has been linked successfully. Return to the website to continue.`;
             } else if (botCodesRegistry[code]) {
-              replyText = `✅ Success! Your AREarnZone account has been linked successfully. You can now return to the website.`;
+              replyText = `✅ Success! Your account has been linked successfully. Return to the website to continue.`;
             }
           }
         }

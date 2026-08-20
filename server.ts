@@ -21,6 +21,26 @@ app.use("*", cors({
   allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
 }));
 
+// API Health Check Endpoints
+app.get("/api/health", (c) => {
+  return c.json({
+    status: "ok",
+    service: "AREarnZone Server API Backend",
+    timestamp: new Date().toISOString(),
+    version: "1.0.0",
+    cors: "enabled",
+  }, 200, { "Content-Type": "application/json; charset=utf-8" });
+});
+
+app.get("/api/health-check", (c) => {
+  return c.json({
+    status: "healthy",
+    ok: true,
+    success: true,
+    timestamp: new Date().toISOString(),
+  }, 200, { "Content-Type": "application/json; charset=utf-8" });
+});
+
 // Serves web manifest
 const serveManifest = (c: any) => {
   return c.json({
@@ -830,7 +850,7 @@ const handleTestSmtpServer = async (c: any) => {
     return c.json({
       ok: true,
       success: true,
-      message: "SMTP connection verified successfully!",
+      message: "Action completed successfully",
       details: `Gmail SMTP Connection & Authentication Successful for ${user} (Source: ${source})`,
       smtp: {
         host: "smtp.gmail.com",
@@ -1326,7 +1346,7 @@ app.all("/api/telegram/webhook", async (c) => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               chat_id: chatId,
-              text: `✅ Success! Your AREarnZone account has been linked successfully. You can now return to the website.`,
+              text: `✅ Success! Your account has been linked successfully. Return to the website to continue.`,
             })
           }).catch(() => {});
         }

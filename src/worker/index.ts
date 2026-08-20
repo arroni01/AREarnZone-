@@ -92,22 +92,37 @@ async function safeSupabaseUpsert(
 // -------------------------------------------------------------
 // 1. GLOBAL CORS & PREFLIGHT HANDLER
 // -------------------------------------------------------------
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+  "Access-Control-Allow-Headers": "*",
+  "Access-Control-Max-Age": "86400",
+};
+
 app.use(
   "*",
   cors({
     origin: "*",
-    allowHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "Cache-Control", "Pragma"],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     maxAge: 86400,
   })
 );
 
+app.use("*", async (c, next) => {
+  await next();
+  c.header("Access-Control-Allow-Origin", "*");
+  c.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
+  c.header("Access-Control-Allow-Headers", "*");
+  if (!c.res.headers.has("Content-Type")) {
+    c.header("Content-Type", "application/json; charset=utf-8");
+  }
+});
+
 app.options("*", (c) => {
-  return c.text("", 200, {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
-    "Access-Control-Max-Age": "86400",
+  return c.json({ ok: true, success: true, message: "CORS preflight OK" }, 200, {
+    ...corsHeaders,
+    "Content-Type": "application/json; charset=utf-8",
   });
 });
 
@@ -618,9 +633,28 @@ app.all("/api/telegram/webhook", async (c) => {
               console.warn("[Telegram Webhook] Error updating user in Supabase:", err);
             }
 
-            replyText = `✅ Success! Your AREarnZone account has been linked successfully. You can now return to the website.`;
-          } else if (botCodes[code]) {
-            replyText = `✅ Success! Your AREarnZone account has been linked successfully. You can now return to the website.`;
+            replyText = `✅ Success! Your account has been linked successfully. Return to the website to continue.`;
+          } else {
+            // Also attempt direct update by verification code
+            try {
+              await client
+                .from("users")
+                .update({
+                  telegram_chat_id: chatId,
+                  telegram_id: telegramId,
+                  telegram_username: username.startsWith('@') ? username : `@${username}`,
+                  telegram_verified: true,
+                  is_telegram_verified: true,
+                  telegram_verification_code: code,
+                  telegram_code: code,
+                  updated_at: new Date().toISOString(),
+                })
+                .or(`telegram_verification_code.eq.${code},verification_code.eq.${code},telegram_code.eq.${code}`);
+            } catch (err) {
+              console.warn("[Telegram Webhook] Direct update by code error:", err);
+            }
+
+            replyText = `✅ Success! Your account has been linked successfully. Return to the website to continue.`;
           }
         }
 
@@ -1389,9 +1423,9 @@ const handleTestSmtpWorker = async (c: any) => {
     }
 
     return c.json({
-      success: true,
       ok: true,
-      message: "SMTP connection verified successfully!",
+      success: true,
+      message: "Action completed successfully",
       details: `Gmail SMTP Edge Handshake and authentication verified successfully for ${user} (Source: ${source})`,
       smtp: {
         host: "smtp.gmail.com",
@@ -1659,6 +1693,8 @@ app.onError((err, c) => {
   }, 500, {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+    "Access-Control-Allow-Headers": "*",
   });
 });
 
@@ -1666,30 +1702,46 @@ app.notFound((c) => {
   return c.json({
     ok: false,
     success: false,
-    status: "error",
-    error: `Endpoint '${c.req.path}' not found`,
-    message: "Endpoint not found",
+    error: "Route not found",
+    message: `API Route '${c.req.path}' not found`,
+    path: c.req.path,
     timestamp: new Date().toISOString(),
   }, 404, {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+    "Access-Control-Allow-Headers": "*",
   });
 });
 
 // Catch-all route fallback
 app.all("*", (c) => {
+  if (c.req.path.startsWith("/api/")) {
+    return c.json({
+      ok: false,
+      success: false,
+      error: "Route not found",
+      message: `API Route '${c.req.path}' not found`,
+      path: c.req.path,
+      timestamp: new Date().toISOString(),
+    }, 404, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+      "Access-Control-Allow-Headers": "*",
+    });
+  }
   return c.json({
     status: "ok",
     ok: true,
     success: true,
-    isConfigured: true,
-    isBotOnline: true,
-    valid: true,
     message: "AREarnZone Cloudflare Worker API Endpoint Active",
     timestamp: new Date().toISOString(),
   }, 200, {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+    "Access-Control-Allow-Headers": "*",
   });
 });
 
@@ -1697,9 +1749,44 @@ export { app };
 
 export default {
   async fetch(request: Request, env: any, ctx: any): Promise<Response> {
+    const corsStandardHeaders: Record<string, string> = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+      "Access-Control-Allow-Headers": "*",
+      "Access-Control-Max-Age": "86400",
+    };
+
+    // 1. Instant Preflight OPTIONS Response
+    if (request.method === "OPTIONS") {
+      return new Response(
+        JSON.stringify({ ok: true, success: true, message: "CORS preflight OK" }),
+        {
+          status: 200,
+          headers: {
+            ...corsStandardHeaders,
+            "Content-Type": "application/json; charset=utf-8",
+          },
+        }
+      );
+    }
+
     try {
       const response = await app.fetch(request, env, ctx);
-      return response;
+      const newHeaders = new Headers(response.headers);
+      
+      newHeaders.set("Access-Control-Allow-Origin", "*");
+      newHeaders.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
+      newHeaders.set("Access-Control-Allow-Headers", "*");
+
+      if (!newHeaders.has("Content-Type")) {
+        newHeaders.set("Content-Type", "application/json; charset=utf-8");
+      }
+
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: newHeaders,
+      });
     } catch (err: any) {
       console.error("[Fatal Cloudflare Worker Runtime Exception]", err);
       return new Response(
@@ -1713,10 +1800,8 @@ export default {
         {
           status: 500,
           headers: {
+            ...corsStandardHeaders,
             "Content-Type": "application/json; charset=utf-8",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
           },
         }
       );

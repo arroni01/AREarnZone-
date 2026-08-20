@@ -22,11 +22,32 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   public static getDerivedStateFromError(error: Error): State {
+    const msg = (error?.message || String(error || '')).toLowerCase();
+    if (
+      msg.includes('database is closing') ||
+      msg.includes('database is closing/hidden') ||
+      msg.includes('connection is closing') ||
+      msg.includes('idbdatabase') ||
+      msg.includes('resizeobserver loop')
+    ) {
+      return { hasError: false, error: null, errorInfo: null };
+    }
     // Update state so the next render will show the fallback UI.
     return { hasError: true, error, errorInfo: null };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    const msg = (error?.message || String(error || '')).toLowerCase();
+    if (
+      msg.includes('database is closing') ||
+      msg.includes('database is closing/hidden') ||
+      msg.includes('connection is closing') ||
+      msg.includes('idbdatabase') ||
+      msg.includes('resizeobserver loop')
+    ) {
+      console.warn('[ErrorBoundary] Ignored benign lifecycle database event:', error?.message);
+      return;
+    }
     console.error("Uncaught error captured by AREARNZONE ErrorBoundary:", error, errorInfo);
     trackError(error, `ErrorBoundary Component Stack: ${errorInfo.componentStack || ''}`, 'runtime');
     this.setState({

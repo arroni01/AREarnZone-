@@ -42,6 +42,18 @@ export function trackError(
 ): void {
   try {
     const message = error instanceof Error ? error.message : String(error || 'Unknown Error');
+    const lowerMsg = message.toLowerCase();
+
+    // Ignore benign database closing/hidden and tab lifecycle events
+    if (
+      lowerMsg.includes('database is closing') ||
+      lowerMsg.includes('database is closing/hidden') ||
+      lowerMsg.includes('connection is closing') ||
+      lowerMsg.includes('idbdatabase') ||
+      lowerMsg.includes('resizeobserver loop')
+    ) {
+      return;
+    }
 
     const logs = getErrors();
     const newLog: SystemErrorLog = {
@@ -83,6 +95,16 @@ export function initErrorTracker(): void {
   window.addEventListener('error', (event) => {
     // Avoid double logging if the error was handled or not genuine
     if (!event.error && !event.message) return;
+    const msg = (event.message || event.error?.message || '').toLowerCase();
+    if (
+      msg.includes('database is closing') ||
+      msg.includes('database is closing/hidden') ||
+      msg.includes('connection is closing') ||
+      msg.includes('idbdatabase') ||
+      msg.includes('resizeobserver loop')
+    ) {
+      return;
+    }
     trackError(
       event.error || new Error(event.message || 'Unknown Global Error'),
       'Global Window Error',
@@ -93,7 +115,16 @@ export function initErrorTracker(): void {
   // 2. Intercept Unhandled Rejections
   window.addEventListener('unhandledrejection', (event) => {
     const reason = event.reason;
-    // Don't log if it's firebase-related fetch errors that are handled lazily, but let's log major rejections
+    const msg = String(reason?.message || reason || '').toLowerCase();
+    if (
+      msg.includes('database is closing') ||
+      msg.includes('database is closing/hidden') ||
+      msg.includes('connection is closing') ||
+      msg.includes('idbdatabase') ||
+      msg.includes('resizeobserver loop')
+    ) {
+      return;
+    }
     trackError(
       reason || new Error('Unhandled Promise Rejection'),
       'Global Unhandled Rejection',
