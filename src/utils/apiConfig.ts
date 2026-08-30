@@ -4,53 +4,53 @@ export const DEFAULT_WORKER_URL = 'https://arearnzone.abdurrahman714915.workers.
 
 /**
  * Returns the base URL for API requests.
- * Uses environment variable VITE_API_BASE_URL, window overrides, cached settings,
- * or defaults to window origin / live Cloudflare Worker URL.
+ * Uses current browser origin / relative path first for the fullstack server,
+ * or user overrides, or fallback to Cloudflare Worker.
  */
 export const getApiBaseUrl = (): string => {
-  let envUrl: string | undefined;
+  // 1. In browser, prioritize current origin
+  if (typeof window !== 'undefined' && window.location && window.location.origin) {
+    try {
+      const cached = localStorage.getItem('arez_api_base_url');
+      if (cached && cached.trim() && (cached.startsWith('http://') || cached.startsWith('https://'))) {
+        return cached.trim().replace(/\/+$/, '');
+      }
+    } catch (e) {}
 
-  // 1. Environment Variable (from Vite build/runtime)
-  try {
-    envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
-    if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
-      return envUrl.trim().replace(/\/+$/, '');
-    }
-  } catch (e) {
-    // Ignore if import.meta is not available
+    return window.location.origin;
   }
 
   // 2. Window object override (dynamic client configuration)
   if (typeof window !== 'undefined' && (window as any).VITE_API_BASE_URL) {
-    const winUrl = String((window as any).VITE_API_BASE_URL).trim().replace(/\/+$/, '');
+    let winUrl = String((window as any).VITE_API_BASE_URL).trim();
     if (winUrl) {
-      return winUrl;
-    }
-  }
-
-  // 3. LocalStorage override (for user-configured Cloudflare Worker endpoint)
-  if (typeof window !== 'undefined') {
-    try {
-      const cached = localStorage.getItem('arez_api_base_url');
-      if (cached && cached.trim()) {
-        return cached.trim().replace(/\/+$/, '');
+      if (!winUrl.startsWith('http://') && !winUrl.startsWith('https://')) {
+        winUrl = `https://${winUrl}`;
       }
-    } catch (e) {
-      // Ignore localStorage restriction
+      return winUrl.replace(/\/+$/, '');
     }
   }
 
-  // 4. Default to current browser origin if available, or fallback to Cloudflare Worker URL
-  if (typeof window !== 'undefined' && window.location.origin) {
-    return window.location.origin;
+  // 3. Environment Variable (from Vite build/runtime)
+  try {
+    const envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
+    if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
+      let formatted = envUrl.trim();
+      if (!formatted.startsWith('http://') && !formatted.startsWith('https://')) {
+        formatted = `https://${formatted}`;
+      }
+      return formatted.replace(/\/+$/, '');
+    }
+  } catch (e) {
+    // Ignore if import.meta is not available
   }
 
   return DEFAULT_WORKER_URL;
 };
 
 /**
- * Constructs a full API URL for a given endpoint route.
- * Automatically prepends the configured Cloudflare Worker API base URL.
+ * Constructs a full or relative API URL for a given endpoint route.
+ * In browser context, returns clean relative path /api/... for same-origin backend.
  */
 export const getApiUrl = (endpoint: string): string => {
   if (!endpoint) return getApiBaseUrl();
@@ -61,6 +61,19 @@ export const getApiUrl = (endpoint: string): string => {
   }
 
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+
+  // In browser, return relative URL directly so it always hits the active host
+  if (typeof window !== 'undefined' && window.location && window.location.origin) {
+    try {
+      const customOverride = localStorage.getItem('arez_api_base_url');
+      if (customOverride && (customOverride.startsWith('http://') || customOverride.startsWith('https://'))) {
+        return `${customOverride.trim().replace(/\/+$/, '')}${cleanEndpoint}`;
+      }
+    } catch (e) {}
+
+    return cleanEndpoint;
+  }
+
   const baseUrl = getApiBaseUrl();
   return `${baseUrl}${cleanEndpoint}`;
 };

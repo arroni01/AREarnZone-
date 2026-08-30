@@ -379,6 +379,37 @@ export interface SocialLink {
   isActive: boolean;
 }
 
+export interface TelegramTaskIdentity {
+  telegramId: string;
+  telegramUsername?: string;
+  telegramPhone?: string;
+  telegramName?: string;
+  totalCompleted: number;
+  totalPending: number;
+  totalApproved: number;
+  totalRejected: number;
+  totalLimit?: number; // Quota ceiling e.g. 100
+  lastLinkedUserId?: string;
+  historicalUserIds?: string[];
+  firstVerifiedAt?: string;
+  lastVerifiedAt?: string;
+  lastUnlinkedAt?: string;
+  completedTaskIds?: string[];
+  historicalSubmissionsCount?: number;
+}
+
+export type TelegramVerificationStatus = 
+  | 'NOT_VERIFIED' 
+  | 'PENDING' 
+  | 'VERIFIED' 
+  | 'REJECTED' 
+  | 'DELETED' 
+  | 'pending' 
+  | 'verification_submitted' 
+  | 'approved' 
+  | 'rejected' 
+  | 'deleted';
+
 export interface TelegramVerificationRequest {
   id: string;
   userId: string;
@@ -386,11 +417,45 @@ export interface TelegramVerificationRequest {
   userEmail: string;
   telegramUsername: string;
   telegramId: string;
+  telegramName?: string;
   telegramPhone?: string;
   verificationCode: string;
-  screenshot?: string; // Bio or bot verification code submission screenshot
-  status: 'pending' | 'approved' | 'rejected';
+  screenshot?: string; // Bio or bot verification code submission screenshot / R2 URL
+  proofUrls?: string[];
+  proofUrl?: string;
+  status: 'pending' | 'verification_submitted' | 'approved' | 'rejected' | 'deleted' | 'VERIFIED' | 'PENDING' | 'REJECTED' | 'DELETED';
   submittedAt: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  deletedAt?: string;
+  deletedBy?: string;
+  adminId?: string;
+  adminName?: string;
+  rejectionReason?: string;
+  botVerifiedData?: {
+    telegramId?: string;
+    username?: string;
+    fullName?: string;
+    phone?: string;
+    isContactAuthentic?: boolean;
+    isChannelJoined?: boolean;
+    verifiedAt?: string | number;
+  };
+  appSubmittedData?: {
+    telegramId?: string;
+    username?: string;
+    phone?: string;
+    code?: string;
+    telegramName?: string;
+  };
+  mismatchDetails?: string[];
+  isServerMatched?: boolean;
+  restoredHistory?: {
+    totalCompleted: number;
+    totalLimit?: number;
+    previousUserIds?: string[];
+    isRestored: boolean;
+  };
 }
 
 export interface AdViewLog {

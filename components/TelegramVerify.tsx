@@ -218,6 +218,41 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
     }
   }, [user.id, user.isTelegramVerified]);
 
+  // Real-time polling when waiting for user to send code and share phone number with the bot
+  React.useEffect(() => {
+    if (step !== 2 || isBotConnected || !verificationCode) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const queryParam = `code=${encodeURIComponent(verificationCode)}&userId=${encodeURIComponent(user.id)}`;
+        const res = await fetch(getApiUrl(`/api/telegram/check-code?${queryParam}`));
+        const data = await safeParseJsonResponse<any>(res);
+        if (data && data.verified === true) {
+          const rawUsername = data.telegramUsername || data.username || user.telegramUsername || 'AREarnZone_User';
+          const username = rawUsername.replace(/^@+/, '');
+          const id = data.telegramId || data.telegramChatId || data.id || user.telegramId || '12345678';
+          setTelegramUsername(username);
+          setTelegramId(id);
+          if (data.telegramPhone) {
+            setTelegramPhone(data.telegramPhone);
+          }
+          setIsBotConnected(true);
+          setIsChannelJoined(true);
+          notify("টেলিগ্রাম বটে আপনার ভেরিফিকেশন সফলভাবে সম্পন্ন হয়েছে! ✅");
+          onUpdateUser({
+            ...user,
+            telegramUsername: username,
+            telegramId: id,
+            isTelegramVerified: true,
+            hasJoinedTelegramChannel: true,
+          });
+        }
+      } catch (e) {}
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [step, isBotConnected, verificationCode, user.id]);
+
   // Poll/Verify the verification code inside bot database
   const handleVerifyBotConnection = async () => {
     setIsCheckingBot(true);
@@ -228,7 +263,7 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
       const res = await fetch(getApiUrl(`/api/telegram/check-code?${queryParam}`));
       const data = await safeParseJsonResponse<any>(res);
       setIsCheckingBot(false);
-      if (data && (data.success || data.ok || data.verified)) {
+      if (data && data.verified === true) {
         const rawUsername = data.telegramUsername || data.username || user.telegramUsername || 'AREarnZone_User';
         const username = rawUsername.replace(/^@+/, '');
         const id = data.telegramId || data.telegramChatId || data.id || user.telegramId || '12345678';
@@ -354,119 +389,123 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
     }
   };
 
-  const handleSubmitRequest = (e: React.FormEvent) => {
+  const handleSubmitRequest = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const formattedUsername = telegramUsername.trim().toLowerCase();
     const cleanUsername = formattedUsername.startsWith('@') ? formattedUsername : '@' + formattedUsername;
     const cleanId = telegramId.trim();
 
-    if (!cleanUsername || cleanUsername === '@') {
+    if (!cleanUsername || cleanUsername === '@' || cleanUsername.length < 3) {
       notify("অনুগ্রহ করে একটি সঠিক টেলিগ্রাম ইউজারনেম দিন (e.g. @username)।");
       return;
     }
 
-    if (!/^\d+$/.test(cleanId)) {
-      notify("টেলিগ্রাম ইউজার আইডি অবশ্যই সংখ্যা হতে হবে।");
-      return;
-    }
-
-    if (botConfig.isConfigured && !isManualInput && !isBotConnected) {
-      notify("টেলিগ্রাম ভেরিফিকেশন সফল করতে প্রথমে বটের সাথে কানেক্ট করুন এবং 'Verify Bot Connection' সম্পন্ন করুন! ❌");
-      return;
-    }
-
-    if (botConfig.isConfigured && !isManualInput && !isChannelJoined) {
-      notify("টেলিগ্রাম ভেরিফিকেশন সফল করতে প্রথমে আমাদের চ্যানেলে জয়েন করে 'Verify Channel Join' বাটনে ক্লিক করতে হবে! ❌");
+    if (!cleanId || !/^\d+$/.test(cleanId)) {
+      notify("টেলিগ্রাম ইউজার আইডি অবশ্যই সঠিক সংখ্যা (Digits) হতে হবে (যেমন: 123456789)।");
       return;
     }
 
     if (!screenshot) {
-      notify("অনুগ্রহ করে আপনার স্ক্রিনশট প্রুফ আপলোড করুন।");
+      notify("অনুগ্রহ করে আপনার টেলিগ্রাম প্রোফাইল বা বট চ্যাটের স্ক্রিনশট প্রুফ আপলোড করুন।");
       return;
     }
 
     setIsSubmitting(true);
 
-    // Dynamic 1:1 Duplicate check across users database
-    const allUsers: User[] = JSON.parse(localStorage.getItem('arez_users') || '[]');
-    
-    const isUsernameTaken = allUsers.some(u => 
-      u.isTelegramVerified && u.telegramUsername?.trim().toLowerCase() === cleanUsername && u.id !== user.id
-    );
-    const isIdTaken = allUsers.some(u => 
-      u.isTelegramVerified && u.telegramId?.trim() === cleanId && u.id !== user.id
-    );
-    const isPhoneTaken = telegramPhone ? allUsers.some(u => 
-      u.isTelegramVerified && u.telegramPhone?.trim() === telegramPhone.trim() && u.id !== user.id
-    ) : false;
+    try {
+      // 1. Upload proof screenshot to Cloudflare R2 / Server storage endpoint
+      let uploadedProofUrl = screenshot;
+      if (screenshot.startsWith('data:image')) {
+        try {
+          const uploadRes = await fetch(getApiUrl('/api/upload'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: screenshot })
+          });
+          const uploadData = await uploadRes.json().catch(() => ({}));
+          if (uploadData && uploadData.url) {
+            uploadedProofUrl = uploadData.url;
+          }
+        } catch (err) {
+          console.warn("Proof upload to server fallback:", err);
+        }
+      }
 
-    // Duplicate check across existing approved/pending telegram requests
-    const isReqUsernameTaken = telegramRequests.some(req => 
-      req.telegramUsername.trim().toLowerCase() === cleanUsername && 
-      req.userId !== user.id && 
-      req.status !== 'rejected'
-    );
-    const isReqIdTaken = telegramRequests.some(req => 
-      req.telegramId.trim() === cleanId && 
-      req.userId !== user.id && 
-      req.status !== 'rejected'
-    );
-    const isReqPhoneTaken = telegramPhone ? telegramRequests.some(req => 
-      req.telegramPhone?.trim() === telegramPhone.trim() && 
-      req.userId !== user.id && 
-      req.status !== 'rejected'
-    ) : false;
+      // 2. Strict Server-Side Submission & Matching Verification
+      const res = await fetch(getApiUrl('/api/telegram/submit-verification'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          userName: user.name,
+          userEmail: user.email,
+          code: verificationCode,
+          telegramId: cleanId,
+          telegramUsername: cleanUsername,
+          telegramPhone: telegramPhone || user.phone || '',
+          screenshot: uploadedProofUrl
+        })
+      });
 
-    if (isUsernameTaken || isReqUsernameTaken) {
-      notify("Error: এই টেলিগ্রাম ইউজারনেমটি ইতিমধ্যে অন্য একটি অ্যাকাউন্টে লিংক করা আছে!");
-      setIsSubmitting(false);
-      return;
-    }
+      const data = await safeParseJsonResponse(res);
 
-    if (isIdTaken || isReqIdTaken) {
-      notify("Error: এই টেলিগ্রাম আইডিটি ইতিমধ্যে অন্য একটি অ্যাকাউন্টে লিংক করা আছে!");
-      setIsSubmitting(false);
-      return;
-    }
+      if (!data) {
+        throw new Error("সার্ভার থেকে কোনো রেসপন্স পাওয়া যায়নি।");
+      }
 
-    if (isPhoneTaken || isReqPhoneTaken) {
-      notify("Error: এই টেলিগ্রাম ফোন নম্বরটি ইতিমধ্যে অন্য একটি অ্যাকাউন্টে লিংক করা আছে!");
-      setIsSubmitting(false);
-      return;
-    }
+      // Handle duplicate account linkage
+      if (data.error === "ALREADY_LINKED" || (data.status === "rejected" && data.message?.includes("already linked"))) {
+        notify("❌ Error: This Telegram account is already linked to another AREarnZone account.");
+        setIsSubmitting(false);
+        return;
+      }
 
-    // Submit request
-    setTimeout(() => {
-      const newRequest: TelegramVerificationRequest = {
+      // Handle data mismatch
+      if (!data.isServerMatched && data.mismatchDetails && data.mismatchDetails.length > 0) {
+        const reasons = data.mismatchDetails.join("\n• ");
+        notify(`⚠️ সার্ভার-সাইড যাচাইকরণে অমিল পাওয়া গেছে:\n• ${reasons}`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      const verifiedRecord = data.record || {
         id: 'TGR-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
         userId: user.id,
         userName: user.name,
         userEmail: user.email,
         telegramUsername: cleanUsername,
         telegramId: cleanId,
-        telegramPhone: telegramPhone,
+        telegramPhone: telegramPhone || user.phone || '',
         verificationCode: verificationCode,
-        screenshot: screenshot,
-        status: 'pending',
-        submittedAt: new Date().toLocaleString()
+        screenshot: uploadedProofUrl,
+        proofUrls: [uploadedProofUrl],
+        status: data.status || 'verification_submitted',
+        isServerMatched: data.isServerMatched ?? true,
+        submittedAt: new Date().toISOString()
       };
 
-      setTelegramRequests(prev => [newRequest, ...prev]);
-      
-      // Update local user's telegram fields but keep verified FALSE until approved
+      setTelegramRequests(prev => [verifiedRecord, ...prev.filter(r => r.userId !== user.id)]);
+
+      // Update local user's telegram fields
       onUpdateUser({
         ...user,
         telegramUsername: cleanUsername,
         telegramId: cleanId,
-        telegramPhone: telegramPhone,
+        telegramPhone: telegramPhone || user.phone || '',
+        telegramVerificationCode: verificationCode,
+        telegramVerificationStatus: verifiedRecord.status,
         hasJoinedTelegramChannel: true,
-        isTelegramVerified: false
+        isTelegramVerified: verifiedRecord.status === 'approved'
       });
 
       setIsSubmitting(false);
-      notify("ভেরিফিকেশন রিকোয়েস্ট সফলভাবে সাবমিট করা হয়েছে!");
-    }, 1500);
+      notify("✅ ভেরিফিকেশন রিকোয়েস্ট সফলভাবে সার্ভারে যাচাই ও সাবমিট হয়েছে! এডমিন দ্রুত রিভিউ করে এপ্রুভ করবেন।");
+    } catch (err: any) {
+      console.error("Submission error:", err);
+      setIsSubmitting(false);
+      notify(`ভেরিফিকেশন সাবমিট করতে সমস্যা হয়েছে: ${err.message || "Please try again"}`);
+    }
   };
 
   if (user.isTelegramVerified) {
@@ -829,12 +868,11 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
                         ১। নিচে থাকা <span className="text-blue-500 font-bold">"Open Bot & Link Code"</span> বাটনে ক্লিক করে সরাসরি বটে যান অথবা কোডটি কপি করে <a href={`https://t.me/${cleanBotUsername}?start=${verificationCode}`} target="_blank" rel="noreferrer" className="text-blue-500 font-black underline">@{cleanBotUsername}</a> বটে পাঠান।
                       </p>
                       <p className="text-[10.5px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed uppercase tracking-tight">
-                        ২। কোডটি বটে পাঠানোর পর নিচের <span className="text-blue-500 font-bold">"Verify Bot Connection"</span> বাটনে ক্লিক করুন। এটি আপনার আইডি ও ইউজারনেম অটো-ফিল করে দিবে।
+                        ২। বট কোডটি পাওয়ার পর <span className="text-emerald-500 font-bold">"📱 Share My Phone Number"</span> বাটন প্রদর্শিত হবে। ওই বাটনে ক্লিক করলে আপনার টেলিগ্রাম নম্বরটি বটে শেয়ার হয়ে যাবে।
                       </p>
-                      <p className="text-[10.5px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed uppercase tracking-tight text-amber-500 font-bold">
-                        ৩। বটের সাথে সফলভাবে লিঙ্ক হওয়ার পর, বটের কনফার্মেশন মেসেজের একটি স্ক্রিনশট নিচে আপলোড করে প্রুফ হিসেবে সাবমিট করুন।
+                      <p className="text-[10.5px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed uppercase tracking-tight text-blue-500 font-bold">
+                        ৩। নম্বর শেয়ার হওয়ার পর নিচের <span className="underline">"Verify Bot Connection"</span> বাটনে ক্লিক করুন। এটি স্বয়ংক্রিয়ভাবে আপনার অ্যাকাউন্ট লিংক ও ভেরিফাই সম্পন্ন করে দিবে।
                       </p>
-
                       <div className="pt-1">
                         <a
                           href={`https://t.me/${cleanBotUsername}?start=${verificationCode}`}
@@ -941,93 +979,68 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
                       onClick={() => {
                         setIsManualInput(!isManualInput);
                         if (!isManualInput) {
-                          notify("ম্যানুয়াল মোড সক্রিয় করা হয়েছে! আপনি এখন ইউজারনেম ও আইডি হাতে লিখতে পারবেন। ✍️");
+                          notify("ম্যানুয়াল মোড সক্রিয়! আপনি এখন ইউজারনেম ও আইডি এডিট করতে পারবেন। ✍️");
                         } else {
-                          notify("অটোমেটিক ভেরিফিকেশন মোড সক্রিয় করা হয়েছে। 🤖");
+                          notify("অটোমেটিক ভেরিফিকেশন মোড সক্রিয়। 🤖");
                         }
                       }}
-                      className="px-6 py-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/25 hover:border-amber-500/50 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                      className="px-6 py-3 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/25 hover:border-blue-500/50 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
                     >
-                      {isManualInput ? "🤖 অটোমেটিক ভেরিফিকেশনে ফিরে যান" : "⚠️ বটের সাথে কানেক্ট করতে সমস্যা হচ্ছে? ম্যানুয়ালি তথ্য দিন (Alternative)"}
+                      <ICONS.Edit size={14} />
+                      {isManualInput ? "🤖 অটোমেটিক ভেরিফিকেশন গাইড দেখুন" : "✍️ ম্যানুয়ালি তথ্য প্রদান / এডিট করুন (Manual Fill)"}
                     </button>
                   </div>
 
                   <form onSubmit={handleSubmitRequest} className="space-y-6">
-                    {isManualInput ? (
-                      <div className="bg-amber-500/10 border border-amber-500/20 text-amber-750 dark:text-amber-400 p-4 rounded-2xl text-xs font-bold leading-relaxed space-y-1 animate-in fade-in duration-300">
-                        <p className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                          <ICONS.Shield size={14} /> ম্যানুয়াল মোড সক্রিয় (Manual Entry Mode Active)
-                        </p>
-                        <p className="text-[11px] opacity-90 font-medium">
-                          অনুগ্রহ করে আপনার সঠিক টেলিগ্রাম ইউজারনেম এবং আইডি টাইপ করে দিন, এবং স্ক্রিনশট প্রুফ সাবমিট করুন। এডমিন আপনার দেওয়া তথ্য ম্যানুয়ালি মিলিয়ে এপ্রুভ করে দেবেন।
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="bg-blue-500/10 border border-blue-500/20 text-blue-750 dark:text-blue-400 p-4 rounded-2xl text-xs font-bold leading-relaxed space-y-1">
-                        <p className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                          <ICONS.Shield size={14} /> তথ্য স্বয়ংক্রিয়ভাবে লক করা (Automatic Fields Locked)
-                        </p>
-                        <p className="text-[11px] opacity-90 font-medium">
-                          নিরাপত্তা ও নির্ভুলতা নিশ্চিত করতে ম্যানুয়াল টাইপিং বন্ধ করা হয়েছে। উপরে বটের চ্যাটে কোড পাঠিয়ে ভেরিফাই করলে আপনার ইউজারনেম এবং আইডি স্বয়ংক্রিয়ভাবে সেট হয়ে যাবে।
-                        </p>
-                      </div>
-                    )}
+                    <div className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-4 rounded-2xl text-xs font-bold leading-relaxed space-y-1">
+                      <p className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-black uppercase text-[10px] tracking-wider">
+                        <ICONS.Shield size={14} /> আপনার টেলিগ্রাম তথ্য ও প্রুফ সাবমিট
+                      </p>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-300 font-medium">
+                        বটের মাধ্যমে ভেরিফাই করলে স্বয়ংক্রিয়ভাবে ফিল্ড পূরণ হবে, অথবা আপনি সরাসরি নিচে আপনার তথ্য লিখে স্ক্রিনশট আপলোড করে সাবমিট করতে পারেন।
+                      </p>
+                    </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 flex items-center gap-1">
-                          ১। ইউজারনেম (Username) {isManualInput ? <ICONS.Edit size={10} className="text-amber-500" /> : <ICONS.Lock size={10} className="text-slate-400" />}
+                          ১। ইউজারনেম (Username) <ICONS.Edit size={10} className="text-blue-500" />
                         </label>
                         <input 
                           type="text" 
                           required 
-                          readOnly={!isManualInput}
                           value={telegramUsername} 
                           onChange={e => setTelegramUsername(e.target.value)}
-                          placeholder={isManualInput ? "e.g. @username" : "Verify via Bot first 🤖"}
-                          className={`w-full border rounded-2xl py-4 px-6 font-bold outline-none text-xs transition-all ${
-                            isManualInput 
-                              ? 'bg-white dark:bg-slate-950 border-amber-500/30 text-slate-850 dark:text-white focus:border-amber-500'
-                              : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-white/5 text-slate-500 dark:text-slate-400 cursor-not-allowed select-all'
-                          }`}
+                          placeholder="e.g. @username"
+                          className="w-full border rounded-2xl py-4 px-6 font-bold outline-none text-xs transition-all bg-white dark:bg-slate-950 border-slate-200 dark:border-white/10 text-slate-850 dark:text-white focus:border-blue-500"
                         />
                       </div>
 
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 flex items-center gap-1">
-                          ২। ইউজার আইডি (User ID) {isManualInput ? <ICONS.Edit size={10} className="text-amber-500" /> : <ICONS.Lock size={10} className="text-slate-400" />}
+                          ২। ইউজার আইডি (User ID) <ICONS.Edit size={10} className="text-blue-500" />
                         </label>
                         <input 
                           type="text" 
                           required 
-                          readOnly={!isManualInput}
                           value={telegramId} 
                           onChange={e => setTelegramId(e.target.value)}
-                          placeholder={isManualInput ? "e.g. 123456789" : "Verify via Bot first 🤖"}
-                          className={`w-full border rounded-2xl py-4 px-6 font-bold outline-none text-xs transition-all ${
-                            isManualInput 
-                              ? 'bg-white dark:bg-slate-950 border-amber-500/30 text-slate-850 dark:text-white focus:border-amber-500'
-                              : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-white/5 text-slate-500 dark:text-slate-400 cursor-not-allowed select-all'
-                          }`}
+                          placeholder="e.g. 123456789"
+                          className="w-full border rounded-2xl py-4 px-6 font-bold outline-none text-xs transition-all bg-white dark:bg-slate-950 border-slate-200 dark:border-white/10 text-slate-850 dark:text-white focus:border-blue-500"
                         />
                       </div>
 
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 flex items-center gap-1">
-                          ৩। ফোন নম্বর (Phone) {isManualInput ? <ICONS.Edit size={10} className="text-amber-500" /> : <ICONS.Lock size={10} className="text-slate-400" />}
+                          ৩। ফোন নম্বর (Phone) <ICONS.Edit size={10} className="text-blue-500" />
                         </label>
                         <input 
                           type="text" 
                           required 
-                          readOnly={!isManualInput}
                           value={telegramPhone ? (telegramPhone.startsWith('+') ? telegramPhone : `+${telegramPhone}`) : ''} 
                           onChange={e => setTelegramPhone(e.target.value.replace('+', ''))}
                           placeholder="e.g. +8801712345678"
-                          className={`w-full border rounded-2xl py-4 px-6 font-bold outline-none text-xs transition-all ${
-                            isManualInput 
-                              ? 'bg-white dark:bg-slate-950 border-amber-500/30 text-slate-850 dark:text-white focus:border-amber-500'
-                              : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-white/5 text-slate-500 dark:text-slate-400 cursor-not-allowed select-all'
-                          }`}
+                          className="w-full border rounded-2xl py-4 px-6 font-bold outline-none text-xs transition-all bg-white dark:bg-slate-950 border-slate-200 dark:border-white/10 text-slate-850 dark:text-white focus:border-blue-500"
                         />
                       </div>
                     </div>

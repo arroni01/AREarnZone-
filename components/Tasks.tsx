@@ -83,12 +83,13 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
   const baseTasks = tasks.filter(t => {
     if (!t.isActive) return false;
     
-    // Telegram task check
-    if (isTelegramTask(t) && !user.isTelegramVerified) return false;
-    
-    // Check if current user already submitted (pending or approved) this task
+    // Check if current user or linked telegram account already submitted (pending or approved) this task
+    // RULE 3: History tied to userId or telegramIdUsed to prevent reset across accounts
     const userSubmitted = safeSubmissions.some(
-      s => s.taskId === t.id && s.userId === user.id && (s.status === 'pending' || s.status === 'approved')
+      s => s.taskId === t.id && (
+        (s.userId === user.id) ||
+        (isTelegramTask(t) && user.telegramId && (s.telegramIdUsed === user.telegramId || s.telegramId === user.telegramId))
+      ) && (s.status === 'pending' || s.status === 'approved')
     );
     if (userSubmitted) return false;
 
@@ -113,7 +114,11 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
 
   let availableTasks = [...baseTasks];
   if (typeFilter !== 'All') {
-    availableTasks = availableTasks.filter(t => t.type === typeFilter);
+    if (typeFilter === 'Telegram' || typeFilter === 'Telegram 🔒') {
+      availableTasks = availableTasks.filter(t => isTelegramTask(t) || t.type === 'Telegram');
+    } else {
+      availableTasks = availableTasks.filter(t => t.type === typeFilter);
+    }
   }
 
   const handleLaunchTask = (task: Task) => {
@@ -211,7 +216,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
         securityHash: securityHash,
         clientIp: user.ip,
         countryCode: userCountryCode,
-        telegramIdUsed: selectedTask.type === 'Telegram' ? user.telegramId : undefined,
+        telegramIdUsed: (selectedTask.type === 'Telegram' || isTelegramTask(selectedTask)) ? user.telegramId : undefined,
         deviceFingerprint: deviceId
       };
       setSubmissions(prev => [newSubmission, ...(prev || [])]);
@@ -257,7 +262,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
         <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-2xl shadow-xl border-2 border-white/10 overflow-x-auto no-scrollbar">
           {(user.isTelegramVerified 
             ? ['All', 'App Install', 'Link Open', 'Watch & Earn', 'Social', 'Telegram', '1 Device= 1 Task']
-            : ['All', 'App Install', 'Link Open', 'Watch & Earn', 'Social', '1 Device= 1 Task']
+            : ['All', 'App Install', 'Link Open', 'Watch & Earn', 'Social', 'Telegram 🔒', '1 Device= 1 Task']
           ).map(type => (
             <button 
               key={type} 
@@ -265,6 +270,8 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
               className={`whitespace-nowrap px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
                 typeFilter === type 
                   ? 'neon-glow-emerald bg-emerald-950 text-emerald-300 scale-105' 
+                  : type.includes('🔒')
+                  ? 'text-blue-400/80 hover:text-blue-300 hover:bg-blue-950/40 border border-blue-500/20'
                   : 'text-slate-300 hover:text-white hover:bg-slate-800'
               }`}
             >
@@ -273,6 +280,27 @@ const Tasks: React.FC<TasksProps> = ({ tasks, user, submissions, setSubmissions,
           ))}
         </div>
       </div>
+
+      {/* TELEGRAM CATEGORY LOCKED BANNER */}
+      {!user.isTelegramVerified && (typeFilter === 'Telegram' || typeFilter === 'Telegram 🔒') && (
+        <div className="bg-gradient-to-r from-blue-950/90 via-slate-900 to-blue-950/90 border-2 border-blue-500/40 p-6 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-2xl">
+          <div className="flex items-center gap-4 text-left">
+            <div className="p-3.5 bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-2xl">
+              <ICONS.Lock size={28} />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-white uppercase tracking-wider">🔒 Telegram Tasks Locked</h4>
+              <p className="text-xs text-blue-300/90 font-bold mt-0.5">Please verify your Telegram account first to unlock high-earning Telegram missions.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate('/telegram-verify')}
+            className="w-full sm:w-auto px-6 py-3 bg-blue-500 hover:bg-blue-400 text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-lg shadow-blue-500/30 transition-all cursor-pointer whitespace-nowrap"
+          >
+            Verify Telegram
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {availableTasks.map(task => {

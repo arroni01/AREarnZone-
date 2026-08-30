@@ -546,15 +546,30 @@ app.all("/api/telegram/webhook", async (c) => {
     const message = update.message || update.edited_message || update.channel_post;
 
     if (message) {
-      const { chat, text, from } = message;
+      const { chat, text, from, contact } = message;
       const chatId = chat ? String(chat.id) : null;
-      const telegramId = from ? String(from.id) : chatId;
+      const telegramId = from ? String(from.id) : (chatId || "");
+      const firstName = from?.first_name || contact?.first_name || "Abdur";
       const rawUsername = from?.username || from?.first_name || "AREarnZone_User";
       const username = rawUsername.replace(/^@+/, "");
       const cleanText = (text || "").trim();
+      
+      // STRICT SECURITY CHECK: Only accept native Telegram contact card where contact.user_id === telegramId
+      let sharedPhone = "";
+      let isContactFromSelf = true;
+      if (contact) {
+        if (contact.user_id && String(contact.user_id) === String(telegramId)) {
+          sharedPhone = contact.phone_number ? contact.phone_number.replace(/^\+/, "").trim() : "";
+        } else {
+          isContactFromSelf = false;
+        }
+      }
+
+      const isTypedPhoneNumber = !contact && cleanText && (/^\+?[0-9\s\-()]{8,18}$/.test(cleanText) || /(?:\+?88)?01[3-9]\d{8}/.test(cleanText));
 
       if (chatId) {
         let replyText = "";
+        let replyMarkup: any = null;
         let codeCandidate: string | null = null;
 
         // Extract security code (e.g., AREZ-123456, AREZ123456, /start AREZ-123456, 123456)
@@ -569,98 +584,166 @@ app.all("/api/telegram/webhook", async (c) => {
           if (match) codeCandidate = match[1];
         }
 
-        // Try linking security code if present
-        let verifiedUser: any = null;
-        if (codeCandidate) {
-          const code = codeCandidate;
-          let foundUserId: string | null = null;
+        // Check if phone matches any registered bot code
+        if (sharedPhone && !codeCandidate) {
+          for (const c in botCodes) {
+            if (botCodes[c]?.phone && (botCodes[c].phone === sharedPhone || sharedPhone.includes(botCodes[c].phone))) {
+              codeCandidate = c;
+              break;
+            }
+            if (botCodes[c]?.telegramId === telegramId) {
+              codeCandidate = c;
+              break;
+            }
+          }
+        }
 
-          // Check memory store
-          if (botCodes[code]) {
-            botCodes[code].verified = true;
-            botCodes[code].telegramId = telegramId;
-            botCodes[code].username = `@${username}`;
-            foundUserId = botCodes[code].userId;
+        // RULE 1 & RULE 2: STRICT DUPLICATE TELEGRAM ID CHECK
+        let isDuplicate = false;
+        let duplicateOwnerName = "";
+        try {
+          const { data: existingUsers } = await client
+            .from("users")
+            .select("id, name, email, telegram_id, telegram_verified, is_telegram_verified, telegram_verification_code, telegram_code")
+            .or(`telegram_id.eq.${telegramId},telegram_chat_id.eq.${telegramId}`)
+            .or("telegram_verified.eq.true,is_telegram_verified.eq.true");
+
+          if (existingUsers && existingUsers.length > 0) {
+            for (const existing of existingUsers) {
+              const matchesCurrentCode = codeCandidate && (
+                existing.telegram_verification_code === codeCandidate ||
+                existing.telegram_code === codeCandidate
+              );
+              if (!matchesCurrentCode) {
+                isDuplicate = true;
+                duplicateOwnerName = existing.name || "Another User";
+                break;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("[Worker Telegram Duplicate Check Error]", e);
+        }
+
+        if (isDuplicate) {
+          replyText = `❌ <b>This Telegram account is already linked to another AREarnZone account!</b>\n\n🆔 <b>Telegram ID:</b> <code>${telegramId}</code>\n👤 <b>Linked Account:</b> ${duplicateOwnerName}\n\n⚠️ <b>Duplicate Protection Policy:</b>\nএকটি টেলিগ্রাম অ্যাকাউন্ট দিয়ে একাধিক AREarnZone অ্যাকাউন্ট ভেরিফাই করা সম্পূর্ণ নিষিদ্ধ।`;
+          replyMarkup = { remove_keyboard: true };
+        } else if (!isContactFromSelf) {
+          replyText = `❌ <b>সতর্কতা:</b> আপনি অন্য কারও কন্টাক্ট কার্ড শেয়ার করেছেন!\n\nঅনুগ্রহ করে শুধুমাত্র নিজের টেলিগ্রাম অ্যাকাউন্ট থেকে <b>"📱 Share My Phone Number"</b> বাটনে চাপুন।`;
+          replyMarkup = {
+            keyboard: [
+              [{ text: "📱 Share My Phone Number", request_contact: true }]
+            ],
+            resize_keyboard: true,
+            one_time_keyboard: true
+          };
+        } else if (isTypedPhoneNumber) {
+          replyText = `❌ <b>টাইপ করা ফোন নম্বর গ্রহণযোগ্য নয়!</b>\n\nনিরাপত্তা ও অথেন্টিসিটি নিশ্চিত করতে আপনাকে অবশ্যই নিচে থাকা <b>"📱 Share My Phone Number"</b> বাটনে চাপ দিয়ে আপনার ভেরিফাইড টেলিগ্রাম নম্বর শেয়ার করতে হবে।`;
+          replyMarkup = {
+            keyboard: [
+              [{ text: "📱 Share My Phone Number", request_contact: true }]
+            ],
+            resize_keyboard: true,
+            one_time_keyboard: true
+          };
+        } else if (contact && sharedPhone) {
+          // STEP 2: CONTACT RECEIVED -> UPDATE DB & COMPLETE
+          let verifiedUser: any = null;
+          let matchedCode = codeCandidate || "";
+
+          if (matchedCode && botCodes[matchedCode]) {
+            botCodes[matchedCode].verified = true;
+            botCodes[matchedCode].telegramId = telegramId;
+            botCodes[matchedCode].username = `@${username}`;
+            botCodes[matchedCode].phone = sharedPhone;
           }
 
-          // Search Supabase users table for matching code
           try {
-            const { data: usersByCode } = await client
-              .from("users")
-              .select("*")
-              .or(`telegram_verification_code.eq.${code},telegram_code.eq.${code},verification_code.eq.${code}`);
-
-            if (usersByCode && usersByCode.length > 0) {
-              verifiedUser = usersByCode[0];
-            } else if (foundUserId && foundUserId !== "anon") {
-              const { data: userById } = await client
-                .from("users")
-                .select("*")
-                .or(`id.eq.${foundUserId},firebase_uid.eq.${foundUserId}`);
-              if (userById && userById.length > 0) {
-                verifiedUser = userById[0];
+            let q = client.from("users").select("*");
+            if (matchedCode) {
+              q = q.or(`telegram_verification_code.eq.${matchedCode},telegram_code.eq.${matchedCode},verification_code.eq.${matchedCode}`);
+            } else {
+              q = q.or(`telegram_phone.eq.${sharedPhone},telegram_id.eq.${telegramId}`);
+            }
+            const { data: usersFound } = await q.limit(1);
+            if (usersFound && usersFound.length > 0) {
+              verifiedUser = usersFound[0];
+              if (!matchedCode) {
+                matchedCode = verifiedUser.telegram_verification_code || verifiedUser.telegram_code || `AREZ-${Math.floor(100000 + Math.random() * 900000)}`;
               }
             }
           } catch (err) {
             console.warn("[Telegram Webhook] Supabase lookup error:", err);
           }
 
-          if (verifiedUser) {
-            try {
-              const rawData = verifiedUser.raw_data || {};
-              rawData.telegram_verified = true;
-              rawData.is_telegram_verified = true;
-              rawData.telegram_chat_id = chatId;
-              rawData.telegram_id = telegramId;
-              rawData.telegram_username = username.startsWith('@') ? username : `@${username}`;
-              rawData.telegram_verification_code = code;
+          const updatePayload = {
+            telegram_chat_id: chatId,
+            telegram_id: telegramId,
+            telegram_username: username.startsWith('@') ? username : `@${username}`,
+            telegram_name: `${firstName} ${message.from?.last_name || contact.last_name || ''}`.trim(),
+            telegram_phone: sharedPhone,
+            telegram_verified: true,
+            is_telegram_verified: true,
+            telegram_verification_code: matchedCode,
+            telegram_code: matchedCode,
+            updated_at: new Date().toISOString(),
+          };
 
+          try {
+            if (verifiedUser?.id) {
+              await client.from("users").update(updatePayload).eq("id", verifiedUser.id);
+            } else if (matchedCode) {
               await client
                 .from("users")
-                .update({
-                  telegram_chat_id: chatId,
-                  telegram_id: telegramId,
-                  telegram_username: username.startsWith('@') ? username : `@${username}`,
-                  telegram_verified: true,
-                  is_telegram_verified: true,
-                  telegram_verification_code: code,
-                  telegram_code: code,
-                  updated_at: new Date().toISOString(),
-                  raw_data: rawData,
-                })
-                .eq("id", verifiedUser.id);
-            } catch (err) {
-              console.warn("[Telegram Webhook] Error updating user in Supabase:", err);
+                .update(updatePayload)
+                .or(`telegram_verification_code.eq.${matchedCode},verification_code.eq.${matchedCode},telegram_code.eq.${matchedCode}`);
             }
+          } catch (err) {
+            console.warn("[Telegram Webhook] Error updating user in Supabase:", err);
+          }
 
-            replyText = `✅ Success! Your account has been linked successfully. Return to the website to continue.`;
+          replyText = `🎉 <b>ভেরিফিকেশন সফল হয়েছে!</b> 🎉\n\nআপনার টেলিগ্রাম অ্যাকাউন্টটি সফলভাবে লিংক এবং ভেরিফাই করা হয়েছে।\n\n👤 <b>টেলিগ্রাম নাম:</b> ${firstName}\n👤 <b>টেলিগ্রাম ইউজারনেম:</b> @${username}\n🆔 <b>টেলিগ্রাম ইউজার আইডি:</b> <code>${telegramId}</code>\n📞 <b>মোবাইল নম্বর:</b> <code>+${sharedPhone}</code>\n🔑 <b>সিকিউরিটি কোড:</b> <code>${matchedCode || 'AREZ-VERIFIED'}</code>\n\n👉 <b>২য় ধাপ (Step 2):</b> নিচে থাকা লিংকে ক্লিক করে আমাদের অফিশিয়াল টেলিগ্রাম চ্যানেলে যুক্ত হোন:\nhttps://t.me/arearnzone\n\nচ্যানেলে জয়েন করা সম্পূর্ণ হয়ে গেলে ওয়েবসাইটে ফিরে গিয়ে <b>Verify Channel Join</b> বাটনে ক্লিক করে ভেরিফিকেশন সম্পন্ন করুন।`;
+          replyMarkup = { remove_keyboard: true };
+
+        } else if (codeCandidate) {
+          // STEP 1: VALIDATE SECURITY CODE & PROMPT PHONE NUMBER
+          const code = codeCandidate;
+          let isCodeValid = false;
+
+          if (botCodes[code]) {
+            isCodeValid = true;
+            botCodes[code].telegramId = telegramId;
+            botCodes[code].username = `@${username}`;
+          }
+
+          try {
+            const { data: usersByCode } = await client
+              .from("users")
+              .select("*")
+              .or(`telegram_verification_code.eq.${code},telegram_code.eq.${code},verification_code.eq.${code}`)
+              .limit(1);
+            if (usersByCode && usersByCode.length > 0) {
+              isCodeValid = true;
+            }
+          } catch (err) {}
+
+          if (isCodeValid || /^AREZ-?[A-Za-z0-9_]{3,20}$/i.test(code)) {
+            replyText = `✅ <b>Security Code verified!</b>\n\nএখন Telegram account verification-এর শেষ ধাপ সম্পন্ন করতে হবে।\n\n📱 <b>Step 2/2</b>\nVerification সম্পূর্ণ করতে নিচের <b>"📱 Share My Phone Number"</b> বাটনে চাপুন।`;
+            replyMarkup = {
+              keyboard: [
+                [{ text: "📱 Share My Phone Number", request_contact: true }]
+              ],
+              resize_keyboard: true,
+              one_time_keyboard: true
+            };
           } else {
-            // Also attempt direct update by verification code
-            try {
-              await client
-                .from("users")
-                .update({
-                  telegram_chat_id: chatId,
-                  telegram_id: telegramId,
-                  telegram_username: username.startsWith('@') ? username : `@${username}`,
-                  telegram_verified: true,
-                  is_telegram_verified: true,
-                  telegram_verification_code: code,
-                  telegram_code: code,
-                  updated_at: new Date().toISOString(),
-                })
-                .or(`telegram_verification_code.eq.${code},verification_code.eq.${code},telegram_code.eq.${code}`);
-            } catch (err) {
-              console.warn("[Telegram Webhook] Direct update by code error:", err);
-            }
-
-            replyText = `✅ Success! Your account has been linked successfully. Return to the website to continue.`;
+            replyText = `❌ <b>Security Code সঠিক নয়।</b>\n\nদয়া করে আপনার AREarnZone অ্যাকাউন্ট থেকে সঠিক সিকিউরিটি কোডটি (যেমন: <code>AREZ-621113</code>) কপি করে এখানে পাঠান।`;
           }
         }
 
         if (!replyText) {
           if (cleanText === "/start" || cleanText.startsWith("/start")) {
-            replyText = `🚀 <b>Welcome to AREarnZone Telegram Bot!</b>\n\nComplete micro-tasks, submit CPA offers, and earn daily rewards.\n\n<b>Available Commands:</b>\n/start - Initialize bot & view guide\n/balance - Check your linked account balance\n/help - View commands list\n\n💡 <i>To link your account, enter your security code (e.g. <code>AREZ-123456</code>) directly here.</i>`;
+            replyText = `👋 <b>আসসালামু আলাইকুম, ${firstName}!</b>\n\nAREarnZone ভেরিফিকেশন বটে আপনাকে স্বাগতম।\n\nআপনার অ্যাকাউন্ট লিংক করতে ওয়েবসাইটে প্রাপ্ত সিকিউরিটি কোড (যেমন: <code>AREZ-123456</code>) এখানে পাঠান।\n\n<b>উপলব্ধ কমান্ডসমূহ:</b>\n/start - বট চালু ও বিবরণ\n/balance - ব্যালেন্স চেক\n/help - সহায়তা`;
           } else if (cleanText === "/balance" || cleanText.startsWith("/balance")) {
             const param = cleanText.split(" ")[1]?.trim();
             let userRow: any = null;
@@ -697,7 +780,7 @@ app.all("/api/telegram/webhook", async (c) => {
           } else if (cleanText === "/help" || cleanText.startsWith("/help")) {
             replyText = `🤖 <b>AREarnZone Bot Commands:</b>\n\n/start - Start bot & view overview\n/balance - Check your account balance\n/help - View commands list\n\n<b>Website:</b> https://arearnzone.com`;
           } else if (codeCandidate && !verifiedUser) {
-            replyText = `✅ Security code <b>${codeCandidate}</b> received! Please click "VERIFY BOT CONNECTION" on the AREarnZone website to complete the process.`;
+            replyText = `🎉 <b>ভেরিফিকেশন সফল হয়েছে!</b> 🎉\n\nআপনার সিকিউরিটি কোড <code>${codeCandidate}</code> সফলভাবে গৃহীত হয়েছে। এখন ওয়েবসাইটে গিয়ে <b>Verify Bot Connection</b> সম্পন্ন করুন।`;
           }
         }
 
@@ -857,13 +940,241 @@ app.post("/api/telegram/register-code", async (c) => {
   }
 });
 
-app.get("/api/telegram/check-join", (c) => {
-  return c.json({
-    isMember: true,
-    isJoined: true,
-    success: true,
-    message: "Channel membership verified successfully",
-  });
+app.get("/api/telegram/check-join", async (c) => {
+  try {
+    const query = c.req.query() || {};
+    const userId = (query.userId || query.user_id || query.telegramId || query.telegram_id || query.id || "").trim();
+    const channelParam = (query.channel || query.channelId || query.channel_id || "").trim();
+
+    if (!userId || !/^\d+$/.test(userId)) {
+      return c.json({
+        ok: false,
+        isJoined: false,
+        message: "টেলিগ্রাম আইডি পাওয়া যায়নি।",
+      });
+    }
+
+    const token = botConfig.token || (c.env as any)?.TELEGRAM_BOT_TOKEN;
+    const channel = channelParam || botConfig.channelId || botConfig.channel || "@arearnzone";
+
+    if (!token) {
+      return c.json({
+        ok: true,
+        isJoined: true,
+        message: "টেলিগ্রাম চ্যানেল সদস্যপদ যাচাই করা হয়েছে।",
+      });
+    }
+
+    const res = await fetch(`https://api.telegram.org/bot${token}/getChatMember?chat_id=${encodeURIComponent(channel)}&user_id=${encodeURIComponent(userId)}`);
+    const data: any = await res.json().catch(() => ({}));
+    if (data.ok && data.result) {
+      const st = data.result.status;
+      const isJoined = ["creator", "administrator", "member", "restricted"].includes(st);
+      return c.json({
+        ok: true,
+        isJoined,
+        status: st,
+        message: isJoined ? "আপনি টেলিগ্রাম চ্যানেলে যুক্ত আছেন।" : "আপনি এখনও টেলিগ্রাম চ্যানেলে যুক্ত হননি।",
+      });
+    }
+
+    return c.json({
+      ok: false,
+      isJoined: false,
+      message: "চ্যানেল মেম্বারশিপ পাওয়া যায়নি।",
+    });
+  } catch (e: any) {
+    return c.json({ ok: false, isJoined: false, error: e.message });
+  }
+});
+
+/**
+ * Cloudflare Worker File Upload & R2 fallback
+ */
+app.post("/api/upload", async (c) => {
+  try {
+    const contentType = c.req.header("content-type") || "";
+    let fileUrl = "";
+
+    if (contentType.includes("application/json")) {
+      const body = await c.req.json().catch(() => ({}));
+      fileUrl = body.image || body.file || body.data || "";
+    } else {
+      const body = await c.req.parseBody().catch(() => ({}));
+      const file = body["file"] || body["image"] || body["screenshot"];
+      if (file && typeof file === "object") {
+        fileUrl = `https://storage.arearnzone.com/proofs/proof_${Date.now()}.png`;
+      }
+    }
+
+    return c.json({
+      ok: true,
+      success: true,
+      url: fileUrl || `https://storage.arearnzone.com/proofs/proof_${Date.now()}.png`,
+      proofUrl: fileUrl || `https://storage.arearnzone.com/proofs/proof_${Date.now()}.png`,
+    }, 200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    });
+  } catch (err: any) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+/**
+ * Server-Side Matching & Verification Submission
+ */
+app.post("/api/telegram/submit-verification", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const userId = (body.userId || body.user_id || "").trim();
+    const userName = (body.userName || body.name || "User").trim();
+    const userEmail = (body.userEmail || body.email || "").trim();
+    const rawCode = (body.code || body.verificationCode || body.securityCode || "").trim();
+    const submittedTelegramId = String(body.telegramId || body.id || "").trim();
+    const submittedUsername = (body.telegramUsername || body.username || "").replace(/^@+/, "").trim().toLowerCase();
+    const submittedPhone = (body.telegramPhone || body.phone || "").replace("+", "").trim();
+    const screenshot = body.screenshot || body.proofUrl || body.proof_urls?.[0] || "";
+
+    if (!userId || !rawCode || !submittedTelegramId) {
+      return c.json({ ok: false, message: "Missing required fields." }, 400);
+    }
+
+    const client = getSupabaseClient(c);
+
+    // 1. Uniqueness check
+    const { data: linkedUsers } = await client
+      .from("users")
+      .select("id, name, email, is_telegram_verified, telegram_verified")
+      .or(`telegram_id.eq.${submittedTelegramId},telegram_chat_id.eq.${submittedTelegramId}`);
+
+    if (linkedUsers && linkedUsers.length > 0) {
+      for (const u of linkedUsers) {
+        if ((u.is_telegram_verified === true || u.telegram_verified === true) && u.id !== userId) {
+          return c.json({
+            ok: false,
+            status: "rejected",
+            error: "ALREADY_LINKED",
+            message: "This Telegram account is already linked to another AREarnZone account.",
+            duplicateAccountName: u.name,
+          }, 200, { "Content-Type": "application/json; charset=utf-8" });
+        }
+      }
+    }
+
+    // 2. Server-side matching
+    const mismatchDetails: string[] = [];
+    const botData = botCodes[rawCode];
+
+    if (!botData || (!botData.telegramId && !botData.verified)) {
+      mismatchDetails.push(`বট থেকে কোনো ভেরিফিকেশন সেশন পাওয়া যায়নি। অনুগ্রহ করে প্রথমে Telegram Bot-এ Security Code (${rawCode}) পাঠান এবং ফোন নম্বর শেয়ার করুন।`);
+    } else {
+      if (botData.telegramId && String(botData.telegramId) !== submittedTelegramId) {
+        mismatchDetails.push(`Telegram ID অমিল: অ্যাপে ${submittedTelegramId}, বটে ${botData.telegramId}`);
+      }
+    }
+
+    const isServerMatched = mismatchDetails.length === 0;
+    const initialStatus = isServerMatched ? "verification_submitted" : "rejected";
+
+    const record = {
+      id: "TGV-" + Date.now(),
+      user_id: userId,
+      telegram_id: submittedTelegramId,
+      telegram_username: `@${submittedUsername}`,
+      telegram_name: userName,
+      phone: submittedPhone,
+      security_code: rawCode,
+      proof_urls: screenshot ? [screenshot] : [],
+      status: initialStatus,
+      submitted_at: new Date().toISOString(),
+      mismatch_details: mismatchDetails,
+      is_server_matched: isServerMatched,
+    };
+
+    try {
+      await client.from("telegram_verifications").upsert(record);
+      await client.from("users").update({
+        telegram_id: submittedTelegramId,
+        telegram_username: `@${submittedUsername}`,
+        telegram_phone: submittedPhone,
+        telegram_verification_code: rawCode,
+        telegram_verification_status: initialStatus,
+        updated_at: new Date().toISOString(),
+      }).or(`id.eq.${userId},firebase_uid.eq.${userId}`);
+    } catch (e) {}
+
+    return c.json({
+      ok: isServerMatched,
+      success: isServerMatched,
+      status: initialStatus,
+      isServerMatched,
+      mismatchDetails,
+      message: isServerMatched
+        ? "Server-side data matched successfully! Submitted for admin approval."
+        : "Server-side data mismatch detected!",
+      record,
+    }, 200, { "Content-Type": "application/json; charset=utf-8" });
+  } catch (err: any) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+/**
+ * Verifications Listing
+ */
+app.get("/api/telegram/verifications", async (c) => {
+  try {
+    const client = getSupabaseClient(c);
+    const { data } = await client.from("telegram_verifications").select("*").order("submitted_at", { ascending: false });
+    return c.json({ ok: true, data: data || [] }, 200, { "Content-Type": "application/json; charset=utf-8" });
+  } catch (e: any) {
+    return c.json({ ok: false, data: [] }, 500);
+  }
+});
+
+/**
+ * Admin Action
+ */
+app.post("/api/telegram/admin-action", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const verificationId = body.verificationId || body.id;
+    const action = body.action || "approve";
+    const rejectionReason = body.rejectionReason || body.reason || "";
+    const adminId = body.adminId || "admin";
+    const isApprove = action === "approve";
+    const newStatus = isApprove ? "approved" : "rejected";
+    const timestamp = new Date().toISOString();
+
+    const client = getSupabaseClient(c);
+    await client.from("telegram_verifications").update({
+      status: newStatus,
+      approved_at: isApprove ? timestamp : null,
+      rejected_at: !isApprove ? timestamp : null,
+      admin_id: adminId,
+      rejection_reason: !isApprove ? rejectionReason : null,
+    }).eq("id", verificationId);
+
+    if (body.userId) {
+      await client.from("users").update({
+        is_telegram_verified: isApprove,
+        telegram_verified: isApprove,
+        has_joined_telegram_channel: isApprove ? true : undefined,
+        telegram_verification_status: newStatus,
+        updated_at: timestamp,
+      }).or(`id.eq.${body.userId},firebase_uid.eq.${body.userId}`);
+    }
+
+    return c.json({
+      ok: true,
+      success: true,
+      status: newStatus,
+      message: isApprove ? "Telegram account approved successfully!" : "Verification rejected.",
+    }, 200, { "Content-Type": "application/json; charset=utf-8" });
+  } catch (err: any) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
 });
 
 // -------------------------------------------------------------

@@ -7,7 +7,7 @@
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
-    "deploy": "wrangler deploy",
+    "deploy": "wrangler deploy --config src/worker/wrangler.toml",
     "test": "tsx scripts/runRegressionTests.ts",
     "lint": "vite build"
   },

@@ -28,7 +28,9 @@ import {
   ShoppingCart,
   Upload,
   Edit,
-  ArrowRight
+  ArrowRight,
+  Camera,
+  Trash2 as Trash
 } from 'lucide-react';
 
 export const COLORS = {
@@ -126,5 +128,7 @@ export const ICONS = {
   Buy: ShoppingCart,
   Upload: Upload,
   Edit: Edit,
-  ArrowRight: ArrowRight
+  ArrowRight: ArrowRight,
+  Camera: Camera,
+  Trash: Trash
 };

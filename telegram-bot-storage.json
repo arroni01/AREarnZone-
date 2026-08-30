@@ -3,9 +3,685 @@
     "AREZ-621113": {
       "expectedPhone": "01326624555",
       "timestamp": 1782462933890
+    },
+    "AREZ-112233": {
+      "userId": "test-user-1",
+      "expectedPhone": "01712345678",
+      "timestamp": 1787839452415
+    },
+    "AREZ-TEST88": {
+      "userId": "test-uid-1",
+      "expectedPhone": "01812345678",
+      "timestamp": 1787923446735
+    },
+    "AREZ-254142": {
+      "userId": "u_x1sp5l25h",
+      "expectedPhone": "01326624555",
+      "timestamp": 1787924190962
+    },
+    "AREZ-TEST-1787927580": {
+      "userId": "USER_TEST_001",
+      "expectedPhone": "8801700112233",
+      "timestamp": 1787927580514
+    },
+    "AREZ-TEST-1787927641": {
+      "userId": "USER_TEST_001",
+      "expectedPhone": "8801700112233",
+      "timestamp": 1787927641431
+    },
+    "AREZ-TEST-1787927659": {
+      "userId": "USER_TEST_001",
+      "expectedPhone": "8801700112233",
+      "timestamp": 1787927659275
+    },
+    "AREZ-TEST-1787927706": {
+      "userId": "USER_TEST_001",
+      "expectedPhone": "8801700112233",
+      "timestamp": 1787927706005
+    },
+    "AREZ-TEST-1787927742": {
+      "userId": "USER_TEST_001",
+      "expectedPhone": "8801700112233",
+      "timestamp": 1787927742770
+    },
+    "AREZ-TEST101": {
+      "telegramId": "987654321",
+      "username": "@tester1_tg",
+      "fullName": "Test User One",
+      "phone": "01711223344",
+      "verified": true,
+      "isChannelJoined": true,
+      "verifiedAt": 1788105886879,
+      "updatedAt": 1788105886879
+    },
+    "AREZ-TEST101-RE": {
+      "telegramId": "987654321",
+      "username": "@tester1_tg",
+      "fullName": "Test User One",
+      "phone": "01711223344",
+      "verified": true,
+      "isChannelJoined": true,
+      "verifiedAt": 1788105889373,
+      "updatedAt": 1788105889373
     }
   },
   "pendingCodes": {
     "12345": "AREZ-621113"
+  },
+  "codes": {
+    "AREZ-621113": {
+      "expectedPhone": "01326624555",
+      "timestamp": 1782462933890
+    },
+    "AREZ-112233": {
+      "userId": "test-user-1",
+      "phone": "01712345678",
+      "createdAt": 1787839452415,
+      "verified": false
+    },
+    "AREZ-260097": {
+      "telegramId": "7801444393",
+      "username": "@arroni01",
+      "phone": "8801326624555",
+      "verified": true,
+      "verifiedAt": 1787923023892,
+      "updatedAt": 1787923023892
+    },
+    "AREZ-TEST88": {
+      "userId": "test-uid-1",
+      "phone": "01812345678",
+      "expectedPhone": "01812345678",
+      "createdAt": 1787923446735,
+      "verified": false
+    },
+    "AREZ-254142": {
+      "userId": "u_x1sp5l25h",
+      "phone": "01326624555",
+      "expectedPhone": "01326624555",
+      "createdAt": 1787924190962,
+      "verified": false
+    },
+    "AREZ-TEST-1787927580": {
+      "telegramId": "5500112233",
+      "username": "@test_trader_01",
+      "phone": "8801700112233",
+      "verified": true,
+      "verifiedAt": 1787927583105,
+      "updatedAt": 1787927583105
+    },
+    "AREZ-TEST-1787927641": {
+      "telegramId": "5500112233",
+      "username": "@test_trader_01",
+      "fullName": "Test User",
+      "phone": "8801700112233",
+      "verified": true,
+      "verifiedAt": 1787927643846,
+      "updatedAt": 1787927643846
+    },
+    "AREZ-TEST-1787927659": {
+      "telegramId": "5500112233",
+      "username": "@test_trader_01",
+      "fullName": "Test User",
+      "phone": "8801700112233",
+      "verified": true,
+      "verifiedAt": 1787927661172,
+      "updatedAt": 1787927661172
+    },
+    "AREZ-TEST-1787927706": {
+      "telegramId": "5500112233",
+      "username": "@test_trader_01",
+      "fullName": "Test User",
+      "phone": "8801700112233",
+      "verified": true,
+      "verifiedAt": 1787927707991,
+      "updatedAt": 1787927707991
+    },
+    "AREZ-TEST-1787927742": {
+      "telegramId": "5500112233",
+      "username": "@test_trader_01",
+      "fullName": "Test User",
+      "phone": "8801700112233",
+      "verified": true,
+      "verifiedAt": 1787927744176,
+      "updatedAt": 1787927744176
+    },
+    "AREZ-TEST101": {
+      "telegramId": "987654321",
+      "username": "@tester1_tg",
+      "fullName": "Test User One",
+      "phone": "01711223344",
+      "verified": true,
+      "isChannelJoined": true,
+      "verifiedAt": 1788105886879,
+      "updatedAt": 1788105886879
+    },
+    "AREZ-TEST101-RE": {
+      "telegramId": "987654321",
+      "username": "@tester1_tg",
+      "fullName": "Test User One",
+      "phone": "01711223344",
+      "verified": true,
+      "isChannelJoined": true,
+      "verifiedAt": 1788105889373,
+      "updatedAt": 1788105889373
+    }
+  },
+  "verifiedUsers": {
+    "987654321": {
+      "userId": "user_test_001",
+      "phone": "01711223344",
+      "username": "@tester1_tg",
+      "code": "AREZ-TEST101",
+      "verifiedAt": 1788105890356
+    },
+    "7801444393": {
+      "phone": "8801326624555",
+      "username": "@arroni01",
+      "code": "AREZ-260097",
+      "verifiedAt": 1787923023892
+    },
+    "5500112233": {
+      "userId": "USER_TEST_001",
+      "phone": "8801700112233",
+      "username": "@test_trader_01",
+      "code": "AREZ-TEST-1787927580",
+      "verifiedAt": 1787927749843
+    }
+  },
+  "verifications": [
+    {
+      "id": "TGV-1788105890138-H8UICO",
+      "userId": "user_test_001",
+      "userName": "Test User One",
+      "userEmail": "user1@test.com",
+      "telegramId": "987654321",
+      "telegramUsername": "@tester1_tg",
+      "telegramName": "Test User One",
+      "telegramPhone": "01711223344",
+      "verificationCode": "AREZ-TEST101-RE",
+      "screenshot": "https://example.com/proof_re.png",
+      "proofUrls": [
+        "https://example.com/proof_re.png"
+      ],
+      "proofUrl": "https://example.com/proof_re.png",
+      "status": "approved",
+      "isServerMatched": true,
+      "mismatchDetails": [],
+      "restoredHistory": {
+        "isRestored": true,
+        "totalCompleted": 0,
+        "totalLimit": 100,
+        "previousUserIds": [
+          "user_test_001"
+        ]
+      },
+      "botVerifiedData": {
+        "telegramId": "987654321",
+        "username": "@tester1_tg",
+        "fullName": "Test User One",
+        "phone": "01711223344",
+        "isContactAuthentic": true,
+        "isChannelJoined": false,
+        "verifiedAt": 1788105889373
+      },
+      "appSubmittedData": {
+        "telegramId": "987654321",
+        "username": "tester1_tg",
+        "phone": "01711223344",
+        "code": "AREZ-TEST101-RE"
+      },
+      "submittedAt": "2026-08-30T16:04:50.138Z",
+      "approvedAt": "2026-08-30T16:04:50.356Z",
+      "adminId": "admin_001",
+      "adminName": "Admin"
+    },
+    {
+      "id": "TGV-1788105888107-UPAZ9C",
+      "userId": "user_test_001",
+      "userName": "Test User One",
+      "userEmail": "user1@test.com",
+      "telegramId": "987654321",
+      "telegramUsername": "@tester1_tg",
+      "telegramName": "Test User One",
+      "telegramPhone": "01711223344",
+      "verificationCode": "AREZ-TEST101",
+      "screenshot": "https://example.com/proof1.png",
+      "proofUrls": [
+        "https://example.com/proof1.png"
+      ],
+      "proofUrl": "https://example.com/proof1.png",
+      "status": "approved",
+      "isServerMatched": true,
+      "mismatchDetails": [],
+      "botVerifiedData": {
+        "telegramId": "987654321",
+        "username": "@tester1_tg",
+        "fullName": "Test User One",
+        "phone": "01711223344",
+        "isContactAuthentic": true,
+        "isChannelJoined": false,
+        "verifiedAt": 1788105886879
+      },
+      "appSubmittedData": {
+        "telegramId": "987654321",
+        "username": "tester1_tg",
+        "phone": "01711223344",
+        "code": "AREZ-TEST101"
+      },
+      "submittedAt": "2026-08-30T16:04:48.107Z",
+      "approvedAt": "2026-08-30T16:04:50.356Z",
+      "deletedAt": "2026-08-30T16:04:49.152Z",
+      "deletedBy": "admin_001",
+      "adminId": "admin_001",
+      "adminName": "Admin"
+    },
+    {
+      "id": "TGV-1788105699514-O4P9MK",
+      "userId": "user_test_001",
+      "userName": "Test User One",
+      "userEmail": "user1@test.com",
+      "telegramId": "987654321",
+      "telegramUsername": "@tester1_tg",
+      "telegramName": "Test User One",
+      "telegramPhone": "01711223344",
+      "verificationCode": "AREZ-TEST101",
+      "screenshot": "https://example.com/proof1.png",
+      "proofUrls": [
+        "https://example.com/proof1.png"
+      ],
+      "proofUrl": "https://example.com/proof1.png",
+      "status": "approved",
+      "isServerMatched": false,
+      "mismatchDetails": [
+        "মোবাইল নম্বর অমিল: অ্যাপে দেওয়া হয়েছে 01711223344, কিন্তু বটের মাধ্যমে ভেরিফাইড কন্টাক্ট নম্বর +01700000000",
+        "Telegram Username অমিল: অ্যাপে দেওয়া হয়েছে @tester1_tg, কিন্তু টেলিগ্রাম প্রোফাইল @arearnzone_user",
+        "Telegram Official Channel (@arearnzone) মেম্বারশিপ নিশ্চিত করা যায়নি। অনুগ্রহ করে চ্যানেলে যুক্ত হোন।"
+      ],
+      "botVerifiedData": {
+        "telegramId": "987654321",
+        "username": "@arearnzone_user",
+        "phone": "01700000000",
+        "isContactAuthentic": true,
+        "isChannelJoined": false,
+        "verifiedAt": 1788105697905
+      },
+      "appSubmittedData": {
+        "telegramId": "987654321",
+        "username": "tester1_tg",
+        "phone": "01711223344",
+        "code": "AREZ-TEST101"
+      },
+      "submittedAt": "2026-08-30T16:01:39.514Z",
+      "approvedAt": "2026-08-30T16:04:50.356Z",
+      "deletedAt": "2026-08-30T16:04:49.152Z",
+      "deletedBy": "admin_001",
+      "adminId": "admin_001",
+      "adminName": "Admin"
+    },
+    {
+      "id": "TGV-1787927747812-GRHFMQ",
+      "userId": "USER_TEST_002",
+      "userName": "Fraud User",
+      "userEmail": "fraud@example.com",
+      "telegramId": "5500998877",
+      "telegramUsername": "@fraud_user",
+      "telegramName": "Fraud User",
+      "telegramPhone": "8801999999999",
+      "verificationCode": "INVALID-CODE-99999",
+      "screenshot": "https://storage.example.com/proofs/fraud.png",
+      "proofUrls": [
+        "https://storage.example.com/proofs/fraud.png"
+      ],
+      "proofUrl": "https://storage.example.com/proofs/fraud.png",
+      "status": "rejected",
+      "isServerMatched": false,
+      "mismatchDetails": [
+        "বট থেকে এখনও কোনো ভেরিফিকেশন ডাটা পাওয়া যায়নি। অনুগ্রহ করে প্রথমে Telegram Bot-এ Security Code (INVALID-CODE-99999) পাঠান এবং ফোন নম্বর শেয়ার করুন।",
+        "Telegram Official Channel (@arearnzone) মেম্বারশিপ নিশ্চিত করা যায়নি। অনুগ্রহ করে চ্যানেলে যুক্ত হোন।"
+      ],
+      "botVerifiedData": {
+        "telegramId": "5500998877",
+        "phone": "8801999999999",
+        "isContactAuthentic": true,
+        "isChannelJoined": false,
+        "verifiedAt": 1787927747812
+      },
+      "appSubmittedData": {
+        "telegramId": "5500998877",
+        "username": "fraud_user",
+        "phone": "8801999999999",
+        "code": "INVALID-CODE-99999"
+      },
+      "submittedAt": "2026-08-28T14:35:47.812Z"
+    },
+    {
+      "id": "TGV-1787927746712-4LMTZW",
+      "userId": "USER_TEST_001",
+      "userName": "Test User One",
+      "userEmail": "test001@example.com",
+      "telegramId": "5500112233",
+      "telegramUsername": "@test_trader_01",
+      "telegramName": "Test User",
+      "telegramPhone": "8801700112233",
+      "verificationCode": "AREZ-TEST-1787927742",
+      "screenshot": "https://storage.example.com/proofs/test1.png",
+      "proofUrls": [
+        "https://storage.example.com/proofs/test1.png"
+      ],
+      "proofUrl": "https://storage.example.com/proofs/test1.png",
+      "status": "approved",
+      "isServerMatched": false,
+      "mismatchDetails": [
+        "Telegram Official Channel (@arearnzone) মেম্বারশিপ নিশ্চিত করা যায়নি। অনুগ্রহ করে চ্যানেলে যুক্ত হোন।"
+      ],
+      "botVerifiedData": {
+        "telegramId": "5500112233",
+        "username": "@test_trader_01",
+        "fullName": "Test User",
+        "phone": "8801700112233",
+        "isContactAuthentic": true,
+        "isChannelJoined": false,
+        "verifiedAt": 1787927744176
+      },
+      "appSubmittedData": {
+        "telegramId": "5500112233",
+        "username": "test_trader_01",
+        "phone": "8801700112233",
+        "code": "AREZ-TEST-1787927742"
+      },
+      "submittedAt": "2026-08-28T14:35:46.712Z",
+      "approvedAt": "2026-08-28T14:35:49.843Z",
+      "adminId": "admin",
+      "adminName": "Admin"
+    },
+    {
+      "id": "TGV-1787927712638-QXZMIG",
+      "userId": "USER_TEST_002",
+      "userName": "Fraud User",
+      "userEmail": "fraud@example.com",
+      "telegramId": "5500998877",
+      "telegramUsername": "@fraud_user",
+      "telegramName": "Fraud User",
+      "telegramPhone": "8801999999999",
+      "verificationCode": "INVALID-CODE-99999",
+      "screenshot": "https://storage.example.com/proofs/fraud.png",
+      "proofUrls": [
+        "https://storage.example.com/proofs/fraud.png"
+      ],
+      "proofUrl": "https://storage.example.com/proofs/fraud.png",
+      "status": "rejected",
+      "isServerMatched": false,
+      "mismatchDetails": [
+        "বট থেকে এখনও কোনো ভেরিফিকেশন ডাটা পাওয়া যায়নি। অনুগ্রহ করে প্রথমে Telegram Bot-এ Security Code (INVALID-CODE-99999) পাঠান এবং ফোন নম্বর শেয়ার করুন।",
+        "Telegram Official Channel (@arearnzone) মেম্বারশিপ নিশ্চিত করা যায়নি। অনুগ্রহ করে চ্যানেলে যুক্ত হোন।"
+      ],
+      "botVerifiedData": {
+        "telegramId": "5500998877",
+        "phone": "8801999999999",
+        "isContactAuthentic": true,
+        "isChannelJoined": false,
+        "verifiedAt": 1787927712638
+      },
+      "appSubmittedData": {
+        "telegramId": "5500998877",
+        "username": "fraud_user",
+        "phone": "8801999999999",
+        "code": "INVALID-CODE-99999"
+      },
+      "submittedAt": "2026-08-28T14:35:12.638Z"
+    },
+    {
+      "id": "TGV-1787927711305-NSMBRE",
+      "userId": "USER_TEST_001",
+      "userName": "Test User One",
+      "userEmail": "test001@example.com",
+      "telegramId": "5500112233",
+      "telegramUsername": "@test_trader_01",
+      "telegramName": "Test User",
+      "telegramPhone": "8801700112233",
+      "verificationCode": "AREZ-TEST-1787927706",
+      "screenshot": "https://storage.example.com/proofs/test1.png",
+      "proofUrls": [
+        "https://storage.example.com/proofs/test1.png"
+      ],
+      "proofUrl": "https://storage.example.com/proofs/test1.png",
+      "status": "approved",
+      "isServerMatched": false,
+      "mismatchDetails": [
+        "Telegram Official Channel (@arearnzone) মেম্বারশিপ নিশ্চিত করা যায়নি। অনুগ্রহ করে চ্যানেলে যুক্ত হোন।"
+      ],
+      "botVerifiedData": {
+        "telegramId": "5500112233",
+        "username": "@test_trader_01",
+        "fullName": "Test User",
+        "phone": "8801700112233",
+        "isContactAuthentic": true,
+        "isChannelJoined": false,
+        "verifiedAt": 1787927707991
+      },
+      "appSubmittedData": {
+        "telegramId": "5500112233",
+        "username": "test_trader_01",
+        "phone": "8801700112233",
+        "code": "AREZ-TEST-1787927706"
+      },
+      "submittedAt": "2026-08-28T14:35:11.305Z",
+      "approvedAt": "2026-08-28T14:35:49.843Z",
+      "adminId": "admin",
+      "adminName": "Admin"
+    },
+    {
+      "id": "TGV-1787927669132-C9G06N",
+      "userId": "USER_TEST_003",
+      "userName": "Duplicate User",
+      "userEmail": "duplicate@example.com",
+      "telegramId": "5500112233",
+      "telegramUsername": "@duplicate_attempt",
+      "telegramName": "Duplicate User",
+      "telegramPhone": "8801700112233",
+      "verificationCode": "AREZ-TEST3-1787927668",
+      "screenshot": "https://storage.example.com/proofs/dup.png",
+      "proofUrls": [
+        "https://storage.example.com/proofs/dup.png"
+      ],
+      "proofUrl": "https://storage.example.com/proofs/dup.png",
+      "status": "rejected",
+      "isServerMatched": false,
+      "mismatchDetails": [
+        "Telegram Username অমিল: অ্যাপে দেওয়া হয়েছে @duplicate_attempt, কিন্তু টেলিগ্রাম প্রোফাইল @test_trader_01",
+        "Telegram Official Channel (@arearnzone) মেম্বারশিপ নিশ্চিত করা যায়নি। অনুগ্রহ করে চ্যানেলে যুক্ত হোন।"
+      ],
+      "botVerifiedData": {
+        "telegramId": "5500112233",
+        "username": "@test_trader_01",
+        "phone": "8801700112233",
+        "isContactAuthentic": true,
+        "isChannelJoined": false,
+        "verifiedAt": 1787927661172
+      },
+      "appSubmittedData": {
+        "telegramId": "5500112233",
+        "username": "duplicate_attempt",
+        "phone": "8801700112233",
+        "code": "AREZ-TEST3-1787927668"
+      },
+      "submittedAt": "2026-08-28T14:34:29.132Z"
+    },
+    {
+      "id": "TGV-1787927666044-XG1QQS",
+      "userId": "USER_TEST_002",
+      "userName": "Fraud User",
+      "userEmail": "fraud@example.com",
+      "telegramId": "5500998877",
+      "telegramUsername": "@fraud_user",
+      "telegramName": "Fraud User",
+      "telegramPhone": "8801999999999",
+      "verificationCode": "INVALID-CODE-99999",
+      "screenshot": "https://storage.example.com/proofs/fraud.png",
+      "proofUrls": [
+        "https://storage.example.com/proofs/fraud.png"
+      ],
+      "proofUrl": "https://storage.example.com/proofs/fraud.png",
+      "status": "rejected",
+      "isServerMatched": false,
+      "mismatchDetails": [
+        "বট থেকে এখনও কোনো ভেরিফিকেশন ডাটা পাওয়া যায়নি। অনুগ্রহ করে প্রথমে Telegram Bot-এ Security Code (INVALID-CODE-99999) পাঠান এবং ফোন নম্বর শেয়ার করুন।",
+        "Telegram Official Channel (@arearnzone) মেম্বারশিপ নিশ্চিত করা যায়নি। অনুগ্রহ করে চ্যানেলে যুক্ত হোন।"
+      ],
+      "botVerifiedData": {
+        "telegramId": "5500998877",
+        "phone": "8801999999999",
+        "isContactAuthentic": true,
+        "isChannelJoined": false,
+        "verifiedAt": 1787927666044
+      },
+      "appSubmittedData": {
+        "telegramId": "5500998877",
+        "username": "fraud_user",
+        "phone": "8801999999999",
+        "code": "INVALID-CODE-99999"
+      },
+      "submittedAt": "2026-08-28T14:34:26.044Z"
+    },
+    {
+      "id": "TGV-1787927664867-5ZP3X6",
+      "userId": "USER_TEST_001",
+      "userName": "Test User One",
+      "userEmail": "test001@example.com",
+      "telegramId": "5500112233",
+      "telegramUsername": "@test_trader_01",
+      "telegramName": "Test User",
+      "telegramPhone": "8801700112233",
+      "verificationCode": "AREZ-TEST-1787927659",
+      "screenshot": "https://storage.example.com/proofs/test1.png",
+      "proofUrls": [
+        "https://storage.example.com/proofs/test1.png"
+      ],
+      "proofUrl": "https://storage.example.com/proofs/test1.png",
+      "status": "approved",
+      "isServerMatched": false,
+      "mismatchDetails": [
+        "Telegram Official Channel (@arearnzone) মেম্বারশিপ নিশ্চিত করা যায়নি। অনুগ্রহ করে চ্যানেলে যুক্ত হোন।"
+      ],
+      "botVerifiedData": {
+        "telegramId": "5500112233",
+        "username": "@test_trader_01",
+        "fullName": "Test User",
+        "phone": "8801700112233",
+        "isContactAuthentic": true,
+        "isChannelJoined": false,
+        "verifiedAt": 1787927661172
+      },
+      "appSubmittedData": {
+        "telegramId": "5500112233",
+        "username": "test_trader_01",
+        "phone": "8801700112233",
+        "code": "AREZ-TEST-1787927659"
+      },
+      "submittedAt": "2026-08-28T14:34:24.867Z",
+      "approvedAt": "2026-08-28T14:35:49.843Z",
+      "adminId": "admin",
+      "adminName": "Admin"
+    },
+    {
+      "id": "TGV-1787927646528-0LB4BN",
+      "userId": "USER_TEST_001",
+      "userName": "Test User One",
+      "userEmail": "test001@example.com",
+      "telegramId": "5500112233",
+      "telegramUsername": "@test_trader_01",
+      "telegramName": "Test User",
+      "telegramPhone": "8801700112233",
+      "verificationCode": "AREZ-TEST-1787927641",
+      "screenshot": "https://storage.example.com/proofs/test1.png",
+      "proofUrls": [
+        "https://storage.example.com/proofs/test1.png"
+      ],
+      "proofUrl": "https://storage.example.com/proofs/test1.png",
+      "status": "approved",
+      "isServerMatched": false,
+      "mismatchDetails": [
+        "Telegram Official Channel (@arearnzone) মেম্বারশিপ নিশ্চিত করা যায়নি। অনুগ্রহ করে চ্যানেলে যুক্ত হোন।"
+      ],
+      "botVerifiedData": {
+        "telegramId": "5500112233",
+        "username": "@test_trader_01",
+        "fullName": "Test User",
+        "phone": "8801700112233",
+        "isContactAuthentic": true,
+        "isChannelJoined": false,
+        "verifiedAt": 1787927643846
+      },
+      "appSubmittedData": {
+        "telegramId": "5500112233",
+        "username": "test_trader_01",
+        "phone": "8801700112233",
+        "code": "AREZ-TEST-1787927641"
+      },
+      "submittedAt": "2026-08-28T14:34:06.528Z",
+      "approvedAt": "2026-08-28T14:35:49.843Z",
+      "adminId": "admin",
+      "adminName": "Admin"
+    },
+    {
+      "id": "TGV-1787927586257-GRQTBW",
+      "userId": "USER_TEST_001",
+      "userName": "Test User One",
+      "userEmail": "test001@example.com",
+      "telegramId": "5500112233",
+      "telegramUsername": "@test_trader_01",
+      "telegramName": "Test User One",
+      "telegramPhone": "8801700112233",
+      "verificationCode": "AREZ-TEST-1787927580",
+      "screenshot": "https://storage.example.com/proofs/test1.png",
+      "proofUrls": [
+        "https://storage.example.com/proofs/test1.png"
+      ],
+      "proofUrl": "https://storage.example.com/proofs/test1.png",
+      "status": "approved",
+      "isServerMatched": false,
+      "mismatchDetails": [
+        "Telegram Official Channel (@arearnzone) মেম্বারশিপ নিশ্চিত করা যায়নি। অনুগ্রহ করে চ্যানেলে যুক্ত হোন।"
+      ],
+      "botVerifiedData": {
+        "telegramId": "5500112233",
+        "username": "@test_trader_01",
+        "phone": "8801700112233",
+        "isContactAuthentic": true,
+        "isChannelJoined": false,
+        "verifiedAt": 1787927583105
+      },
+      "appSubmittedData": {
+        "telegramId": "5500112233",
+        "username": "test_trader_01",
+        "phone": "8801700112233",
+        "code": "AREZ-TEST-1787927580"
+      },
+      "submittedAt": "2026-08-28T14:33:06.257Z",
+      "approvedAt": "2026-08-28T14:35:49.843Z",
+      "adminId": "admin",
+      "adminName": "Admin"
+    }
+  ],
+  "identities": {
+    "987654321": {
+      "telegramId": "987654321",
+      "telegramUsername": "@tester1_tg",
+      "telegramPhone": "01711223344",
+      "telegramName": "Test User One",
+      "totalCompleted": 0,
+      "totalPending": 0,
+      "totalApproved": 0,
+      "totalRejected": 0,
+      "totalLimit": 100,
+      "lastLinkedUserId": "user_test_001",
+      "historicalUserIds": [
+        "user_test_001"
+      ],
+      "firstVerifiedAt": "2026-08-30T16:04:48.801Z",
+      "lastVerifiedAt": "2026-08-30T16:04:48.801Z",
+      "completedTaskIds": [],
+      "lastUnlinkedAt": "2026-08-30T16:04:49.152Z"
+    }
   }
 }
