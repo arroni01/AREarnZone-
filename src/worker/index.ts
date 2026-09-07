@@ -2,6 +2,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createClient } from "@supabase/supabase-js";
+import defaultBotConfig from "../../telegram-bot-config.json";
 
 const app = new Hono();
 
@@ -148,13 +149,16 @@ app.get("/api/health", (c) => {
 
 // In-Worker Ephemeral / Cache state
 let botConfig = {
-  token: "8008225715:AAEE...",
-  username: "@AREarnZone_bot",
-  channel: "https://t.me/arearnzone",
+  token: (defaultBotConfig as any)?.token || "",
+  username: (defaultBotConfig as any)?.username || "@AREranZone_bot",
+  channel: (defaultBotConfig as any)?.channel || "https://t.me/arearnzone",
   channelId: "-1002345678901",
+  botId: (defaultBotConfig as any)?.botId || "8008225715",
   enabled: true,
-  isConfigured: true,
-  isBotOnline: true,
+  isConfigured: Boolean((defaultBotConfig as any)?.token),
+  isBotOnline: (defaultBotConfig as any)?.status === "CONNECTED",
+  status: (defaultBotConfig as any)?.status || "CONNECTED",
+  lastSuccessfulCheck: (defaultBotConfig as any)?.lastSuccessfulCheck || null,
 };
 
 let botCodes: Record<string, { userId: string; createdAt: number; verified: boolean; telegramId?: string; username?: string }> = {};
@@ -353,33 +357,102 @@ app.all("/api/cpa/callback/:networkParam", handleCpaPostback);
 // -------------------------------------------------------------
 const handleGetTelegramConfigWorker = async (c: any) => {
   try {
+    // 1. Resolve token from environment variables if present
+    const envToken = getEnv(c, "TELEGRAM_BOT_TOKEN") || getEnv(c, "VITE_TELEGRAM_BOT_TOKEN") || getEnv(c, "BOT_TOKEN");
+    if (envToken && envToken.trim().length > 10 && !envToken.includes("...")) {
+      botConfig.token = envToken.trim();
+    }
+
+    // 2. Query Supabase for persisted configuration
     const client = getSupabaseClient(c);
     try {
       const { data } = await client.from("system_settings").select("*").eq("key", "telegram_bot").single();
       if (data && data.value) {
-        if (data.value.bot_token) botConfig.token = data.value.bot_token;
+        if (data.value.bot_token && data.value.bot_token.length > 10 && !data.value.bot_token.includes("...")) {
+          botConfig.token = data.value.bot_token;
+        }
         if (data.value.bot_username) botConfig.username = data.value.bot_username;
         if (data.value.telegram_channel) botConfig.channel = data.value.telegram_channel;
         if (data.value.channel_id) botConfig.channelId = data.value.channel_id;
+        if (data.value.bot_id) botConfig.botId = data.value.bot_id;
       }
     } catch (e) {}
 
-    const cleanUsername = botConfig.username ? botConfig.username.replace(/^@+/, "") : "AREarnZone_bot";
+    try {
+      const { data: tgData } = await client.from("telegram_config").select("*").eq("id", "global").single();
+      if (tgData) {
+        if (tgData.bot_token && tgData.bot_token.length > 10 && !tgData.bot_token.includes("...")) {
+          botConfig.token = tgData.bot_token;
+        }
+        if (tgData.bot_username) botConfig.username = tgData.bot_username;
+        if (tgData.telegram_channel) botConfig.channel = tgData.telegram_channel;
+        if (tgData.channel_id) botConfig.channelId = tgData.channel_id;
+        if (tgData.bot_id) botConfig.botId = tgData.bot_id;
+      }
+    } catch (e) {}
+
+    // 3. Reliable token validation with Telegram getMe API
+    const activeToken = botConfig.token;
+    let isConnected = false;
+    if (activeToken && activeToken.length > 10 && !activeToken.includes("...")) {
+      try {
+        const meRes = await fetch(`https://api.telegram.org/bot${activeToken}/getMe`, {
+          signal: AbortSignal.timeout(6000),
+        });
+        const meData: any = await meRes.json().catch(() => ({}));
+        if (meData && meData.ok && meData.result?.username) {
+          const clean = meData.result.username.replace(/^@+/, "");
+          botConfig.username = `@${clean}`;
+          botConfig.botId = String(meData.result.id || "");
+          botConfig.lastSuccessfulCheck = new Date().toISOString();
+          botConfig.status = "CONNECTED";
+          botConfig.isBotOnline = true;
+          isConnected = true;
+        } else {
+          botConfig.isBotOnline = false;
+          botConfig.status = "DISCONNECTED";
+        }
+      } catch (meErr) {
+        // If temporary timeout/network glitch, maintain previous status if verified
+        isConnected = botConfig.isBotOnline !== false;
+      }
+    } else {
+      isConnected = false;
+      botConfig.isBotOnline = false;
+      botConfig.status = "DISCONNECTED";
+    }
+
+    const cleanUsername = (botConfig.username || "AREranZone_bot").replace(/^@+/, "");
     const formattedUsername = `@${cleanUsername}`;
+    const channel = botConfig.channel || "https://t.me/arearnzone";
+    const masked = (activeToken && activeToken.length > 8 && !activeToken.includes("..."))
+      ? `${activeToken.substring(0, 4)}...${activeToken.slice(-4)}`
+      : (activeToken && activeToken.includes("...") ? activeToken : "None");
 
     return c.json({
       ok: true,
       success: true,
-      isConfigured: !!botConfig.token && botConfig.token !== "None",
-      isBotOnline: botConfig.isBotOnline !== false,
+      status: isConnected ? "CONNECTED" : "DISCONNECTED",
+      isBotOnline: isConnected,
+      isConfigured: Boolean(activeToken && activeToken.length > 10 && !activeToken.includes("...")),
       botUsername: formattedUsername,
       bot_username: cleanUsername,
-      channelLink: botConfig.channel,
-      telegramChannel: botConfig.channel,
-      telegram_channel: botConfig.channel,
-      maskedToken: botConfig.token.length > 8 ? botConfig.token.substring(0, 4) + "..." + botConfig.token.slice(-4) : botConfig.token,
+      botId: botConfig.botId || "8008225715",
+      lastSuccessfulCheck: botConfig.lastSuccessfulCheck || (isConnected ? new Date().toISOString() : null),
+      channelLink: channel,
+      telegramChannel: channel,
+      telegram_channel: channel,
+      channelId: botConfig.channelId || "-1002345678901",
+      maskedToken: masked,
       lastPollingError: null,
-      config: botConfig,
+      config: {
+        username: formattedUsername,
+        channel,
+        channelId: botConfig.channelId || "-1002345678901",
+        botId: botConfig.botId || "8008225715",
+        status: isConnected ? "CONNECTED" : "DISCONNECTED",
+        lastSuccessfulCheck: botConfig.lastSuccessfulCheck || (isConnected ? new Date().toISOString() : null),
+      },
     }, 200, {
       "Content-Type": "application/json; charset=utf-8",
       "Access-Control-Allow-Origin": "*",
@@ -404,60 +477,85 @@ const handleSaveTelegramBotWorker = async (c: any) => {
     }
 
     const query = c.req.query() || {};
-    const rawToken = (body.bot_token || body.token || body.botToken || query.bot_token || query.token || "").trim();
+    const candidateToken = (body.bot_token || body.token || body.botToken || query.bot_token || query.token || "").trim();
     const rawUsername = (body.bot_username || body.username || body.botUsername || query.bot_username || query.username || "").trim();
     const rawChannel = (body.telegram_channel || body.channel || body.channelLink || body.channel_link || body.telegramChannel || query.telegram_channel || query.channel || "").trim();
     const rawChannelId = (body.channel_id || body.channelId || body.chat_id || query.channel_id || "").trim();
-
-    const normalizedUsername = rawUsername ? rawUsername.replace(/^@+/, "") : "";
-    const formattedUsername = normalizedUsername ? `@${normalizedUsername}` : (botConfig.username || "@AREarnZone_bot");
-
-    if (rawToken) botConfig.token = rawToken;
-    if (normalizedUsername) botConfig.username = formattedUsername;
-    if (rawChannel) botConfig.channel = rawChannel;
-    if (rawChannelId) botConfig.channelId = rawChannelId;
-
-    botConfig.isConfigured = !!botConfig.token;
+    const forceSave = body.forceSave === true || body.force === true || query.forceSave === "true";
 
     const webhookUrl = "https://arearnzone.abdurrahman714915.workers.dev/api/telegram/webhook";
-    let webhookStatus = "skipped";
-    let webhookDetails: any = null;
+    let isConnected = false;
 
-    // Trigger Telegram setWebhook API automatically
-    if (botConfig.token && botConfig.token.length > 10) {
+    // Validate candidate token with Telegram getMe
+    if (candidateToken && candidateToken.length > 10 && !candidateToken.includes("...")) {
       try {
-        const tgRes = await fetch(
-          `https://api.telegram.org/bot${botConfig.token}/setWebhook?url=${encodeURIComponent(webhookUrl)}&drop_pending_updates=true`
-        );
-        const tgData: any = await tgRes.json().catch(() => ({}));
-        webhookDetails = tgData;
-        if (tgData && tgData.ok) {
-          webhookStatus = "connected";
+        const meRes = await fetch(`https://api.telegram.org/bot${candidateToken}/getMe`, {
+          signal: AbortSignal.timeout(8000),
+        });
+        const meData: any = await meRes.json().catch(() => ({}));
+        if (meData && meData.ok && meData.result?.username) {
+          const clean = meData.result.username.replace(/^@+/, "");
+          botConfig.token = candidateToken;
+          botConfig.username = `@${clean}`;
+          botConfig.botId = String(meData.result.id || "");
+          botConfig.lastSuccessfulCheck = new Date().toISOString();
           botConfig.isBotOnline = true;
-        } else {
-          webhookStatus = tgData?.description || "failed";
-        }
+          botConfig.status = "CONNECTED";
+          isConnected = true;
+          if (rawChannel) botConfig.channel = rawChannel;
+          if (rawChannelId) botConfig.channelId = rawChannelId;
 
-        // Auto-fetch bot username from getMe if needed
-        try {
-          const meRes = await fetch(`https://api.telegram.org/bot${botConfig.token}/getMe`);
-          const meData: any = await meRes.json().catch(() => ({}));
-          if (meData && meData.ok && meData.result?.username) {
-            const fetchedClean = meData.result.username.replace(/^@+/, "");
-            botConfig.username = `@${fetchedClean}`;
-            botConfig.isBotOnline = true;
+          // Set webhook automatically on Telegram API
+          try {
+            await fetch(
+              `https://api.telegram.org/bot${candidateToken}/setWebhook?url=${encodeURIComponent(webhookUrl)}&drop_pending_updates=true`
+            );
+          } catch (whErr) {
+            console.warn("[Telegram SetWebhook Worker]", whErr);
           }
-        } catch (meErr) {}
-      } catch (tgErr: any) {
-        console.warn("[Telegram SetWebhook Worker]", tgErr);
-        webhookStatus = "error: " + (tgErr?.message || String(tgErr));
+        } else if (!forceSave) {
+          const desc = meData?.description || "Invalid Telegram Bot Token";
+          return c.json({
+            ok: false,
+            success: false,
+            error: "INVALID_TOKEN",
+            message: `Invalid Telegram Bot Token (${desc}). পূর্বের সচল বট কানেকশন অপরিবর্তিত রাখা হয়েছে।`,
+            status: botConfig.isBotOnline ? "CONNECTED" : "DISCONNECTED",
+            isBotOnline: botConfig.isBotOnline,
+            botUsername: botConfig.username,
+            channelLink: botConfig.channel,
+          }, 400, {
+            "Content-Type": "application/json; charset=utf-8",
+            "Access-Control-Allow-Origin": "*",
+          });
+        }
+      } catch (meErr: any) {
+        if (!forceSave) {
+          return c.json({
+            ok: false,
+            success: false,
+            error: "NETWORK_ERROR",
+            message: "Telegram API সংযোগ পরীক্ষা করতে বিলম্ব হয়েছে: " + (meErr?.message || "Timeout"),
+            status: botConfig.isBotOnline ? "CONNECTED" : "DISCONNECTED",
+            isBotOnline: botConfig.isBotOnline,
+          }, 500, {
+            "Content-Type": "application/json; charset=utf-8",
+            "Access-Control-Allow-Origin": "*",
+          });
+        }
       }
+    } else {
+      if (rawUsername) {
+        botConfig.username = `@${rawUsername.replace(/^@+/, "")}`;
+      }
+      if (rawChannel) botConfig.channel = rawChannel;
+      if (rawChannelId) botConfig.channelId = rawChannelId;
+      isConnected = botConfig.isBotOnline;
     }
 
     // Persist to Supabase tables
     const client = getSupabaseClient(c);
     try {
-      // 1. system_settings table
       await client.from("system_settings").upsert({
         key: "telegram_bot",
         value: {
@@ -465,26 +563,27 @@ const handleSaveTelegramBotWorker = async (c: any) => {
           bot_username: botConfig.username,
           telegram_channel: botConfig.channel,
           channel_id: botConfig.channelId,
+          bot_id: botConfig.botId,
           webhook_url: webhookUrl,
+          status: isConnected ? "CONNECTED" : "DISCONNECTED",
           updated_at: new Date().toISOString(),
         },
         updated_at: new Date().toISOString(),
       }).catch(() => {});
 
-      // 2. telegram_config table
       await client.from("telegram_config").upsert({
         id: "global",
         bot_token: botConfig.token,
         bot_username: botConfig.username,
         telegram_channel: botConfig.channel,
         channel_id: botConfig.channelId,
+        bot_id: botConfig.botId,
         webhook_url: webhookUrl,
-        is_active: true,
+        is_active: isConnected,
         updated_at: new Date().toISOString(),
         raw_data: botConfig,
       }).catch(() => {});
 
-      // 3. settings table
       await client.from("settings").upsert({
         id: "telegram_config",
         updated_at: new Date().toISOString(),
@@ -494,20 +593,37 @@ const handleSaveTelegramBotWorker = async (c: any) => {
       console.warn("[Telegram Supabase Persist]", dbErr);
     }
 
+    const cleanUsername = (botConfig.username || "AREranZone_bot").replace(/^@+/, "");
+    const formattedUsername = `@${cleanUsername}`;
+    const masked = (botConfig.token && botConfig.token.length > 8 && !botConfig.token.includes("..."))
+      ? `${botConfig.token.substring(0, 4)}...${botConfig.token.slice(-4)}`
+      : "None";
+
     return c.json({
       ok: true,
       success: true,
-      message: "Telegram bot configured and webhook connected successfully!",
-      botUsername: botConfig.username,
-      bot_username: botConfig.username.replace(/^@+/, ""),
-      channelLink: botConfig.channel,
-      telegram_channel: botConfig.channel,
-      isConfigured: true,
-      isBotOnline: true,
-      config: botConfig,
+      status: isConnected ? "CONNECTED" : "DISCONNECTED",
+      isBotOnline: isConnected,
+      message: isConnected
+        ? "টেলিগ্রাম বট সফলভাবে কানেক্ট ও সেভ হয়েছে! ✅"
+        : (forceSave ? "টেলিগ্রাম কনফিগারেশন সেভ হয়েছে! ⚠️" : "টেলিগ্রাম বট কনফিগারেশন আপডেট হয়েছে।"),
+      botUsername: formattedUsername,
+      bot_username: cleanUsername,
+      botId: botConfig.botId || "8008225715",
+      channelLink: botConfig.channel || "https://t.me/arearnzone",
+      telegramChannel: botConfig.channel || "https://t.me/arearnzone",
+      telegram_channel: botConfig.channel || "https://t.me/arearnzone",
+      isConfigured: Boolean(botConfig.token && botConfig.token.length > 10),
+      maskedToken: masked,
       webhookUrl,
-      webhookStatus,
-      webhookDetails,
+      config: {
+        username: formattedUsername,
+        channel: botConfig.channel,
+        channelId: botConfig.channelId || "-1002345678901",
+        botId: botConfig.botId || "8008225715",
+        status: isConnected ? "CONNECTED" : "DISCONNECTED",
+        lastSuccessfulCheck: botConfig.lastSuccessfulCheck,
+      },
     }, 200, {
       "Content-Type": "application/json; charset=utf-8",
       "Access-Control-Allow-Origin": "*",

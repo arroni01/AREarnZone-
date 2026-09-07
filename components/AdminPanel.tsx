@@ -31,7 +31,7 @@ import {
   GatewayLog,
 } from "../types";
 import { ICONS } from "../constants";
-import { getApiUrl, safeParseJsonResponse } from "../src/utils/apiConfig";
+import { getApiUrl, safeParseJsonResponse, DEFAULT_WORKER_URL } from "../src/utils/apiConfig";
 import MonitorDashboard from "./MonitorDashboard";
 import CPAControlCenter from "./CPAControlCenter";
 import RegressionTestDashboard from "./RegressionTestDashboard";
@@ -1680,12 +1680,35 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const fetchTelegramConfig = async () => {
     try {
-      const res = await fetch(getApiUrl("/api/telegram/config"));
+      let res = await fetch(getApiUrl("/api/telegram/config"));
+      let data: any = null;
+
       if (res.ok) {
-        const data = await safeParseJsonResponse<any>(res);
-        setTgBotUsername(data.botUsername || "@AREarnZone_bot");
-        setTgChannelLink(data.channelLink || "https://t.me/arearnzone");
-        setTgBotIsOnline(!!data.isBotOnline);
+        data = await safeParseJsonResponse<any>(res);
+      }
+
+      // If response returned HTML or invalid data (e.g. static hosting 404 fallback), retry against DEFAULT_WORKER_URL directly
+      if (!data || data.error === "HTML_RESPONSE_RECEIVED" || typeof data !== "object") {
+        try {
+          const fallbackRes = await fetch(`${DEFAULT_WORKER_URL}/api/telegram/config`);
+          if (fallbackRes.ok) {
+            data = await safeParseJsonResponse<any>(fallbackRes);
+          }
+        } catch (fbErr) {
+          console.warn("[Telegram Config] Cloudflare Worker direct fetch error:", fbErr);
+        }
+      }
+
+      if (data) {
+        const isOnline = Boolean(
+          data.isBotOnline === true ||
+          data.status === "CONNECTED" ||
+          (data.config && (data.config.status === "CONNECTED" || data.config.isBotOnline === true))
+        );
+
+        setTgBotUsername(data.botUsername || data.bot_username || (data.config && data.config.username) || "@AREranZone_bot");
+        setTgChannelLink(data.channelLink || data.telegramChannel || data.telegram_channel || (data.config && data.config.channel) || "https://t.me/arearnzone");
+        setTgBotIsOnline(isOnline);
         if (data.maskedToken && data.maskedToken !== "None") {
           setTgBotMaskedToken(data.maskedToken);
         }
@@ -1695,7 +1718,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         if (!data.isConfigured) {
           // 1. Try restoring from globalConfig first
           const cachedBotToken = globalConfig?.telegramBotToken;
-          const cachedBotUsername = globalConfig?.telegramBotUsername || "@AREarnZone_bot";
+          const cachedBotUsername = globalConfig?.telegramBotUsername || "@AREranZone_bot";
           const cachedBotChannel = globalConfig?.telegramChannelLink || "https://t.me/arearnzone";
 
           if (cachedBotToken && cachedBotToken.trim()) {
@@ -1861,7 +1884,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     if (activeTab === "system") {
       fetchEmailCounters();
       fetchTelegramConfig();
-      const interval = setInterval(fetchEmailCounters, 10000);
+      const interval = setInterval(() => {
+        fetchEmailCounters();
+        fetchTelegramConfig();
+      }, 10000);
       return () => clearInterval(interval);
     }
   }, [activeTab]);

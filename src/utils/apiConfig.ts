@@ -8,8 +8,8 @@ export const DEFAULT_WORKER_URL = 'https://arearnzone.abdurrahman714915.workers.
  * or user overrides, or fallback to Cloudflare Worker.
  */
 export const getApiBaseUrl = (): string => {
-  // 1. In browser, prioritize current origin
-  if (typeof window !== 'undefined' && window.location && window.location.origin) {
+  // 1. Explicit override in localStorage
+  if (typeof window !== 'undefined') {
     try {
       const cached = localStorage.getItem('arez_api_base_url');
       if (cached && cached.trim() && (cached.startsWith('http://') || cached.startsWith('https://'))) {
@@ -17,17 +17,15 @@ export const getApiBaseUrl = (): string => {
       }
     } catch (e) {}
 
-    return window.location.origin;
-  }
-
-  // 2. Window object override (dynamic client configuration)
-  if (typeof window !== 'undefined' && (window as any).VITE_API_BASE_URL) {
-    let winUrl = String((window as any).VITE_API_BASE_URL).trim();
-    if (winUrl) {
-      if (!winUrl.startsWith('http://') && !winUrl.startsWith('https://')) {
-        winUrl = `https://${winUrl}`;
+    // 2. Global window override
+    if ((window as any).VITE_API_BASE_URL) {
+      let winUrl = String((window as any).VITE_API_BASE_URL).trim();
+      if (winUrl) {
+        if (!winUrl.startsWith('http://') && !winUrl.startsWith('https://')) {
+          winUrl = `https://${winUrl}`;
+        }
+        return winUrl.replace(/\/+$/, '');
       }
-      return winUrl.replace(/\/+$/, '');
     }
   }
 
@@ -43,6 +41,14 @@ export const getApiBaseUrl = (): string => {
     }
   } catch (e) {
     // Ignore if import.meta is not available
+  }
+
+  // 4. In browser: Only use same-origin if running in local Node or Cloud Run dev preview with fullstack server
+  if (typeof window !== 'undefined' && window.location && window.location.origin) {
+    const hostname = window.location.hostname || '';
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.run.app')) {
+      return window.location.origin;
+    }
   }
 
   return DEFAULT_WORKER_URL;
@@ -62,8 +68,8 @@ export const getApiUrl = (endpoint: string): string => {
 
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
-  // In browser, return relative URL directly so it always hits the active host
-  if (typeof window !== 'undefined' && window.location && window.location.origin) {
+  // Check for custom override in localStorage
+  if (typeof window !== 'undefined') {
     try {
       const customOverride = localStorage.getItem('arez_api_base_url');
       if (customOverride && (customOverride.startsWith('http://') || customOverride.startsWith('https://'))) {
@@ -71,7 +77,11 @@ export const getApiUrl = (endpoint: string): string => {
       }
     } catch (e) {}
 
-    return cleanEndpoint;
+    // In local Node or Cloud Run dev environment with Express server, use relative path
+    const hostname = window.location?.hostname || '';
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.run.app')) {
+      return cleanEndpoint;
+    }
   }
 
   const baseUrl = getApiBaseUrl();
@@ -152,6 +162,22 @@ export const apiFetch = async <T = any>(endpoint: string, options?: RequestInit)
 
     // Check if the response returned an HTML document instead of JSON (e.g., static hosting 404 fallback)
     if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || contentType.includes('text/html')) {
+      // If we got HTML from same-origin, attempt automatic fallback to Cloudflare Worker
+      if (!url.startsWith(DEFAULT_WORKER_URL)) {
+        try {
+          const fallbackUrl = `${DEFAULT_WORKER_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+          console.info(`[API Client] Static host returned HTML. Falling back to Cloudflare Worker: ${fallbackUrl}`);
+          const fbRes = await fetch(fallbackUrl, mergedOptions);
+          const fbText = await fbRes.text();
+          if (!fbText.trim().startsWith('<!DOCTYPE') && !fbText.trim().startsWith('<html')) {
+            const fbParsed = JSON.parse(fbText);
+            return fbParsed as unknown as T;
+          }
+        } catch (fbErr) {
+          console.warn('[API Client] Worker fallback failed:', fbErr);
+        }
+      }
+
       console.warn(`[API Client] Received HTML instead of JSON for endpoint: ${endpoint}.`);
       const resObj = {
         ok: false,
