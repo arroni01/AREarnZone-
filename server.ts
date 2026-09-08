@@ -1610,7 +1610,11 @@ function comparePhones(phone1: string, phone2: string): boolean {
 
 function normalizeSecurityCode(code: string): string {
   if (!code) return "";
-  return String(code).trim().toUpperCase().replace(/[_\s]+/g, "-");
+  let clean = String(code).trim().toUpperCase().replace(/[_\s]+/g, "-");
+  if (/^\d{6}$/.test(clean)) {
+    clean = `AREZ-${clean}`;
+  }
+  return clean;
 }
 
 async function checkTelegramChannelMembership(
@@ -1894,6 +1898,23 @@ async function processTelegramUpdate(update: any) {
     }
     saveBotStorage();
 
+    // Sync verified code to Cloudflare Worker in real time
+    try {
+      fetch("https://arearnzone.abdurrahman714915.workers.dev/api/telegram/sync-verified", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: matchedCode,
+          telegramId,
+          username: `@${username}`,
+          fullName,
+          phone: sharedPhone,
+          verified: true,
+          verifiedAt: Date.now(),
+        }),
+      }).catch((syncErr) => console.warn("[Telegram Worker Sync Warn]", syncErr?.message));
+    } catch (e) {}
+
     if (supabase && isSupabaseConfigured) {
       try {
         const updatePayload = {
@@ -2034,9 +2055,10 @@ const handleCheckCodeUnified = async (c: any) => {
   const rawCode = (c.req.query("code") || body.code || "").trim();
   const code = normalizeSecurityCode(rawCode);
   const userId = (c.req.query("userId") || c.req.query("user_id") || body.userId || body.user_id || "").trim();
+  const telegramId = (c.req.query("telegramId") || c.req.query("telegram_id") || body.telegramId || body.telegram_id || "").trim();
   const phone = (c.req.query("phone") || body.phone || "").replace("+", "").trim();
 
-  if (!code && !rawCode && !userId && !phone) {
+  if (!code && !rawCode && !userId && !phone && !telegramId) {
     return c.json({ error: "Code, userId, or phone required", ok: false, success: false, verified: false }, 400, {
       "Content-Type": "application/json; charset=utf-8"
     });
@@ -2060,11 +2082,11 @@ const handleCheckCodeUnified = async (c: any) => {
     }
   }
 
-  // 2. Check by userId or phone in botStorage.codes
-  if (botStorage.codes && (userId || phone)) {
+  // 2. Check by telegramId, userId or phone in botStorage.codes
+  if (botStorage.codes && (userId || phone || telegramId)) {
     for (const [, v] of Object.entries(botStorage.codes as Record<string, any>)) {
       if (v && v.verified) {
-        if ((userId && v.userId === userId) || (phone && v.phone && comparePhones(v.phone, phone))) {
+        if ((telegramId && v.telegramId === telegramId) || (userId && v.userId === userId) || (phone && v.phone && comparePhones(v.phone, phone))) {
           return c.json({
             ok: true,
             success: true,
@@ -2931,6 +2953,30 @@ async function startTelegramBotPolling() {
           saveBotConfig();
           console.info(`[Telegram Bot Engine] Connected as @${meData.result.username} (ID: ${meData.result.id})`);
         }
+      }
+
+      // Sync verified codes from local storage to Cloudflare Worker
+      try {
+        const storedCodes = botStorage?.codes || {};
+        for (const [codeKey, codeVal] of Object.entries(storedCodes)) {
+          if (codeVal && (codeVal as any).verified) {
+            fetch("https://arearnzone.abdurrahman714915.workers.dev/api/telegram/sync-verified", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                code: codeKey,
+                telegramId: (codeVal as any).telegramId,
+                username: (codeVal as any).username,
+                fullName: (codeVal as any).fullName,
+                phone: (codeVal as any).phone,
+                verified: true,
+                verifiedAt: (codeVal as any).verifiedAt || Date.now(),
+              }),
+            }).catch(() => {});
+          }
+        }
+      } catch (syncErr) {
+        console.warn("[Telegram Worker Pre-Sync Notice]", syncErr);
       }
     } catch (e) {
       console.warn("[Telegram Bot Init Notice]", e);

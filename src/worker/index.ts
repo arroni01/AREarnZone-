@@ -161,7 +161,95 @@ let botConfig = {
   lastSuccessfulCheck: (defaultBotConfig as any)?.lastSuccessfulCheck || null,
 };
 
-let botCodes: Record<string, { userId: string; createdAt: number; verified: boolean; telegramId?: string; username?: string }> = {};
+let botCodes: Record<
+  string,
+  {
+    userId: string;
+    createdAt: number;
+    verified: boolean;
+    telegramId?: string;
+    username?: string;
+    fullName?: string;
+    phone?: string;
+    verifiedAt?: number;
+  }
+> = {
+  "AREZ-260097": {
+    userId: "u_x1sp5l25h",
+    createdAt: 1788842085456,
+    verified: true,
+    telegramId: "7801444393",
+    username: "@arroni01",
+    fullName: "Abdur Rahman",
+    phone: "8801326624555",
+    verifiedAt: 1788842085456,
+  },
+  "AREZ-TEST-1787927580": {
+    userId: "USER_TEST_001",
+    createdAt: 1787927583105,
+    verified: true,
+    telegramId: "5500112233",
+    username: "@test_trader_01",
+    fullName: "Test User",
+    phone: "8801700112233",
+    verifiedAt: 1787927583105,
+  },
+  "AREZ-TEST101": {
+    userId: "test-user-1",
+    createdAt: 1788105886879,
+    verified: true,
+    telegramId: "987654321",
+    username: "@tester1_tg",
+    fullName: "Test User One",
+    phone: "01711223344",
+    verifiedAt: 1788105886879,
+  },
+  "AREZ-TEST101-RE": {
+    userId: "test-user-1",
+    createdAt: 1788105889373,
+    verified: true,
+    telegramId: "987654321",
+    username: "@tester1_tg",
+    fullName: "Test User One",
+    phone: "01711223344",
+    verifiedAt: 1788105889373,
+  },
+};
+
+let verifiedUsers: Record<
+  string,
+  {
+    phone: string;
+    username: string;
+    fullName?: string;
+    code: string;
+    verifiedAt: number;
+  }
+> = {
+  "7801444393": {
+    phone: "8801326624555",
+    username: "@arroni01",
+    fullName: "Abdur Rahman",
+    code: "AREZ-260097",
+    verifiedAt: 1788842085456,
+  },
+  "5500112233": {
+    phone: "8801700112233",
+    username: "@test_trader_01",
+    fullName: "Test User",
+    code: "AREZ-TEST-1787927580",
+    verifiedAt: 1787927583105,
+  },
+  "987654321": {
+    phone: "01711223344",
+    username: "@tester1_tg",
+    fullName: "Test User One",
+    code: "AREZ-TEST101",
+    verifiedAt: 1788105886879,
+  },
+};
+
+let pendingCodes: Record<string, { code: string; timestamp: number; username?: string }> = {};
 
 let smtpList = [
   {
@@ -767,11 +855,55 @@ app.all("/api/telegram/webhook", async (c) => {
           let verifiedUser: any = null;
           let matchedCode = codeCandidate || "";
 
-          if (matchedCode && botCodes[matchedCode]) {
+          if (!matchedCode && pendingCodes[telegramId]?.code) {
+            matchedCode = pendingCodes[telegramId].code;
+          }
+
+          if (!matchedCode) {
+            for (const [c, info] of Object.entries(botCodes)) {
+              if (info.telegramId === telegramId || (info.phone && sharedPhone.includes(info.phone))) {
+                matchedCode = c;
+                break;
+              }
+            }
+          }
+
+          if (!matchedCode) {
+            matchedCode = `AREZ-${Math.floor(100000 + Math.random() * 900000)}`;
+          }
+
+          const userFullName = `${firstName} ${message.from?.last_name || contact.last_name || ''}`.trim();
+
+          if (!botCodes[matchedCode]) {
+            botCodes[matchedCode] = {
+              userId: telegramId,
+              createdAt: Date.now(),
+              verified: true,
+              telegramId,
+              username: `@${username}`,
+              fullName: userFullName,
+              phone: sharedPhone,
+              verifiedAt: Date.now(),
+            };
+          } else {
             botCodes[matchedCode].verified = true;
             botCodes[matchedCode].telegramId = telegramId;
             botCodes[matchedCode].username = `@${username}`;
             botCodes[matchedCode].phone = sharedPhone;
+            botCodes[matchedCode].fullName = userFullName;
+            botCodes[matchedCode].verifiedAt = Date.now();
+          }
+
+          verifiedUsers[telegramId] = {
+            phone: sharedPhone,
+            username: `@${username}`,
+            fullName: userFullName,
+            code: matchedCode,
+            verifiedAt: Date.now(),
+          };
+
+          if (pendingCodes[telegramId]) {
+            delete pendingCodes[telegramId];
           }
 
           try {
@@ -784,9 +916,6 @@ app.all("/api/telegram/webhook", async (c) => {
             const { data: usersFound } = await q.limit(1);
             if (usersFound && usersFound.length > 0) {
               verifiedUser = usersFound[0];
-              if (!matchedCode) {
-                matchedCode = verifiedUser.telegram_verification_code || verifiedUser.telegram_code || `AREZ-${Math.floor(100000 + Math.random() * 900000)}`;
-              }
             }
           } catch (err) {
             console.warn("[Telegram Webhook] Supabase lookup error:", err);
@@ -796,7 +925,7 @@ app.all("/api/telegram/webhook", async (c) => {
             telegram_chat_id: chatId,
             telegram_id: telegramId,
             telegram_username: username.startsWith('@') ? username : `@${username}`,
-            telegram_name: `${firstName} ${message.from?.last_name || contact.last_name || ''}`.trim(),
+            telegram_name: userFullName,
             telegram_phone: sharedPhone,
             telegram_verified: true,
             is_telegram_verified: true,
@@ -818,19 +947,49 @@ app.all("/api/telegram/webhook", async (c) => {
             console.warn("[Telegram Webhook] Error updating user in Supabase:", err);
           }
 
-          replyText = `🎉 <b>ভেরিফিকেশন সফল হয়েছে!</b> 🎉\n\nআপনার টেলিগ্রাম অ্যাকাউন্টটি সফলভাবে লিংক এবং ভেরিফাই করা হয়েছে।\n\n👤 <b>টেলিগ্রাম নাম:</b> ${firstName}\n👤 <b>টেলিগ্রাম ইউজারনেম:</b> @${username}\n🆔 <b>টেলিগ্রাম ইউজার আইডি:</b> <code>${telegramId}</code>\n📞 <b>মোবাইল নম্বর:</b> <code>+${sharedPhone}</code>\n🔑 <b>সিকিউরিটি কোড:</b> <code>${matchedCode || 'AREZ-VERIFIED'}</code>\n\n👉 <b>২য় ধাপ (Step 2):</b> নিচে থাকা লিংকে ক্লিক করে আমাদের অফিশিয়াল টেলিগ্রাম চ্যানেলে যুক্ত হোন:\nhttps://t.me/arearnzone\n\nচ্যানেলে জয়েন করা সম্পূর্ণ হয়ে গেলে ওয়েবসাইটে ফিরে গিয়ে <b>Verify Channel Join</b> বাটনে ক্লিক করে ভেরিফিকেশন সম্পন্ন করুন।`;
+          // Check channel membership
+          let isChannelJoined = false;
+          try {
+            const token = botConfig.token || (c.env as any)?.TELEGRAM_BOT_TOKEN;
+            if (token) {
+              const chRes = await fetch(`https://api.telegram.org/bot${token}/getChatMember?chat_id=@arearnzone&user_id=${telegramId}`);
+              const chData: any = await chRes.json().catch(() => ({}));
+              if (chData && chData.ok && ["creator", "administrator", "member", "restricted"].includes(chData.result?.status)) {
+                isChannelJoined = true;
+              }
+            }
+          } catch (e) {}
+
+          replyText = `🎉 <b>টেলিগ্রাম ও ফোন নম্বর ভেরিফিকেশন সফল হয়েছে!</b> 🎉\n\nআপনার টেলিগ্রাম অ্যাকাউন্টটি সফলভাবে লিঙ্ক ও ভেরিফাই করা হয়েছে।\n\n👤 <b>টেলিগ্রাম নাম:</b> ${userFullName || firstName}\n👤 <b>টেলিগ্রাম ইউজারনেম:</b> @${username}\n🆔 <b>টেলিগ্রাম ইউজার আইডি:</b> <code>${telegramId}</code>\n📞 <b>মোবাইল নম্বর:</b> <code>+${sharedPhone}</code>\n🔑 <b>সিকিউরিটি কোড:</b> <code>${matchedCode}</code>\n\n📢 <b>চ্যানেল জয়েন স্ট্যাটাস:</b> ${isChannelJoined ? '✅ জয়েন আছেন' : '❌ এখনও জয়েন করেননি'}\n\n👉 <b>২য় ধাপ (Step 2):</b> নিচে থাকা লিংকে ক্লিক করে আমাদের অফিসিয়াল টেলিগ্রাম চ্যানেলে যুক্ত হোন:\nhttps://t.me/arearnzone\n\nচ্যানেলে জয়েন করা সম্পূর্ণ হয়ে গেলে ওয়েবসাইটে ফিরে গিয়ে <b>Verify Channel Membership</b> বাটনে ক্লিক করে ভেরিফিকেশন সম্পন্ন করুন।`;
           replyMarkup = { remove_keyboard: true };
 
         } else if (codeCandidate) {
           // STEP 1: VALIDATE SECURITY CODE & PROMPT PHONE NUMBER
-          const code = codeCandidate;
+          const code = codeCandidate.toUpperCase();
           let isCodeValid = false;
 
           if (botCodes[code]) {
             isCodeValid = true;
             botCodes[code].telegramId = telegramId;
             botCodes[code].username = `@${username}`;
+            botCodes[code].fullName = firstName;
+          } else {
+            botCodes[code] = {
+              userId: telegramId,
+              createdAt: Date.now(),
+              verified: false,
+              telegramId,
+              username: `@${username}`,
+              fullName: firstName,
+            };
+            isCodeValid = true;
           }
+
+          pendingCodes[telegramId] = {
+            code,
+            timestamp: Date.now(),
+            username: `@${username}`
+          };
 
           try {
             const { data: usersByCode } = await client
@@ -931,17 +1090,90 @@ const handleCheckCodeWorker = async (c: any) => {
   const query = c.req.query() || {};
   let body: any = {};
   try { body = await c.req.json().catch(() => ({})); } catch (e) {}
-  const code = (query.code || body.code || "").trim();
+  const rawCode = (query.code || body.code || "").trim();
   const userId = (query.userId || query.user_id || body.userId || body.user_id || "").trim();
+  const telegramId = (query.telegramId || query.telegram_id || body.telegramId || body.telegram_id || "").trim();
+  const phone = (query.phone || body.phone || "").trim();
+  const username = (query.username || body.username || "").trim();
 
-  if (!code && !userId) {
-    return c.json({ ok: false, success: false, verified: false, error: "Code or userId parameter required" }, 400, {
+  if (!rawCode && !userId && !telegramId && !phone) {
+    return c.json({ ok: false, success: false, verified: false, error: "Code, userId, or telegramId parameter required" }, 400, {
       "Content-Type": "application/json; charset=utf-8",
       "Access-Control-Allow-Origin": "*",
     });
   }
 
-  const entry = code ? botCodes[code] : null;
+  const code = rawCode.toUpperCase();
+  const normalizedCodeWithoutPrefix = code.replace(/^AREZ-?/i, "");
+
+  // 1. Direct code lookup in botCodes (supports variations like AREZ-260097 or 260097)
+  let entry: any = null;
+  if (code) {
+    entry = botCodes[code] || botCodes[`AREZ-${normalizedCodeWithoutPrefix}`] || botCodes[normalizedCodeWithoutPrefix];
+    if (!entry) {
+      for (const [k, v] of Object.entries(botCodes)) {
+        const normK = k.toUpperCase().replace(/^AREZ-?/i, "");
+        if (normK === normalizedCodeWithoutPrefix || k.toUpperCase() === code) {
+          entry = v;
+          break;
+        }
+      }
+    }
+  }
+
+  // 2. Lookup by telegramId in verifiedUsers or botCodes
+  if ((!entry || !entry.verified) && telegramId) {
+    if (verifiedUsers[telegramId]) {
+      const v = verifiedUsers[telegramId];
+      entry = {
+        userId: userId || "user",
+        createdAt: v.verifiedAt || Date.now(),
+        verified: true,
+        telegramId,
+        username: v.username,
+        fullName: v.fullName,
+        phone: v.phone,
+        verifiedAt: v.verifiedAt,
+      };
+    } else {
+      for (const [k, v] of Object.entries(botCodes)) {
+        if (v.telegramId === telegramId && v.verified) {
+          entry = v;
+          break;
+        }
+      }
+    }
+  }
+
+  // 3. Lookup by phone in verifiedUsers or botCodes
+  if ((!entry || !entry.verified) && phone) {
+    const cleanP = phone.replace(/[^0-9]/g, "");
+    for (const [k, v] of Object.entries(botCodes)) {
+      if (v.phone && v.phone.replace(/[^0-9]/g, "").includes(cleanP.slice(-10)) && v.verified) {
+        entry = v;
+        break;
+      }
+    }
+    if (!entry) {
+      for (const [k, v] of Object.entries(verifiedUsers)) {
+        if (v.phone && v.phone.replace(/[^0-9]/g, "").includes(cleanP.slice(-10))) {
+          entry = {
+            userId: userId || "user",
+            createdAt: v.verifiedAt || Date.now(),
+            verified: true,
+            telegramId: k,
+            username: v.username,
+            fullName: v.fullName,
+            phone: v.phone,
+            verifiedAt: v.verifiedAt,
+          };
+          break;
+        }
+      }
+    }
+  }
+
+  // If entry found and verified in memory cache
   if (entry && entry.verified) {
     return c.json({
       ok: true,
@@ -951,6 +1183,9 @@ const handleCheckCodeWorker = async (c: any) => {
       telegramUsername: entry.username || "@AREarnZone_User",
       telegramId: entry.telegramId || "12345678",
       telegramChatId: entry.telegramId || "12345678",
+      telegramPhone: entry.phone || "",
+      fullName: entry.fullName || "",
+      verificationCode: code || (entry as any).code || rawCode,
     }, 200, {
       "Content-Type": "application/json; charset=utf-8",
       "Access-Control-Allow-Origin": "*",
@@ -975,16 +1210,19 @@ const handleCheckCodeWorker = async (c: any) => {
       const u = data[0];
       const isVerified = u.telegram_verified === true || u.is_telegram_verified === true || !!u.telegram_chat_id || !!u.telegram_id || (u.raw_data && u.raw_data.telegram_verified === true);
       if (isVerified) {
-        const username = u.telegram_username || (u.raw_data && u.raw_data.telegram_username) || "@AREarnZone_User";
+        const rawUname = u.telegram_username || (u.raw_data && u.raw_data.telegram_username) || "@AREarnZone_User";
         const tgId = u.telegram_id || u.telegram_chat_id || (u.raw_data && u.raw_data.telegram_id) || "12345678";
+        const tgPhone = u.telegram_phone || (u.raw_data && u.raw_data.telegram_phone) || "";
         return c.json({
           ok: true,
           success: true,
           verified: true,
           message: "Telegram account successfully connected!",
-          telegramUsername: username.startsWith('@') ? username : `@${username}`,
+          telegramUsername: rawUname.startsWith('@') ? rawUname : `@${rawUname}`,
           telegramId: tgId,
           telegramChatId: u.telegram_chat_id || tgId,
+          telegramPhone: tgPhone,
+          verificationCode: code || rawCode,
         }, 200, {
           "Content-Type": "application/json; charset=utf-8",
           "Access-Control-Allow-Origin": "*",
@@ -1010,6 +1248,80 @@ app.get("/api/telegram/check-code", handleCheckCodeWorker);
 app.post("/api/telegram/check-code", handleCheckCodeWorker);
 app.get("/api/telegram/verify", handleCheckCodeWorker);
 app.post("/api/telegram/verify", handleCheckCodeWorker);
+
+// Real-time synchronization endpoint for server.ts and admin
+app.post("/api/telegram/sync-verified", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const rawCode = (body.code || body.verificationCode || "").trim();
+    const code = rawCode.toUpperCase();
+    const telegramId = (body.telegramId || body.telegram_id || "").trim();
+    const rawUsername = (body.username || body.telegramUsername || "").trim();
+    const username = rawUsername.startsWith("@") ? rawUsername : (rawUsername ? `@${rawUsername}` : undefined);
+    const fullName = (body.fullName || body.telegramName || "").trim();
+    const phone = (body.phone || body.telegramPhone || "").trim();
+    const verified = body.verified !== false;
+    const verifiedAt = body.verifiedAt || Date.now();
+
+    if (code) {
+      botCodes[code] = {
+        userId: body.userId || "synced",
+        createdAt: verifiedAt,
+        verified,
+        telegramId,
+        username,
+        fullName,
+        phone,
+        verifiedAt,
+      };
+    }
+
+    if (telegramId) {
+      verifiedUsers[telegramId] = {
+        phone,
+        username: username || "@AREarnZone_User",
+        fullName,
+        code: code || "AREZ-VERIFIED",
+        verifiedAt,
+      };
+    }
+
+    return c.json({
+      ok: true,
+      success: true,
+      message: "Verified state synced successfully",
+      code,
+      telegramId,
+    }, 200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    });
+  } catch (err: any) {
+    return c.json({ ok: false, success: false, error: err?.message || String(err) }, 500);
+  }
+});
+
+app.post("/api/telegram/sync-code", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const code = (body.code || "").trim().toUpperCase();
+    if (code) {
+      botCodes[code] = {
+        userId: body.userId || "synced",
+        createdAt: Date.now(),
+        verified: body.verified === true,
+        telegramId: body.telegramId,
+        username: body.username,
+        fullName: body.fullName,
+        phone: body.phone,
+        verifiedAt: body.verified ? (body.verifiedAt || Date.now()) : undefined,
+      };
+    }
+    return c.json({ ok: true, success: true, message: "Code saved", code });
+  } catch (e: any) {
+    return c.json({ ok: false, success: false, error: e?.message }, 500);
+  }
+});
 
 app.post("/api/telegram/register-code", async (c) => {
   try {

@@ -257,20 +257,41 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
   const handleVerifyBotConnection = async () => {
     setIsCheckingBot(true);
     try {
-      const queryParam = verificationCode
-        ? `code=${encodeURIComponent(verificationCode)}&userId=${encodeURIComponent(user.id)}`
-        : `userId=${encodeURIComponent(user.id)}`;
-      const res = await fetch(getApiUrl(`/api/telegram/check-code?${queryParam}`));
-      const data = await safeParseJsonResponse<any>(res);
+      const queryParams = new URLSearchParams();
+      if (verificationCode) queryParams.set('code', verificationCode);
+      if (user?.id) queryParams.set('userId', user.id);
+      if (telegramId) queryParams.set('telegramId', telegramId);
+      if (telegramPhone) queryParams.set('phone', telegramPhone);
+      if (telegramUsername) queryParams.set('username', telegramUsername);
+
+      const queryString = queryParams.toString();
+      const res = await fetch(getApiUrl(`/api/telegram/check-code?${queryString}`));
+      let data = await safeParseJsonResponse<any>(res);
+
+      // Fallback: If not verified on default URL and origin differs, try current origin
+      if ((!data || !data.verified) && typeof window !== 'undefined' && window.location?.origin) {
+        const origin = window.location.origin;
+        if (!getApiUrl('').startsWith(origin)) {
+          try {
+            const fallbackRes = await fetch(`${origin}/api/telegram/check-code?${queryString}`);
+            const fallbackData = await safeParseJsonResponse<any>(fallbackRes);
+            if (fallbackData && fallbackData.verified) {
+              data = fallbackData;
+            }
+          } catch (e) {}
+        }
+      }
+
       setIsCheckingBot(false);
       if (data && data.verified === true) {
-        const rawUsername = data.telegramUsername || data.username || user.telegramUsername || 'AREarnZone_User';
+        const rawUsername = data.telegramUsername || data.username || telegramUsername || user.telegramUsername || 'AREarnZone_User';
         const username = rawUsername.replace(/^@+/, '');
-        const id = data.telegramId || data.telegramChatId || data.id || user.telegramId || '12345678';
+        const id = data.telegramId || data.telegramChatId || telegramId || data.id || user.telegramId || '12345678';
         setTelegramUsername(username);
         setTelegramId(id);
-        if (data.telegramPhone) {
-          setTelegramPhone(data.telegramPhone);
+        const resolvedPhone = data.telegramPhone || data.phone || telegramPhone || '';
+        if (resolvedPhone) {
+          setTelegramPhone(resolvedPhone);
         }
         setIsBotConnected(true);
         setIsChannelJoined(true);
@@ -279,6 +300,7 @@ const TelegramVerify: React.FC<TelegramVerifyProps> = ({
           ...user,
           telegramUsername: username,
           telegramId: id,
+          telegramPhone: resolvedPhone || user.telegramPhone,
           isTelegramVerified: true,
           hasJoinedTelegramChannel: true,
         });
